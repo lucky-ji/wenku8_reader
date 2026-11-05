@@ -1,0 +1,142 @@
+# SPDX-License-Identifier: GPL-2.0-only
+name: Native Qt 5 desktop builds
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Source branch, commit or tag to build (no automatic publishing)
+        type: string
+        default: main
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: native-desktop-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  linux:
+    name: Linux ${{ matrix.arch }} / Qt 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            arch: x86_64
+            system_qt: false
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+            system_qt: true
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Record exact source identity
+        id: identity
+        run: |
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git rev-parse HEAD HEAD^{tree}
+      - name: Install native build and OS runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libmbedtls-dev xvfb libegl1 libopengl0 libgl1 libnss3 libxss1 libpulse0 libdbus-1-3 libfontconfig1 libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxi6 libxcb-xinerama0 libxcb-xinput0 libxcb-cursor0 libxkbcommon-x11-0 libx11-xcb1 libxrender1 libxext6 libglib2.0-0
+      - name: Install official Qt 5.15.2 with real WebEngine
+        if: ${{ !matrix.system_qt }}
+        run: |
+          python3 -m pip install aqtinstall==3.3.0
+          python3 -m aqt install-qt linux desktop 5.15.2 gcc_64 --outputdir "$RUNNER_TEMP/Qt" -m qtwebengine
+          echo "QT5_ROOT=$RUNNER_TEMP/Qt/5.15.2/gcc_64" >> "$GITHUB_ENV"
+      - name: Install Ubuntu ARM64 Qt 5 with real WebEngine
+        if: ${{ matrix.system_qt }}
+        run: |
+          sudo apt-get install -y qtbase5-dev libqt5svg5-dev qtwebengine5-dev qttools5-dev-tools
+          echo "QT5_ROOT=$(qmake -query QT_INSTALL_PREFIX)" >> "$GITHUB_ENV"
+          dpkg-query -W qtbase5-dev qtwebengine5-dev libqt5svg5-dev
+      - name: Configure native Release client with Mbed TLS
+        run: |
+          cmake -S . -B build/native -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QT5_ROOT" \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DWENKU8_BUILD_CLIENT=ON -DWENKU8_BUILD_SHARED=OFF -DWENKU8_BUNDLED_CURL=ON \
+            -DCURL_USE_OPENSSL=OFF -DCURL_USE_MBEDTLS=ON -DCURL_USE_SECTRANSP=OFF \
+            -DCURL_DISABLE_LDAP=ON -DCURL_DISABLE_LDAPS=ON
+          cmake --build build/native --parallel 4
+      - name: Package and record runtime dependencies
+        env:
+          SYSTEM_QT: ${{ matrix.system_qt }}
+        run: |
+          args=()
+          if [[ "$SYSTEM_QT" == true ]]; then args+=(--system-qt); fi
+          python3 platform/linux/package.py --build build/native --qt-root "$QT5_ROOT" --output out/native "${args[@]}"
+          python3 platform/linux/collect_sources.py --metadata out/native/BUILD-METADATA.json --output out/native-provenance "${args[@]}"
+      - name: Check deployed application and real WebEngine startup
+        run: |
+          strBundle="out/native/wenku8-reader-1.0.0-linux-${{ matrix.arch }}"
+          xvfb-run -a "$strBundle/wenku8_reader" --version
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export QTWEBENGINE_CHROMIUM_FLAGS="--disable-gpu --disable-dev-shm-usage"
+          xvfb-run -a bash -c '"$1/wenku8_reader" > "$2/startup.log" 2>&1 & nPid=$!; sleep 20; kill -0 "$nPid"; pgrep -f "[Q]tWebEngineProcess"; kill "$nPid"' bash "$strBundle" out/native
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-binary-linux-${{ matrix.arch }}-${{ steps.identity.outputs.commit }}
+          path: |
+            out/native/*.tar.gz
+            out/native/BUILD-METADATA.json
+            out/native/SHA256SUMS.txt
+            out/native/startup.log
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-provenance-linux-${{ matrix.arch }}-${{ steps.identity.outputs.commit }}
+          path: out/native-provenance/
+          if-no-files-found: error
+          retention-days: 30
+  macos:
+    name: macOS Intel / Qt 5.15.2
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Record exact source identity
+        id: identity
+        run: |
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git rev-parse HEAD HEAD^{tree}
+      - name: Install official Qt 5.15.2 with real WebEngine
+        run: |
+          python3 -m venv "$RUNNER_TEMP/aqt-venv"
+          "$RUNNER_TEMP/aqt-venv/bin/pip" install aqtinstall==3.3.0
+          "$RUNNER_TEMP/aqt-venv/bin/python" -m aqt install-qt mac desktop 5.15.2 clang_64 --outputdir "$RUNNER_TEMP/Qt" -m qtwebengine
+          echo "QT5_ROOT=$RUNNER_TEMP/Qt/5.15.2/clang_64" >> "$GITHUB_ENV"
+      - name: Configure native Release client with SecureTransport
+        run: |
+          cmake -S . -B build/native -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QT5_ROOT" \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DWENKU8_BUILD_CLIENT=ON -DWENKU8_BUILD_SHARED=OFF -DWENKU8_BUNDLED_CURL=ON \
+            -DCURL_USE_OPENSSL=OFF -DCURL_USE_MBEDTLS=OFF -DCURL_USE_SECTRANSP=ON \
+            -DCURL_DISABLE_LDAP=ON -DCURL_DISABLE_LDAPS=ON
+          cmake --build build/native --parallel 4
+      - name: Deploy real Qt WebEngine application bundle
+        run: |
+          bash platform/macos/package.sh build/native "$QT5_ROOT" out/native
+          python3 platform/linux/collect_sources.py --metadata out/native/BUILD-METADATA.json --output out/native-provenance
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-binary-macos-x86_64-${{ steps.identity.outputs.commit }}
+          path: |
+            out/native/*.zip
+            out/native/BUILD-METADATA.json
+            out/native/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-provenance-macos-x86_64-${{ steps.identity.outputs.commit }}
+          path: out/native-provenance/
+          if-no-files-found: error
+          retention-days: 30
