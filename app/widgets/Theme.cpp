@@ -144,6 +144,9 @@ namespace Wenku8::Reader
                     .arg(oBar.name(), oC.m_oBorder.name(), oC.m_oSection.name(),
                          oC.m_oMuted.name());
         }
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
+        strSheet += "QPushButton, QToolButton { outline:0; }";
+#endif
         pWidget->setStyleSheet(strSheet + scrollBarStyle(eTheme));
         for (auto pLabel : pWidget->findChildren<QLabel*>())
             if (pLabel->objectName() == "muted" || pLabel->objectName() == "subtitle" ||
@@ -215,11 +218,11 @@ namespace Wenku8::Reader
             const auto oHover = bPrimary ? oC.m_oAccent.darker(112) : oC.m_oHover;
             const auto oPressed = bPrimary ? oC.m_oAccent.darker(125) : oC.m_oSelection;
             QString strStyle =
-                QString("QPushButton { background:%1; color:%2; border:%3; border-radius:9px; "
-                        "padding:9px 14px; } QPushButton:hover { background:%4; border:1px solid "
-                        "%5; } QPushButton:pressed { background:%6; } QPushButton:focus { "
-                        "border:2px solid %5; padding:8px 13px; } QPushButton:disabled { color:%7; "
-                        "background:%8; border:1px solid %9; }")
+                QString(
+                    "QPushButton { background:%1; color:%2; border:%3; border-radius:9px; "
+                    "padding:9px 14px; } QPushButton:hover { background:%4; border:1px solid "
+                    "%5; } QPushButton:pressed { background:%6; } QPushButton:disabled { color:%7; "
+                    "background:%8; border:1px solid %9; }")
                     .arg(strBackground, strForeground, strBorder, oHover.name(),
                          oC.m_oSelectionText.name(), oPressed.name(), oC.m_oDisabled.name(),
                          oC.m_oSection.name(), oC.m_oBorder.name());

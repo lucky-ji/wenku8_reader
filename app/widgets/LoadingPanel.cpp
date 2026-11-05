@@ -73,14 +73,21 @@ namespace Wenku8::Reader
         m_pProgressText->setStyleSheet(
             QString("background:transparent;color:%1;font-size:12px;border:0;")
                 .arg(oC.m_oMuted.name()));
-        m_pCancel->setStyleSheet(
+        QString strCancelStyle =
             QString(
                 "QPushButton{background:%1;color:%2;border:1px solid "
                 "%3;border-radius:11px;padding:0;font-size:13px;}QPushButton:hover{background:%4;"
-                "border-color:%5;}QPushButton:pressed{background:%6;}QPushButton:focus{border:2px "
-                "solid %5;}QPushButton:disabled{color:%7;background:%1;border-color:%3;}")
+                "border-color:%5;}QPushButton:pressed{background:%6;}"
+                "QPushButton:disabled{color:%7;background:%1;border-color:%3;}")
                 .arg(oC.m_oPanel.name(), oC.m_oText.name(), oC.m_oBorder.name(), oC.m_oHover.name(),
-                     oC.m_oAccent.name(), oC.m_oSelection.name(), oC.m_oDisabled.name()));
+                     oC.m_oAccent.name(), oC.m_oSelection.name(), oC.m_oDisabled.name());
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+        strCancelStyle +=
+            QString("QPushButton:focus{border:2px solid %1;}").arg(oC.m_oAccent.name());
+#else
+        strCancelStyle += "QPushButton{outline:0;}";
+#endif
+        m_pCancel->setStyleSheet(strCancelStyle);
         update();
     }
     void LoadingPanel::setMessage(const QString& strMessage)

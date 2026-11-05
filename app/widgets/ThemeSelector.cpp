@@ -57,9 +57,7 @@ namespace Wenku8::Reader
                 auto oR = rect().adjusted(1, 1, -1, -1);
                 const bool bSelected = isChecked(), bHover = underMouse();
                 QColor oInk = bSelected ? oC.m_oSelectionText : oC.m_oText;
-                oP.setPen(bSelected    ? QPen(oC.m_oSelectionText, 1)
-                          : hasFocus() ? QPen(oC.m_oSelectionText, 1.5)
-                                       : QPen(Qt::NoPen));
+                oP.setPen(bSelected ? QPen(oC.m_oSelectionText, 1) : QPen(Qt::NoPen));
                 oP.setBrush(bSelected ? oC.m_oSelection : bHover ? oC.m_oHover : Qt::transparent);
                 oP.drawRoundedRect(oR, 10, 10);
                 makeIcon(m_nIndex == 0   ? Icon::Sun
