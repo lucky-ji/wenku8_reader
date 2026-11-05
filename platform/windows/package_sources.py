@@ -53,7 +53,7 @@ def selectedDependency(strName, vModules, strPlatform):
     strLeaf = strName.split("/")[-1]
     if strPlatform == "android":
         return strLeaf in {"libiconv-1.17.tar.gz", "mbedtls-3.6.5.tar.bz2", "mbedtls-3.6.5-sha256sum.txt"}
-    return False
+    return strLeaf in {"openssl-1.1.1t.tar.gz", "zlib-1.2.13.tar.gz"}
 
 
 def validateArchive(pArchive, strPlatform):
@@ -146,6 +146,8 @@ def runPackaging(strDefaultPlatform="windows"):
                 (oArguments.openssl_source or pRoot / "openssl-1.1.1t.tar.gz", "openssl-1.1.1t.tar.gz"),
                 (oArguments.zlib_source or pRoot / "zlib-1.2.13.tar.gz", "zlib-1.2.13.tar.gz"),
             ]:
+                if "dependencies/" + strName in vDependencyManifest:
+                    continue
                 if not pSource.is_file():
                     raise RuntimeError("Missing matching dependency archive: " + strName)
                 oOutput.write(pSource, "dependencies/" + strName)
