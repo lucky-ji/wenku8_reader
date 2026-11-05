@@ -1,0 +1,1 @@
+<RCC><qresource prefix="/mobile-browser"><file>mobile_fetch.js</file><file>mobile_navigation.js</file><file>remember_login.js</file><file>login_ui.js</file></qresource></RCC>

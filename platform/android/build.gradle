@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: GPL-2.0-only
+buildscript {
+    repositories {
+        if (System.getenv('WENKU8_MAVEN_MIRROR')) {
+            maven { url System.getenv('WENKU8_MAVEN_MIRROR') + '/google' }
+            maven { url System.getenv('WENKU8_MAVEN_MIRROR') + '/central' }
+        } else { google(); mavenCentral() }
+    }
+    dependencies { classpath 'com.android.tools.build:gradle:3.6.0' }
+}
+apply plugin: 'com.android.application'
+repositories {
+    if (System.getenv('WENKU8_MAVEN_MIRROR')) {
+        maven { url System.getenv('WENKU8_MAVEN_MIRROR') + '/google' }
+        maven { url System.getenv('WENKU8_MAVEN_MIRROR') + '/central' }
+    } else { google(); mavenCentral() }
+}
+dependencies { implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar']) }
+android {
+    compileSdkVersion androidCompileSdkVersion.toInteger()
+    buildToolsVersion '28.0.3'
+    defaultConfig { minSdkVersion qtMinSdkVersion; targetSdkVersion qtTargetSdkVersion }
+    sourceSets.main {
+        manifest.srcFile 'AndroidManifest.xml'
+        java.srcDirs = [qt5AndroidDir + '/src', 'src', 'java']
+        aidl.srcDirs = [qt5AndroidDir + '/src', 'src', 'aidl']
+        res.srcDirs = [qt5AndroidDir + '/res', 'res']
+        assets.srcDirs = ['assets']
+        jniLibs.srcDirs = ['libs']
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+    lintOptions { abortOnError false }
+    aaptOptions { noCompress 'rcc' }
+}

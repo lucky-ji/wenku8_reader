@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="21762" targetRuntime="iOS.CocoaTouch" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" initialViewController="launch-controller">
+  <device id="retina6_1" orientation="portrait" appearance="light"/>
+  <dependencies><plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="21754"/><capability name="Safe area layout guides" minToolsVersion="9.0"/></dependencies>
+  <scenes><scene sceneID="launch-scene"><objects>
+    <viewController id="launch-controller" sceneMemberID="viewController"><view key="view" contentMode="scaleToFill" id="launch-view">
+      <rect key="frame" x="0" y="0" width="390" height="844"/>
+      <subviews>
+        <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="轻小说文库" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="launch-brand">
+          <rect key="frame" x="95" y="407" width="200" height="30"/>
+          <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="24"/>
+          <color key="textColor" red="0.1373" green="0.1882" blue="0.2667" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+          <nil key="highlightedColor"/>
+        </label>
+      </subviews>
+      <viewLayoutGuide key="safeArea" id="launch-safe-area"/>
+      <constraints>
+        <constraint firstItem="launch-brand" firstAttribute="centerX" secondItem="launch-view" secondAttribute="centerX" id="launch-brand-center-x"/>
+        <constraint firstItem="launch-brand" firstAttribute="centerY" secondItem="launch-view" secondAttribute="centerY" id="launch-brand-center-y"/>
+      </constraints>
+      <color key="backgroundColor" red="0.9725" green="0.9804" blue="0.9882" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+    </view></viewController>
+    <placeholder placeholderIdentifier="IBFirstResponder" id="launch-responder" sceneMemberID="firstResponder"/>
+  </objects></scene></scenes>
+</document>

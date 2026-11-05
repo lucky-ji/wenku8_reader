@@ -1,0 +1,17 @@
+<RCC><qresource prefix="/app-info">
+<file alias="notice.txt">../../licenses/NOTICE.txt</file>
+<file alias="android-notice.txt">../../platform/android/assets/licenses/NOTICE.txt</file>
+<file alias="release_notes.json">release_notes.json</file>
+<file alias="REFERENCE-GPL-2.0.txt">../../platform/android/assets/licenses/REFERENCE-GPL-2.0.txt</file>
+<file alias="Qt-5.15.2-GPL-2.0.txt">../../platform/android/assets/licenses/Qt-5.15.2-GPL-2.0.txt</file>
+<file alias="Qt-bundled-notices.txt">../../platform/android/assets/licenses/Qt-bundled-notices.txt</file>
+<file alias="curl-8.0.1.txt">../../platform/android/assets/licenses/curl-8.0.1.txt</file>
+<file alias="libxml2-2.15.4.txt">../../platform/android/assets/licenses/libxml2-2.15.4.txt</file>
+<file alias="tinyxml2.txt">../../platform/android/assets/licenses/tinyxml2.txt</file>
+<file alias="libiconv-1.17.txt">../../platform/android/assets/licenses/libiconv-1.17.txt</file>
+<file alias="mbedtls-3.6.5.txt">../../platform/android/assets/licenses/mbedtls-3.6.5.txt</file>
+<file alias="llvm-libcxx.txt">../../platform/android/assets/licenses/llvm-libcxx.txt</file>
+<file alias="Qt-5.15.2-Chromium.txt">../../platform/android/assets/licenses/Qt-5.15.2-Chromium.txt</file>
+<file alias="OpenSSL-1.1.1t.txt">../../platform/android/assets/licenses/OpenSSL-1.1.1t.txt</file>
+<file alias="zlib-1.2.13.txt">../../platform/android/assets/licenses/zlib-1.2.13.txt</file>
+</qresource></RCC>

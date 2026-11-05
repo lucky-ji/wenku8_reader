@@ -1,0 +1,26 @@
+<RCC><qresource prefix="/wenku8/icons"><file alias="app-icon.png">app-icon.png</file>
+<file alias="library.svg">assets/icons/library.svg</file>
+<file alias="discover.svg">assets/icons/discover.svg</file>
+<file alias="download.svg">assets/icons/download.svg</file>
+<file alias="search.svg">assets/icons/search.svg</file>
+<file alias="refresh.svg">assets/icons/refresh.svg</file>
+<file alias="sign-in.svg">assets/icons/sign-in.svg</file>
+<file alias="book.svg">assets/icons/book.svg</file>
+<file alias="list.svg">assets/icons/list.svg</file>
+<file alias="left.svg">assets/icons/left.svg</file>
+<file alias="right.svg">assets/icons/right.svg</file>
+<file alias="text-smaller.svg">assets/icons/text-smaller.svg</file>
+<file alias="text-larger.svg">assets/icons/text-larger.svg</file>
+<file alias="bookmark.svg">assets/icons/bookmark.svg</file>
+<file alias="restore-bookmark.svg">assets/icons/restore-bookmark.svg</file>
+<file alias="cancel.svg">assets/icons/cancel.svg</file>
+<file alias="sun.svg">assets/icons/sun.svg</file>
+<file alias="moon.svg">assets/icons/moon.svg</file>
+<file alias="leaf.svg">assets/icons/leaf.svg</file>
+<file alias="shield.svg">assets/icons/shield.svg</file>
+<file alias="history.svg">assets/icons/history.svg</file>
+<file alias="shelf-add.svg">assets/icons/shelf-add.svg</file>
+<file alias="fullscreen.svg">assets/icons/fullscreen.svg</file>
+<file alias="profile.svg">assets/icons/profile.svg</file>
+</qresource></RCC>
+
