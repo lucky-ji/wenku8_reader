@@ -32,7 +32,7 @@
     },
     {
       "name": "desktop-qt5",
-      "displayName": "Linux / macOS Qt 5 (not release-validated)",
+      "displayName": "Linux / macOS Qt 5 (system dependencies)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/desktop",
       "cacheVariables": {
@@ -66,6 +66,42 @@
         "ANDROID_MIN_SDK_VERSION": "21",
         "ANDROID_TARGET_SDK_VERSION": "28"
       }
+    },
+    {
+      "name": "windows-x86-qt5",
+      "inherits": "windows-qt5",
+      "displayName": "Windows x86 / Qt 5.15 (x86 MSVC developer shell)",
+      "binaryDir": "${sourceDir}/build/windows-x86",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{QT5_X86_ROOT}"
+      }
+    },
+    {
+      "name": "android-armv7-qt5",
+      "inherits": "android-arm64-qt5",
+      "displayName": "Android armeabi-v7a / Qt 5.15 + system WebView",
+      "binaryDir": "${sourceDir}/build/android-armeabi-v7a",
+      "cacheVariables": {
+        "ANDROID_ABI": "armeabi-v7a"
+      }
+    },
+    {
+      "name": "android-x86-qt5",
+      "inherits": "android-arm64-qt5",
+      "displayName": "Android x86 / Qt 5.15 + system WebView",
+      "binaryDir": "${sourceDir}/build/android-x86",
+      "cacheVariables": {
+        "ANDROID_ABI": "x86"
+      }
+    },
+    {
+      "name": "android-x86_64-qt5",
+      "inherits": "android-arm64-qt5",
+      "displayName": "Android x86_64 / Qt 5.15 + system WebView",
+      "binaryDir": "${sourceDir}/build/android-x86_64",
+      "cacheVariables": {
+        "ANDROID_ABI": "x86_64"
+      }
     }
   ],
   "buildPresets": [
@@ -88,6 +124,43 @@
     {
       "name": "android-apk-qt5",
       "configurePreset": "android-arm64-qt5",
+      "targets": [
+        "apk"
+      ]
+    },
+    {
+      "name": "windows-x86-qt5",
+      "configurePreset": "windows-x86-qt5"
+    },
+    {
+      "name": "android-armv7-qt5",
+      "configurePreset": "android-armv7-qt5"
+    },
+    {
+      "name": "android-armv7-apk-qt5",
+      "configurePreset": "android-armv7-qt5",
+      "targets": [
+        "apk"
+      ]
+    },
+    {
+      "name": "android-x86-qt5",
+      "configurePreset": "android-x86-qt5"
+    },
+    {
+      "name": "android-x86-apk-qt5",
+      "configurePreset": "android-x86-qt5",
+      "targets": [
+        "apk"
+      ]
+    },
+    {
+      "name": "android-x86_64-qt5",
+      "configurePreset": "android-x86_64-qt5"
+    },
+    {
+      "name": "android-x86_64-apk-qt5",
+      "configurePreset": "android-x86_64-qt5",
       "targets": [
         "apk"
       ]

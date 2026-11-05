@@ -24,7 +24,7 @@ gh workflow run native-desktop.yml --ref main -f ref=main
 
 ## 安装与运行边界
 
-Linux 以 `.tar.gz` 提供。解压后运行 `wenku8_reader`；`RUNTIME-DEPENDENCIES.txt` 列出所需 Ubuntu OS 运行库。x86_64 包含实际需要的官方 Qt 私有库、插件、WebEngine helper 与资源；ARM64 使用 Ubuntu 系统 Qt，不随包复制 Qt 库。两种包均不复制 OS 库，不能将其视为任意 Linux 发行版通用的静态二进制。
+Linux 以 `.tar.gz` 提供。解压后运行 `wenku8_reader`；`RUNTIME-DEPENDENCIES.txt` 列出所需 Ubuntu OS 运行库。x86_64 包含实际需要的官方 Qt 私有库、插件、WebEngine helper 与资源；ARM64 使用 Ubuntu 系统 Qt，不随包复制 Qt 库。两种包均不复制 OS 库，不能将其视为任意 Linux 发行版通用的静态二进制。中文界面建议安装系统 `fonts-noto-cjk` 字体包；官方 x86_64 Qt kit 另带 ICU 56.1，其原始源码和许可随正式分发材料保留。
 
 macOS 以 `.zip` 提供应用 bundle，显式设定最低 macOS 10.15，并在 Mach-O load commands 中核对实际 minimum OS。部署使用 Qt 5 的 `macdeployqt`，包含真实 WebEngine 运行组件。构建使用 ad-hoc 签名校验包内完整性，没有 Apple Developer ID 签名或公证，不宣称已经满足 Mac App Store 分发要求。
 

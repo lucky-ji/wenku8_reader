@@ -3,7 +3,7 @@
 ## 通用要求
 
 - CMake 3.24 或更高版本、Ninja、支持 C++17 的编译器。
-- 客户端使用 Qt 5.15.2，包含 Widgets、Svg、Concurrent；桌面另需 Network、WebEngineWidgets 及其传递依赖，Android 另需 AndroidExtras。
+- 客户端使用 Qt 5，工具链基线为 5.15.2，包含 Widgets、Svg、Concurrent；桌面另需 Network、WebEngineWidgets 及其传递依赖，Android 另需 AndroidExtras。Linux ARM64 使用 Ubuntu 的 Qt 5 包，实际版本记录在发行材料中。
 - SDK 依赖 cURL 7.85+、TinyXML-2、libxml2，非 Windows 平台另需 Iconv。仓库保留 TinyXML-2 源码与 libxml2/cURL 原始归档；`WENKU8_BUNDLED_CURL=ON` 使用仓库的 cURL 源码，`OFF` 使用目标环境提供的 cURL。
 - Qt、Visual Studio、Android SDK/NDK、JDK、签名工具等开发环境不随仓库提供。第三方源码与许可证保持原样。
 
@@ -93,7 +93,7 @@ cmake --build build/sdk --config Release
 cmake --install build/sdk --config Release --prefix out/sdk
 ```
 
-使用系统 cURL 时设置 `-DWENKU8_BUNDLED_CURL=OFF`；静态 SDK 设置 `-DWENKU8_BUILD_SHARED=OFF`。Linux/macOS 的 `desktop-qt5` 预设使用 `QT5_ROOT` 和可选 `WENKU8_TARGET_DEPS`，需要系统提供目标 cURL 和 Iconv；这些平台尚未完成发行验收。
+使用系统 cURL 时设置 `-DWENKU8_BUNDLED_CURL=OFF`；静态 SDK 设置 `-DWENKU8_BUILD_SHARED=OFF`。Linux/macOS 的 `desktop-qt5` 预设使用 `QT5_ROOT` 和可选 `WENKU8_TARGET_DEPS`，需要系统提供满足最低版本的目标 cURL 和 Iconv。发行构建的 Qt、TLS 后端、系统依赖及原生构建流程见 [原生桌面构建](NATIVE_DESKTOP.md)；编译和启动检查不代替真实账号与设备的业务验收。
 
 iOS 仅保留启动界面与基础配置，WKWebView 会话适配尚未实现。当前不提供 iOS 客户端构建预设，不能将现有目录视为可发布版本。
 
@@ -124,3 +124,26 @@ python platform/android/package_sources.py --previous C:/ReleaseSources/matching
 `--qt-source` 只加入 Qt 超级工程的配置文件；各 Qt 模块的完整对应源码来自 `--previous`。Windows 保留 WebEngine 及 Chromium 源码，补齐实际 Qt 依赖的 OpenSSL/zlib 原始源码。Android 选择完整 qtbase、qtsvg、qtimageformats、qtandroidextras，加上 Mbed TLS/iconv；Android 系统 WebView 不随 APK 分发，因此不附带 Chromium 或 OpenSSL。Qt 原始源码中的测试和夹具保持原样；应用自己的旧测试、调试程序、旧目录、构建输出、Qt 开发环境及用户数据不进入源码包。
 
 可用 `--stage` 指定部署目录，额外提取 Qt 组件原始归属到 `licenses/qt-components/`。每个输出包含 `SOURCE-README.txt` 和 `SOURCE-MANIFEST.json`，并在打包后核验 ZIP CRC、必要源码路径和项目目录白名单，生成旁置 SHA-256 文件。修改正式源码后必须重新生成对应源码包，使其与最终二进制一致。
+
+
+## 架构选择
+
+各架构使用独立的 Qt kit、依赖前缀、构建目录和安装包，不能混用不同位数的 DLL 或静态库。
+
+| 目标 | 配置预设 | 环境要求 |
+| --- | --- | --- |
+| Windows x64 | `windows-qt5` | x64 MSVC 开发者终端，`QT5_ROOT` 指向 `msvc2019_64` |
+| Windows x86 | `windows-x86-qt5` | x86 MSVC 开发者终端，`QT5_X86_ROOT` 指向 `msvc2019` |
+| Android ARM64 | `android-arm64-qt5` | `WENKU8_TARGET_DEPS` 指向 `arm64-v8a` 前缀 |
+| Android ARMv7 | `android-armv7-qt5` | 依赖前缀为 `armeabi-v7a` |
+| Android x86 | `android-x86-qt5` | 依赖前缀为 `x86` |
+| Android x86_64 | `android-x86_64-qt5` | 依赖前缀为 `x86_64` |
+
+Windows x86 打包时为 `build_msi.py` 添加 `--arch x86`，由 WiX 生成对应位数的安装包，并部署同位数的 Qt 与 Visual C++ 运行库；x64 使用默认 `--arch x64`。两种安装包采用独立的安装目录与升级标识。
+
+Android 四 ABI 的网络与编码依赖可使用 [原生依赖构建脚本](ANDROID_BUILD.md) 准备。选定预设后先执行 `cmake --preset <预设名>`，再执行 `cmake --build --preset <预设名>`；生成 APK 时为构建命令添加 `--target apk`，或使用 `CMakePresets.json` 中对应的 APK 构建预设。每次都应让 `ANDROID_ABI` 与依赖前缀一致。
+
+Linux x86_64、Linux ARM64 与 macOS Intel 的原生 runner、构建配置、部署、运行依赖、签名及对应源码安排见 [NATIVE_DESKTOP.md](NATIVE_DESKTOP.md)。Windows ARM64 和原生 macOS ARM64 尚无本项目可用的 Qt 5 WebEngine kit；iOS 登录适配尚未完成，因此不生成占位客户端。
+
+
+桌面统一对应源码可以使用 `--platform desktop`：输入归档应含 QtMacExtras、QtX11Extras 及其他实际分发的 Qt 5.15.2 模块；用 `--icu-source` 提供官方 Linux Qt kit 所用的 ICU 56.1 原始源码。该模式同时保留 Windows Qt 组件所用的 OpenSSL/zlib 源码。Ubuntu 系统 Qt 和 OS 库未随 Linux 包复制，准确系统包及 source package 版本由构建 provenance 记录。

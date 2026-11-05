@@ -16,8 +16,11 @@
 | [LLVM libc++ filesystem](https://github.com/llvm/llvm-project/tree/llvmorg-9.0.1/libcxx) | 9.0.1；补足 NDK r21 的 filesystem 实现 | Apache-2.0 WITH LLVM-exception，含 GPL 兼容例外；[完整文本](third_party/libcxx-filesystem/LICENSE.TXT) |
 | [OpenSSL](https://www.openssl.org/) | 1.1.1t；部分桌面 Qt 运行组件依赖 | OpenSSL / SSLeay 双许可证；[完整文本](licenses/OpenSSL-1.1.1t.txt) |
 | [zlib](https://zlib.net/) | 1.2.13；部分 Qt 运行组件依赖 | zlib license；[完整文本](licenses/zlib-1.2.13.txt) |
+| [ICU](https://github.com/unicode-org/icu/releases/tag/release-56-1) | 56.1；官方 Linux Qt kit 的 Unicode 运行依赖 | ICU、Unicode 数据及原始附加条款；[完整原始许可](licenses/icu-56.1.txt)，未经修改的源码随桌面对应源码提供 |
 
 Windows 默认 SDK cURL 使用系统 Schannel，不为此链接 OpenSSL。Android 系统 WebView 由操作系统提供，不随 APK 分发 Chromium。Qt AndroidExtras 的许可随 Qt 5 相应模块保留。上表描述本项目使用的版本；改用系统 cURL 或其他 Qt 构建时，必须按实际依赖更新发行材料。
+
+原生桌面构建补充：Linux x86_64 与 macOS Intel 使用官方 Qt 5.15.2，macOS SDK cURL 使用系统 SecureTransport；Linux SDK cURL 使用发行版 Mbed TLS，采用 GPL-2.0-or-later 许可选项。Ubuntu 24.04 ARM64 使用系统 Qt 5.15.13、Qt WebEngine 5.15.16 及系统 Mbed TLS，不随应用复制这些系统库。Linux 包内的 `BUILD-METADATA.json`、`RUNTIME-DEPENDENCIES.txt` 与对应源码材料记录实际系统包及源码版本，不能将其视为使用了表中全部同版本的私有库。QtMacExtras、QtX11Extras 等实际分发模块的原始源码与声明随桌面对应源码保留。
 
 项目的线性 SVG 操作图标为自有资源；不包含外部图标字体。应用图标为本项目生成的视觉资源。小说、封面和插图仅在用户运行时从内容来源获取，不作为源码或安装包素材分发。
 

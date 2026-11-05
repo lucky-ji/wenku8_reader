@@ -11,10 +11,11 @@ vProjectFiles = (
     "README.md", "THIRD_PARTY_NOTICES.md", "LICENSE", "AGENTS.md",
     ".clang-format", ".gitattributes", ".gitignore", "CMakeLists.txt", "CMakePresets.json",
 )
-vProjectDirectories = ("sdk", "app", "platform", "cmake", "third_party", "licenses", "docs")
+vProjectDirectories = ("sdk", "app", "platform", "cmake", "third_party", "licenses", "docs", ".github")
 vWindowsModules = (
     "qtbase", "qtimageformats", "qtsvg", "qtdeclarative", "qtwebchannel",
     "qtlocation", "qtserialport", "qtwebengine", "qttranslations",
+    "qtmacextras", "qtx11extras",
 )
 vAndroidModules = ("qtbase", "qtimageformats", "qtsvg", "qtandroidextras")
 vExcludedParts = {".git", ".vs", ".vscode", "__pycache__", "CMakeFiles", "android-build", "node_modules"}
@@ -53,7 +54,7 @@ def selectedDependency(strName, vModules, strPlatform):
     strLeaf = strName.split("/")[-1]
     if strPlatform == "android":
         return strLeaf in {"libiconv-1.17.tar.gz", "mbedtls-3.6.5.tar.bz2", "mbedtls-3.6.5-sha256sum.txt"}
-    return strLeaf in {"openssl-1.1.1t.tar.gz", "zlib-1.2.13.tar.gz"}
+    return strLeaf in {"openssl-1.1.1t.tar.gz", "zlib-1.2.13.tar.gz", "icu4c-56_1-src.tgz"}
 
 
 def validateArchive(pArchive, strPlatform):
@@ -72,7 +73,7 @@ def validateArchive(pArchive, strPlatform):
             "project/third_party/curl-8.0.1.zip", "project/third_party/libxml2-2.15.4.tar.xz",
             "dependencies/qt-5.15.2/qtbase/configure.json", "SOURCE-README.txt", "SOURCE-MANIFEST.json",
         ]
-        if strPlatform == "windows":
+        if strPlatform != "android":
             vRequired.extend([
                 "dependencies/qt-5.15.2/qtwebengine/src/3rdparty/chromium/LICENSE",
                 "dependencies/openssl-1.1.1t.tar.gz", "dependencies/zlib-1.2.13.tar.gz",
@@ -83,6 +84,12 @@ def validateArchive(pArchive, strPlatform):
                 "dependencies/libiconv-1.17.tar.gz", "dependencies/mbedtls-3.6.5.tar.bz2",
                 "project/platform/android/AndroidManifest.xml",
                 "project/third_party/libcxx-filesystem/LICENSE.TXT",
+            ])
+        if strPlatform == "desktop":
+            vRequired.extend([
+                "dependencies/qt-5.15.2/qtmacextras/LICENSE.GPL2",
+                "dependencies/qt-5.15.2/qtx11extras/LICENSE.GPL2",
+                "dependencies/icu4c-56_1-src.tgz",
             ])
         vMissing = [strName for strName in vRequired if strName not in vNames]
         if vMissing:
@@ -95,13 +102,14 @@ def validateArchive(pArchive, strPlatform):
 
 def runPackaging(strDefaultPlatform="windows"):
     oParser = argparse.ArgumentParser(description=__doc__)
-    oParser.add_argument("--platform", choices=("windows", "android"), default=strDefaultPlatform)
+    oParser.add_argument("--platform", choices=("windows", "android", "desktop"), default=strDefaultPlatform)
     oParser.add_argument("--previous", type=Path, required=True, help="Matching dependency source archive; its old project tree is ignored")
     oParser.add_argument("--qt-source", type=Path, help="Matching Qt 5.15.2 source root, used for supermodule build files only")
     oParser.add_argument("--stage", type=Path, help="Optional deployed application directory for Qt component notices")
     oParser.add_argument("--output", type=Path, required=True)
     oParser.add_argument("--openssl-source", type=Path, help="Windows matching OpenSSL 1.1.1t original archive")
     oParser.add_argument("--zlib-source", type=Path, help="Windows matching zlib 1.2.13 original archive")
+    oParser.add_argument("--icu-source", type=Path, help="ICU 56.1 original source for the official Linux Qt kit")
     oArguments = oParser.parse_args()
     pRoot = Path(__file__).resolve().parents[2]
     pOutput = oArguments.output.resolve()
@@ -109,14 +117,14 @@ def runPackaging(strDefaultPlatform="windows"):
     if pOutput == pPrevious:
         raise RuntimeError("Output must differ from previous archive")
     pOutput.parent.mkdir(parents=True, exist_ok=True)
-    vModules = vWindowsModules if oArguments.platform == "windows" else vAndroidModules
+    vModules = vAndroidModules if oArguments.platform == "android" else vWindowsModules
     vProjectManifest = []
     vDependencyManifest = defaultdict(lambda: {"files": 0, "bytes": 0})
     vNotices = []
     pNoticeDirectory = oArguments.stage / "licenses/qt-components" if oArguments.stage else None
     if pNoticeDirectory:
         pNoticeDirectory.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(pOutput, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as oOutput:
+    with zipfile.ZipFile(pOutput, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as oOutput:
         with zipfile.ZipFile(pPrevious) as oPrevious:
             nCopied = 0
             for oEntry in oPrevious.infolist():
@@ -141,7 +149,7 @@ def runPackaging(strDefaultPlatform="windows"):
             for pFile in sorted(oArguments.qt_source.iterdir()):
                 if pFile.is_file() and not pFile.name.startswith(".QT-"):
                     oOutput.write(pFile, "dependencies/qt-5.15.2/" + pFile.name)
-        if oArguments.platform == "windows":
+        if oArguments.platform != "android":
             for pSource, strName in [
                 (oArguments.openssl_source or pRoot / "openssl-1.1.1t.tar.gz", "openssl-1.1.1t.tar.gz"),
                 (oArguments.zlib_source or pRoot / "zlib-1.2.13.tar.gz", "zlib-1.2.13.tar.gz"),
@@ -152,6 +160,14 @@ def runPackaging(strDefaultPlatform="windows"):
                     raise RuntimeError("Missing matching dependency archive: " + strName)
                 oOutput.write(pSource, "dependencies/" + strName)
                 vDependencyManifest["dependencies/" + strName] = {"files": 1, "bytes": pSource.stat().st_size, "sha256": fileHash(pSource)}
+        if oArguments.platform == "desktop" and "dependencies/icu4c-56_1-src.tgz" not in vDependencyManifest:
+            if not oArguments.icu_source or not oArguments.icu_source.is_file():
+                raise RuntimeError("Desktop sources require the matching ICU 56.1 source archive")
+            oOutput.write(oArguments.icu_source, "dependencies/icu4c-56_1-src.tgz")
+            vDependencyManifest["dependencies/icu4c-56_1-src.tgz"] = {
+                "files": 1, "bytes": oArguments.icu_source.stat().st_size,
+                "sha256": fileHash(oArguments.icu_source),
+            }
         for pFile, strName in projectSources(pRoot):
             vData = pFile.read_bytes()
             oOutput.writestr(strName, vData)
@@ -160,11 +176,17 @@ def runPackaging(strDefaultPlatform="windows"):
             "Windows Qt WebEngine sources include Chromium and its original third-party notices. "
             "OpenSSL 1.1.1t and zlib 1.2.13 sources match deployed Qt dependencies; the SDK cURL uses Windows Schannel. "
             "Microsoft CRT/D3D runtime components are redistributables under their own terms."
-            if oArguments.platform == "windows" else
+            if oArguments.platform != "android" else
             "Android sources include Qt Core/Gui/Widgets/Concurrent, Svg, image formats, AndroidExtras, "
             "Mbed TLS 3.6.5, GNU libiconv/libcharset 1.17 and matching LLVM filesystem source. "
             "System WebView is supplied by Android and is not bundled; Android does not bundle OpenSSL or Chromium."
         )
+        if oArguments.platform == "desktop":
+            strPlatformNotes += (
+                " Desktop sources also include QtMacExtras, QtX11Extras and ICU 56.1 for the official Linux Qt kit. "
+                "macOS uses system SecureTransport. Linux OS libraries and Ubuntu system Qt are not bundled; "
+                "their exact runtime and source package versions are recorded in native build provenance."
+            )
         strReadme = (
             "Light Novel Library / 轻小说文库 1.0.0 - " + oArguments.platform + " corresponding source\n\n"
             "project/ contains the clean C++ SDK, Qt 5 client, platform adapters, build scripts and licenses.\n"

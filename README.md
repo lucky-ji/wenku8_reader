@@ -23,10 +23,12 @@
 
 | 平台 | 状态 | 登录组件 |
 | --- | --- | --- |
-| Windows x64 | 1.0.0 发行目标 | Qt 5 WebEngine |
-| Android ARM64 | 1.0.0 发行目标 | Android 系统 WebView |
-| Linux / macOS | 保留桌面构建路径，尚未完成平台验收 | Qt 5 WebEngine |
-| iOS | 尚未完成，不提供可用客户端 | WKWebView 适配待实现 |
+| Windows x64 / x86 | 安装包、便携包构建与校验通过 | Qt 5 WebEngine |
+| Android ARM64 / ARMv7 / x86 / x86_64 | Release 构建与架构检查通过 | Android 系统 WebView |
+| Linux x86_64 | Ubuntu 22.04 原生构建与启动检查通过 | Qt 5 WebEngine |
+| Linux ARM64 | Ubuntu 24.04 原生构建与启动检查通过 | 系统 Qt 5 WebEngine |
+| macOS Intel x86_64 | 原生构建、部署与 WebEngine 启动检查通过 | Qt 5 WebEngine |
+| iOS | 登录适配尚未完成，不提供占位客户端 | WKWebView 适配待实现 |
 
 应用首次使用时按需打开登录窗口；登录成功后关闭网页，书架、阅读与其他业务通过 Qt 界面操作。网站可用性及验证要求取决于源站，客户端会显示实际错误，不将验证页视为业务数据。
 
@@ -67,7 +69,9 @@ cmake -S . -B build/sdk -DWENKU8_BUILD_CLIENT=OFF
 cmake --build build/sdk --config Release
 ```
 
-Android 的 Qt、NDK、JDK 和目标原生依赖必须匹配。完整配置、APK 生成与打包说明见 [构建指南](docs/BUILDING.md)。
+Android 的 Qt、NDK、JDK 和目标原生依赖必须匹配，四 ABI 可使用 [依赖构建脚本](docs/ANDROID_BUILD.md) 分别准备。Linux/macOS 的原生构建与部署见 [原生桌面指南](docs/NATIVE_DESKTOP.md)。完整配置、APK 生成与打包说明见 [构建指南](docs/BUILDING.md)。
+
+Linux 包依赖对应 Ubuntu 的系统运行库，不能视为所有发行版通用包；macOS 包使用本机完整性签名，尚未进行 Apple 公证。原生 Windows ARM64 与 macOS ARM64 缺少本项目可用的 Qt 5 WebEngine kit。构建和启动检查不代替真实设备、账号及源站环境的业务测试。
 
 ## 许可与致谢
 
