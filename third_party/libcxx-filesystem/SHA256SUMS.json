@@ -1,0 +1,9 @@
+{
+  "src/filesystem/operations.cpp": "e085069e9c9d78fdb8230195c42fe5fb9e722cd92f67a0e306cc9b27eb64bcbb",
+  "src/filesystem/directory_iterator.cpp": "85d53d0eead2f6d72c2f6765cb18c0424d70e66d728e0f91617349809721e88b",
+  "src/filesystem/filesystem_common.h": "1b32eacff427ae168f5d3f7b9440d9c8f4f86d5152e74a653a236b13158cb809",
+  "src/include/config_elast.h": "7637f5cb8e6dca7656e4c7bba55ba97d9f8d4012ad08265c8883764afd7e22d8",
+  "src/include/atomic_support.h": "6702bfc4593696ee720edd1472c81e7ec277699797bf44d4cffdd4a83508c46f",
+  "src/include/apple_availability.h": "02fe8e0bfaeb9ccdbb8c6da9587c2a9ead73c6c498fdf3719b950e8fc9d9fbeb",
+  "LICENSE.TXT": "539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b"
+}

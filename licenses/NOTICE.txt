@@ -1,0 +1,31 @@
+轻小说文库 · 开源许可
+
+本应用及其 C++ SDK 采用 GNU General Public License version 2 only（GPL-2.0-only）。许可证全文见 REFERENCE-GPL-2.0.txt。
+
+本应用使用下列开源组件。各组件的原始版权、许可证及第三方声明保持有效，不因本应用的许可而被替换。
+
+• Qt 5.15.2：采用 GPL-2.0 许可选项。包含 Core、Gui、Widgets、Svg、Concurrent、图片格式插件及相应平台插件。完整许可见 Qt-5.15.2-GPL-2.0.txt；Qt 内置第三方组件声明见发布包内的 Qt 组件许可目录及对应源码。
+• curl 8.0.1：curl license，见 curl-8.0.1.txt。
+• libxml2 2.15.4：MIT 及源文件内的补充声明，见 libxml2-2.15.4.txt。
+• TinyXML-2 10.0.0：zlib license，见对应源码 third_party/tinyxml2/LICENSE.txt。
+• 桌面版 Qt 5.15.2 WebEngine、WebChannel、QML 等模块及其传递依赖：沿用相应 Qt 许可选项；Chromium 及其内置第三方声明见 Qt-5.15.2-Chromium.txt 与 Qt 组件许可目录。
+• Android 版本另使用 Qt AndroidExtras、GNU libiconv / libcharset、Mbed TLS 和 LLVM libc++ filesystem；各自原始许可证见发布包许可目录。
+
+平台组件
+
+Android 系统 WebView 由操作系统提供。Windows 版使用系统 Schannel 进行 TLS；Microsoft 运行库遵守随附的再分发条款。
+
+完整法律文本与版权声明
+
+发布包许可目录保留各组件随附的许可证正文、版权声明及 Qt 内置第三方声明。OpenSSL、zlib 和 Chromium 等归档声明不表示所有平台均使用相同运行组件；实际组件依平台而定。上游源码中的 LICENSE、COPYING、NOTICE 及文件头声明一并保留。
+
+对应源码
+
+应用、SDK、构建脚本及所分发开源组件的对应源码随发布包的源码归档提供。再分发时应保留本许可目录，并按各许可证提供对应源码及必要构建信息。
+
+参考来源
+
+轻小说文库的协议实现参考 MewX/light-novel-library_Wenku8_Android 的公开资料。其 GPL v2 声明及完整来源说明保留在对应源码归档中。
+https://github.com/MewX/light-novel-library_Wenku8_Android
+
+软件按各许可证约定提供，不附加适销性、特定用途适用性等保证。具体权利与限制以完整许可证正文为准。
