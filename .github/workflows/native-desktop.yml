@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-only
 name: Native Qt 5 desktop builds
 on:
+  push:
+    branches: [codex/native-desktop-builds]
   workflow_dispatch:
     inputs:
       ref:
@@ -31,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || github.sha }}
       - name: Record exact source identity
         id: identity
         run: |
@@ -100,7 +102,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || github.sha }}
       - name: Record exact source identity
         id: identity
         run: |

@@ -1,6 +1,6 @@
 # 原生 Linux 与 macOS 构建
 
-手动工作流 `Native Qt 5 desktop builds` 仅构建和保存 Actions artifacts，不创建标签、不修改 Release、不自动发布。
+工作流 `Native Qt 5 desktop builds` 支持手动执行，以及限定 `codex/native-desktop-builds` 分支的 push 触发；仅构建和保存 Actions artifacts，不创建标签、不修改 Release、不自动发布。main 的普通 push 不触发构建。
 
 | 目标 | 原生 runner | Qt 来源 | SDK TLS |
 | --- | --- | --- | --- |
