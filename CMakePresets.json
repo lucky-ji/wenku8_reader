@@ -1,0 +1,96 @@
+{
+  "version": 5,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "sdk",
+      "displayName": "Pure C++ SDK (system cURL)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/sdk",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "WENKU8_BUILD_CLIENT": "OFF",
+        "WENKU8_BUNDLED_CURL": "OFF",
+        "CMAKE_PREFIX_PATH": "$env{WENKU8_TARGET_DEPS}"
+      }
+    },
+    {
+      "name": "windows-qt5",
+      "displayName": "Windows x64 / Qt 5.15",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_PREFIX_PATH": "$env{QT5_ROOT}",
+        "WENKU8_BUILD_CLIENT": "ON",
+        "WENKU8_BUNDLED_CURL": "ON"
+      }
+    },
+    {
+      "name": "desktop-qt5",
+      "displayName": "Linux / macOS Qt 5 (not release-validated)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/desktop",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_PREFIX_PATH": "$env{QT5_ROOT};$env{WENKU8_TARGET_DEPS}",
+        "WENKU8_BUILD_CLIENT": "ON",
+        "WENKU8_BUNDLED_CURL": "OFF"
+      }
+    },
+    {
+      "name": "android-arm64-qt5",
+      "displayName": "Android ARM64 / Qt 5.15 + system WebView",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/android-arm64",
+      "toolchainFile": "$env{ANDROID_NDK_ROOT}/build/cmake/android.toolchain.cmake",
+      "environment": {
+        "PATH": "$env{QT5_ANDROID_ROOT}/bin$pathListSep$penv{PATH}"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_PREFIX_PATH": "$env{QT5_ANDROID_ROOT};$env{WENKU8_TARGET_DEPS}",
+        "CMAKE_FIND_ROOT_PATH": "$env{QT5_ANDROID_ROOT};$env{WENKU8_TARGET_DEPS}",
+        "WENKU8_BUILD_CLIENT": "ON",
+        "WENKU8_BUILD_SHARED": "OFF",
+        "WENKU8_BUNDLED_CURL": "OFF",
+        "ANDROID_ABI": "arm64-v8a",
+        "ANDROID_PLATFORM": "android-21",
+        "ANDROID_STL": "c++_shared",
+        "WENKU8_ANDROID_FILESYSTEM_SOURCE_DIR": "${sourceDir}/third_party/libcxx-filesystem",
+        "ANDROID_SDK": "$env{ANDROID_SDK_ROOT}",
+        "ANDROID_MIN_SDK_VERSION": "21",
+        "ANDROID_TARGET_SDK_VERSION": "28"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "sdk",
+      "configurePreset": "sdk"
+    },
+    {
+      "name": "windows-qt5",
+      "configurePreset": "windows-qt5"
+    },
+    {
+      "name": "desktop-qt5",
+      "configurePreset": "desktop-qt5"
+    },
+    {
+      "name": "android-arm64-qt5",
+      "configurePreset": "android-arm64-qt5"
+    },
+    {
+      "name": "android-apk-qt5",
+      "configurePreset": "android-arm64-qt5",
+      "targets": [
+        "apk"
+      ]
+    }
+  ]
+}
