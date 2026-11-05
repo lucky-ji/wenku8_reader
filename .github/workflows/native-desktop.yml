@@ -118,7 +118,7 @@ jobs:
         run: |
           cmake -S . -B build/native -G Ninja \
             -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QT5_ROOT" \
-            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15 \
             -DWENKU8_BUILD_CLIENT=ON -DWENKU8_BUILD_SHARED=OFF -DWENKU8_BUNDLED_CURL=ON \
             -DCURL_USE_OPENSSL=OFF -DCURL_USE_MBEDTLS=OFF -DCURL_USE_SECTRANSP=ON \
             -DCURL_DISABLE_LDAP=ON -DCURL_DISABLE_LDAPS=ON
@@ -127,11 +127,21 @@ jobs:
         run: |
           bash platform/macos/package.sh build/native "$QT5_ROOT" out/native
           python3 platform/linux/collect_sources.py --metadata out/native/BUILD-METADATA.json --output out/native-provenance
+      - name: Check normal macOS client and WebEngine survival
+        run: |
+          strApp="$PWD/out/native/轻小说文库.app"
+          "$strApp/Contents/MacOS/wenku8_client" > out/native/startup.log 2>&1 &
+          nPid=$!
+          trap 'kill "$nPid" 2>/dev/null || true' EXIT
+          sleep 20
+          kill -0 "$nPid"
+          pgrep -fl '[Q]tWebEngineProcess'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: native-binary-macos-x86_64-${{ steps.identity.outputs.commit }}
           path: |
             out/native/*.zip
+            out/native/startup.log
             out/native/BUILD-METADATA.json
             out/native/SHA256SUMS.txt
           if-no-files-found: error

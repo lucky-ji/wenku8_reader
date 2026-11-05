@@ -18,7 +18,7 @@
 gh workflow run native-desktop.yml --ref main -f ref=main
 ```
 
-工作流检查出指定 ref，分别原生编译完整 SDK、Qt UI、桌面登录与阅读器。CMake 必须找到真实 Qt 5 WebEngine，缺失时直接失败。Linux 通过 Xvfb 启动部署后的客户端并检查 WebEngine 辅助进程；macOS 验证部署后的主程序、WebEngine helper 架构和签名，并执行版本入口。这些检查不代替真实账号、源站和实体设备的业务验收。
+工作流检查出指定 ref，分别原生编译完整 SDK、Qt UI、桌面登录与阅读器。CMake 必须找到真实 Qt 5 WebEngine，缺失时直接失败。Linux 通过 Xvfb 启动部署后的客户端并检查 WebEngine 辅助进程；macOS 验证部署后的主程序、WebEngine helper 架构和签名，执行版本入口，再正常启动客户端并检查 20 秒后主进程与真实 WebEngine helper 仍存活。这些检查不代替真实账号、源站和实体设备的业务验收。
 
 每个平台产生 binary 和 provenance 两个 artifact。`BUILD-METADATA.json` 记录实际 commit、Git tree、架构、Qt 版本、Qt 部署模块与系统运行库版本。即使后续仅整理 Git 提交信息，也可以用 tree 比对确认构建源码是否保持一致。
 
@@ -26,7 +26,7 @@ gh workflow run native-desktop.yml --ref main -f ref=main
 
 Linux 以 `.tar.gz` 提供。解压后运行 `wenku8_reader`；`RUNTIME-DEPENDENCIES.txt` 列出所需 Ubuntu OS 运行库。x86_64 包含实际需要的官方 Qt 私有库、插件、WebEngine helper 与资源；ARM64 使用 Ubuntu 系统 Qt，不随包复制 Qt 库。两种包均不复制 OS 库，不能将其视为任意 Linux 发行版通用的静态二进制。
 
-macOS 以 `.zip` 提供应用 bundle。部署使用 Qt 5 的 `macdeployqt`，包含真实 WebEngine 运行组件。构建使用 ad-hoc 签名校验包内完整性，没有 Apple Developer ID 签名或公证，不宣称已经满足 Mac App Store 分发要求。
+macOS 以 `.zip` 提供应用 bundle，显式设定最低 macOS 10.15，并在 Mach-O load commands 中核对实际 minimum OS。部署使用 Qt 5 的 `macdeployqt`，包含真实 WebEngine 运行组件。构建使用 ad-hoc 签名校验包内完整性，没有 Apple Developer ID 签名或公证，不宣称已经满足 Mac App Store 分发要求。
 
 ## 源码与许可
 
