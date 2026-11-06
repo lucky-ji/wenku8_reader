@@ -464,6 +464,10 @@ public final class BrowserLogin
                     oChild.invalidate();
                 }
             }
+            if (m_oActivity instanceof ReaderActivity)
+            {
+                ((ReaderActivity)m_oActivity).restoreQtRendering();
+            }
             nativeEvent(m_nToken, 6, "");
         });
     }

@@ -3,11 +3,58 @@ package io.github.lucky_ji.wenku8_reader;
 import android.util.SparseBooleanArray;
 import android.view.KeyEvent;
 import org.qtproject.qt5.android.bindings.QtActivity;
+import org.qtproject.qt5.android.QtNative;
 
 public class ReaderActivity extends QtActivity
 {
     private static volatile boolean m_bVolumePagingEnabled = false;
     private final SparseBooleanArray m_oCaptured = new SparseBooleanArray();
+    private boolean m_bResumed = false;
+    private boolean m_bQtRefreshPending = false;
+    private boolean m_bQtFrameQueued = false;
+
+    public void restoreQtRendering()
+    {
+        m_bQtRefreshPending = true;
+        scheduleQtRefresh();
+    }
+    private void scheduleQtRefresh()
+    {
+        if (!m_bQtRefreshPending || m_bQtFrameQueued || !m_bResumed || !hasWindowFocus() ||
+            BrowserLogin.showing() || isFinishing() || isDestroyed())
+        {
+            return;
+        }
+        m_bQtFrameQueued = true;
+        getWindow().getDecorView().postOnAnimation(() ->
+        {
+            m_bQtFrameQueued = false;
+            if (!m_bQtRefreshPending || !m_bResumed || !hasWindowFocus() ||
+                BrowserLogin.showing() || isFinishing() || isDestroyed())
+            {
+                return;
+            }
+            m_bQtRefreshPending = false;
+            // Qt 5's onResume uses this hook to expose all windows and mark the
+            // Android raster surface dirty. View.invalidate() cannot do that.
+            // Wait for an Android frame after removing the WebView overlay.
+            QtNative.updateWindow();
+        });
+    }
+    @Override public void onResume()
+    {
+        super.onResume();
+        m_bResumed = true;
+        scheduleQtRefresh();
+    }
+    @Override public void onWindowFocusChanged(boolean bHasFocus)
+    {
+        super.onWindowFocusChanged(bHasFocus);
+        if (bHasFocus)
+        {
+            scheduleQtRefresh();
+        }
+    }
     public static void setVolumePagingEnabled(boolean bEnabled)
     {
         m_bVolumePagingEnabled = bEnabled;
@@ -48,11 +95,14 @@ public class ReaderActivity extends QtActivity
     }
     @Override public void onDestroy()
     {
+        m_bResumed = false;
+        m_bQtRefreshPending = false;
         BrowserLogin.destroy();
         super.onDestroy();
     }
     @Override public void onPause()
     {
+        m_bResumed = false;
         BrowserLogin.persist();
         m_bVolumePagingEnabled = false;
         m_oCaptured.clear();
