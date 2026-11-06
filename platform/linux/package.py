@@ -24,9 +24,14 @@ def main():
     oArguments = oParser.parse_args()
     pRoot = Path(__file__).resolve().parents[2]
     strArchitecture = command(["uname", "-m"])
+    oVersion = re.search(r"project\(Wenku8Reader\s+VERSION\s+([0-9]+\.[0-9]+\.[0-9]+)",
+                         (pRoot / "CMakeLists.txt").read_text(encoding="utf-8"))
+    if not oVersion:
+        raise RuntimeError("Project version is missing")
+    strVersion = oVersion.group(1)
     pOutput = oArguments.output.resolve()
     pOutput.mkdir(parents=True, exist_ok=True)
-    pBundle = pOutput / ("wenku8-reader-1.0.0-linux-" + strArchitecture)
+    pBundle = pOutput / ("wenku8-reader-" + strVersion + "-linux-" + strArchitecture)
     pBundle.mkdir()
     for strDirectory in ("bin", "lib", "libexec", "plugins", "resources", "translations", "licenses/system"):
         (pBundle / strDirectory).mkdir(parents=True, exist_ok=True)
@@ -88,13 +93,13 @@ def main():
             strOwner = command(["dpkg-query", "-S", strLibrary]).split(": ", 1)[0]
         except subprocess.CalledProcessError:
             strOwner = command(["dpkg-query", "-S", str(Path(strLibrary).resolve())]).split(": ", 1)[0]
-        strVersion = command(["dpkg-query", "-W", "-f=${Version}", strOwner])
-        vPackages[strOwner] = strVersion
+        strPackageVersion = command(["dpkg-query", "-W", "-f=${Version}", strOwner])
+        vPackages[strOwner] = strPackageVersion
         pCopyright = Path("/usr/share/doc") / strOwner.split(":")[0] / "copyright"
         if pCopyright.is_file():
             shutil.copy2(pCopyright, pBundle / "licenses/system" / (strOwner.replace(":", "-") + ".copyright"))
     vMetadata = {
-        "version": "1.0.0", "platform": "linux", "architecture": strArchitecture,
+        "version": strVersion, "platform": "linux", "architecture": strArchitecture,
         "commit": command(["git", "rev-parse", "HEAD"], cwd=pRoot),
         "tree": command(["git", "rev-parse", "HEAD^{tree}"], cwd=pRoot),
         "qtVersion": command([str(pQt / "bin/qmake"), "-query", "QT_VERSION"]),
