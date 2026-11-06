@@ -12,7 +12,6 @@ import android.net.http.SslError;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
-import android.view.ViewGroup;
 import android.webkit.*;
 import android.widget.*;
 import org.json.*;
@@ -30,7 +29,7 @@ public final class BrowserLogin
     private final String m_strOrigin;
     private final NavigationPolicy m_oNavigation;
     private final String m_strNavigationScript;
-    private final FrameLayout m_oOverlay;
+    private final LoginWindow m_oLoginWindow;
     private final WebView m_oWeb;
     private final TextView m_oHint;
     private final FrameLayout m_oPageLoading;
@@ -111,12 +110,11 @@ public final class BrowserLogin
         m_nToken = nId;
         m_oNavigation = new NavigationPolicy(strSite);
         m_strNavigationScript = strGuard;
-        m_oOverlay = new FrameLayout(oOwner);
-        m_oOverlay.setBackgroundColor(Color.WHITE);
-        m_oOverlay.setVisibility(View.GONE);
+        FrameLayout oContent = new FrameLayout(oOwner);
+        oContent.setBackgroundColor(Color.WHITE);
         LinearLayout oColumn = new LinearLayout(oOwner);
         oColumn.setOrientation(LinearLayout.VERTICAL);
-        m_oOverlay.addView(oColumn, new FrameLayout.LayoutParams(-1, -1));
+        oContent.addView(oColumn, new FrameLayout.LayoutParams(-1, -1));
         LinearLayout oBar = new LinearLayout(oOwner);
         oBar.setGravity(Gravity.CENTER_VERTICAL);
         oBar.setPadding(dp(12), dp(8), dp(16), dp(8));
@@ -359,7 +357,7 @@ public final class BrowserLogin
         m_oWeb.setDownloadListener((strU, strA, strC, strM, nL) ->
         {
         });
-        m_oActivity.addContentView(m_oOverlay, new ViewGroup.LayoutParams(-1, -1));
+        m_oLoginWindow = new LoginWindow(oOwner, oContent, this::cancel);
         nativeEvent(m_nToken, 0, oSettings.getUserAgentString());
     }
     public static void create(Activity oOwner, String strOrigin, String strGuard, long nToken)
@@ -386,8 +384,7 @@ public final class BrowserLogin
                 return;
             if (nAction == 0)
             {
-                oB.m_oOverlay.setVisibility(View.VISIBLE);
-                oB.m_oOverlay.bringToFront();
+                oB.m_oLoginWindow.show();
                 oB.m_oWeb.requestFocus();
             }
             else if (nAction == 1)
@@ -419,8 +416,8 @@ public final class BrowserLogin
                 oB.abort("cancel");
                 oB.m_bClosed = true;
                 oB.m_oWeb.stopLoading();
+                oB.m_oLoginWindow.close();
                 oB.m_oWeb.destroy();
-                ((ViewGroup)oB.m_oOverlay.getParent()).removeView(oB.m_oOverlay);
                 m_oInstance = null;
             }
             else if (nAction == 6)
@@ -444,32 +441,8 @@ public final class BrowserLogin
                 android.content.Context.INPUT_METHOD_SERVICE);
         oKeyboard.hideSoftInputFromWindow(m_oWeb.getWindowToken(), 0);
         m_oWeb.clearFocus();
-        m_oOverlay.setVisibility(View.GONE);
-        ViewGroup oContent = m_oActivity.findViewById(android.R.id.content);
-        // The WebView and keyboard can retain the first focus transfer. Restore
-        // Android's Qt view before acknowledging the return on the Qt thread.
-        oContent.post(() ->
-        {
-            if (m_bClosed || m_oOverlay.getVisibility() == View.VISIBLE)
-            {
-                return;
-            }
-            for (int nIndex = 0; nIndex < oContent.getChildCount(); ++nIndex)
-            {
-                View oChild = oContent.getChildAt(nIndex);
-                if (oChild != m_oOverlay && oChild.getVisibility() == View.VISIBLE)
-                {
-                    oChild.requestFocus();
-                    oChild.requestLayout();
-                    oChild.invalidate();
-                }
-            }
-            if (m_oActivity instanceof ReaderActivity)
-            {
-                ((ReaderActivity)m_oActivity).restoreQtRendering();
-            }
-            nativeEvent(m_nToken, 6, "");
-        });
+        m_oLoginWindow.hide();
+        nativeEvent(m_nToken, 6, "");
     }
     private void cancel()
     {
@@ -480,7 +453,7 @@ public final class BrowserLogin
     public static boolean showing()
     {
         BrowserLogin oB = m_oInstance;
-        return oB != null && oB.m_oOverlay.getVisibility() == View.VISIBLE;
+        return oB != null && oB.m_oLoginWindow.visible();
     }
     public static void persist()
     {
@@ -495,7 +468,7 @@ public final class BrowserLogin
     public static boolean back()
     {
         BrowserLogin oB = m_oInstance;
-        if (oB != null && oB.m_oOverlay.getVisibility() == View.VISIBLE)
+        if (oB != null && oB.m_oLoginWindow.visible())
         {
             oB.cancel();
             return true;
@@ -511,9 +484,8 @@ public final class BrowserLogin
             oB.m_bClosed = true;
             oB.abort("cancel");
             oB.m_oWeb.stopLoading();
+            oB.m_oLoginWindow.close();
             oB.m_oWeb.destroy();
-            if (oB.m_oOverlay.getParent() != null)
-                ((ViewGroup)oB.m_oOverlay.getParent()).removeView(oB.m_oOverlay);
             m_oInstance = null;
         }
     }
