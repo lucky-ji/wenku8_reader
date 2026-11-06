@@ -80,6 +80,13 @@ public final class BrowserLogin
         m_oHint.setText("暂时无法打开登录页面，请检查网络后重试。");
         m_oHint.setVisibility(View.VISIBLE);
     }
+    private void networkError(String strMessage)
+    {
+        error(strMessage);
+        m_oHint.setText("登录网页无法加载，可能是当前网络异常，或应用的联网权限被关闭。\n" +
+                        "请检查网络，并在系统的应用联网设置中允许「轻小说文库」使用 WLAN／移动数据；" +
+                        "如系统单独管理 WebView／浏览器的联网权限，也请一并检查。");
+    }
     private boolean navigate(WebView oView, String strUrl, boolean bMain, String strMethod)
     {
         if (!bMain)
@@ -136,7 +143,9 @@ public final class BrowserLogin
         oTitle.setTextSize(18);
         oBar.addView(oTitle, new LinearLayout.LayoutParams(0, -2, 1));
         m_oHint = new TextView(oOwner);
-        m_oHint.setPadding(16, 4, 16, 8);
+        m_oHint.setPadding(dp(16), dp(8), dp(16), dp(12));
+        m_oHint.setTextSize(14);
+        m_oHint.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         m_oHint.setTextColor(Color.DKGRAY);
         m_oHint.setVisibility(View.GONE);
         oColumn.addView(m_oHint);
@@ -280,7 +289,7 @@ public final class BrowserLogin
                 {
                     if (!m_bClosed && nGeneration == m_nNavigationGeneration &&
                         m_oPageLoading.getVisibility() == View.VISIBLE)
-                        error("网页加载超时，请检查网络后重试。");
+                        networkError("网页加载超时，请检查网络后重试。");
                 }, 30000);
             }
             @Override public void onPageCommitVisible(WebView oView, String strUrl)
@@ -293,15 +302,29 @@ public final class BrowserLogin
                                         WebResourceError oError)
             {
                 if (oRequest.isForMainFrame())
-                    error("网页加载失败（错误码 " + oError.getErrorCode() +
+                    networkError("网页加载失败（错误码 " + oError.getErrorCode() +
                           "），请检查网络并重试。");
+            }
+            @SuppressWarnings("deprecation")
+            @Override
+            public void onReceivedError(WebView oView, int nCode, String strDescription,
+                                        String strFailedUrl)
+            {
+                // Before Android 6, only this main-document callback is available.
+                // Newer WebViews use the request callback so subresource failures
+                // cannot display a permission warning over an otherwise usable page.
+                if (android.os.Build.VERSION.SDK_INT < 23 && strFailedUrl != null &&
+                    strFailedUrl.equals(oView.getUrl()))
+                {
+                    networkError("网页加载失败，请检查网络后重试。");
+                }
             }
             @Override
             public void onReceivedHttpError(WebView oView, WebResourceRequest oRequest,
                                             WebResourceResponse oResponse)
             {
                 if (oRequest.isForMainFrame())
-                    error("网站返回 HTTP " + oResponse.getStatusCode() +
+                    networkError("网站返回 HTTP " + oResponse.getStatusCode() +
                           "，请完成验证或稍后重试。");
             }
             @Override public void onPageFinished(WebView oView, String strUrl)
