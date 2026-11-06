@@ -16,7 +16,7 @@
 | [LLVM libc++ filesystem](https://github.com/llvm/llvm-project/tree/llvmorg-9.0.1/libcxx) | 9.0.1；补足 NDK r21 的 filesystem 实现 | Apache-2.0 WITH LLVM-exception，含 GPL 兼容例外；[完整文本](third_party/libcxx-filesystem/LICENSE.TXT) |
 | [OpenSSL](https://www.openssl.org/) | 1.1.1t；部分桌面 Qt 运行组件依赖 | OpenSSL / SSLeay 双许可证；[完整文本](licenses/OpenSSL-1.1.1t.txt) |
 | [zlib](https://zlib.net/) | 1.2.13；部分 Qt 运行组件依赖 | zlib license；[完整文本](licenses/zlib-1.2.13.txt) |
-| [ICU](https://github.com/unicode-org/icu/releases/tag/release-56-1) | 56.1；官方 Linux Qt kit 的 Unicode 运行依赖 | ICU、Unicode 数据及原始附加条款；[完整原始许可](licenses/icu-56.1.txt)，未经修改的源码地址和摘要见 [依赖来源](docs/DEPENDENCIES.md) |
+| [ICU](https://github.com/unicode-org/icu/releases/tag/release-56-1) | 56.1；官方 Linux Qt kit 的 Unicode 运行依赖 | ICU、Unicode 数据及原始附加条款；[完整原始许可](licenses/icu-56.1.txt)，未经修改的源码随桌面对应源码提供 |
 
 Windows 默认 SDK cURL 使用系统 Schannel，不为此链接 OpenSSL。Android 系统 WebView 由操作系统提供，不随 APK 分发 Chromium。Qt AndroidExtras 的许可随 Qt 5 相应模块保留。上表描述本项目使用的版本；改用系统 cURL 或其他 Qt 构建时，必须按实际依赖更新发行材料。
 
@@ -33,7 +33,7 @@ Windows 默认 SDK cURL 使用系统 Schannel，不为此链接 OpenSSL。Androi
 
 ## 对应源码与再分发
 
-本项目、SDK、平台适配及构建脚本从 [主仓库](https://github.com/lucky-ji/wenku8_reader) 获取；正式版本代码通过对应标签定位。仓库中的第三方源码与原始归档保持原样，其他依赖的精确版本、完整原始源码地址和摘要见 [依赖来源](docs/DEPENDENCIES.md)。Release 手动附件仅包含编译好的发布包，不再作为工程源码下载入口。源码获取方式的调整不改变任何组件的许可证或对应源码义务；重新分发时应持续保证匹配源码、原始声明和必要构建信息可获取，不能以摘要或上游首页替代实际匹配源码。
+源码仓库保留本项目、SDK、平台适配和构建脚本；构建所需的可再分发第三方源码按原始许可证保存。正式二进制应同时提供匹配版本的完整对应源码，包括所分发 Qt 模块、Chromium/Qt 内置组件、实际链接的原生依赖、构建脚本和必要修改说明。仅提供许可证摘要或上游主页链接不能替代适用许可证要求的对应源码。
 
 发布包的 `licenses/` 与源码归档中应保留完整原始声明。使用系统组件、不同 Qt 安装或不同 TLS 后端重新打包时，应重新核对实际分发的组件与源码。Microsoft CRT 等运行库遵循各自再分发条款，不以本项目 GPL 重新许可。
 

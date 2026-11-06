@@ -16,7 +16,7 @@ namespace Wenku8::Reader
     }
     QString applicationVersion()
     {
-        return "1.0.1";
+        return "1.0.0";
     }
     QString licenseText(const QString& strResource)
     {

@@ -225,18 +225,19 @@ namespace Wenku8::Reader
             QSize sizeHint(const QStyleOptionViewItem& oO, const QModelIndex&) const override
             {
                 auto pView = qobject_cast<const QListWidget*>(parent());
-                // Reserve the scrollbar gutter in both layouts. Basing mobile cells
-                // on the live viewport creates a feedback loop at wrapping/height
-                // boundaries (for example three search results in two columns).
-                const int nWidth = pView ? qMax(1, pView->maximumViewportSize().width() -
-                                                     pView->verticalScrollBar()->sizeHint().width())
-                                        : oO.rect.width();
+                int nWidth = pView ? pView->viewport()->width() : oO.rect.width();
                 if (pView && pView->property("mobileCards").toBool())
                 {
                     int nColumns = qMax(2, nWidth / 176),
                         nCell = qMax(116, (nWidth - nColumns * 12 - 2) / nColumns);
                     return {nCell, qRound(qMin(130, nCell - 36) * 1.45) + 112};
                 }
+                // Reserve the scrollbar gutter even before it appears. Using the live
+                // viewport width here makes item size depend on the layout's result,
+                // causing card positions to change when history gains/loses a scrollbar.
+                if (pView)
+                    nWidth = qMax(1, pView->maximumViewportSize().width() -
+                                         pView->verticalScrollBar()->sizeHint().width());
                 int nColumns = qMax(1, (nWidth + 6) / 322);
                 return {qMax(240, (nWidth - 12 - (nColumns - 1) * 12) / nColumns), 188};
             }

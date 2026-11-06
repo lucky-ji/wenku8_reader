@@ -24,21 +24,12 @@ gh workflow run native-desktop.yml --ref main -f ref=main
 
 ## 安装与运行边界
 
-Linux 以 `.tar.gz` 提供。解压后运行 `wenku8_reader`；`RUNTIME-DEPENDENCIES.txt` 列出所需 Ubuntu OS 运行库。x86_64 包含实际需要的官方 Qt 私有库、插件、WebEngine helper 与资源；ARM64 使用 Ubuntu 系统 Qt，不随包复制 Qt 库。两种包均不复制 OS 库，不能将其视为任意 Linux 发行版通用的静态二进制。中文界面建议安装系统 `fonts-noto-cjk` 字体包；官方 x86_64 Qt kit 另带 ICU 56.1，其原始许可随运行包保留，源码版本与上游地址见 [依赖来源](DEPENDENCIES.md)。
+Linux 以 `.tar.gz` 提供。解压后运行 `wenku8_reader`；`RUNTIME-DEPENDENCIES.txt` 列出所需 Ubuntu OS 运行库。x86_64 包含实际需要的官方 Qt 私有库、插件、WebEngine helper 与资源；ARM64 使用 Ubuntu 系统 Qt，不随包复制 Qt 库。两种包均不复制 OS 库，不能将其视为任意 Linux 发行版通用的静态二进制。中文界面建议安装系统 `fonts-noto-cjk` 字体包；官方 x86_64 Qt kit 另带 ICU 56.1，其原始源码和许可随正式分发材料保留。
 
 macOS 以 `.zip` 提供应用 bundle，显式设定最低 macOS 10.15，并在 Mach-O load commands 中核对实际 minimum OS。部署使用 Qt 5 的 `macdeployqt`，包含真实 WebEngine 运行组件。构建使用 ad-hoc 签名校验包内完整性，没有 Apple Developer ID 签名或公证，不宣称已经满足 Mac App Store 分发要求。
 
 ## 源码与许可
 
-自编译先从主仓库克隆工程，再按本页配置原生环境：
+provenance artifact 包含精确 `project.tar.gz`、build/tree 标识、许可证和依赖来源。官方 Qt kit 的完整对应源码在正式发布时由发布流程合并匹配的 Qt 5.15.2 原始模块与组件声明，包括实际使用的 qtx11extras、qtmacextras 等；不能把 provenance artifact 单独称为完整 Qt 对应源码包。上游完整 Qt 5.15.2 源码摘要已记录在 artifact。
 
-```sh
-git clone https://github.com/lucky-ji/wenku8_reader.git
-cd wenku8_reader
-```
-
-正式版本代码可通过 `git switch --detach v1.0.0` 取得。Qt 5、ICU、TLS 后端等第三方依赖按 [依赖来源](DEPENDENCIES.md) 中固定的版本、地址和摘要取得；Qt/VS/NDK 开发环境不包含在工程仓库中。
-
-Actions 的 provenance artifact 仅用于记录构建身份、系统包和原始声明，不作为用户获取工程源码的入口，也不上传为 Release 附件。Release 手动附件仅保留编译好的平台发布包。
-
-Linux ARM64 的系统 Qt 版本不假定为 5.15.2；实际版本在运行包的 `BUILD-METADATA.json` 中记录。系统 Qt 和 OS 库未随二进制复制，作为明确的系统前置依赖处理。重新分发时仍需遵守各组件原始许可并保留相应声明与源码获取安排。
+Linux ARM64 的系统 Qt 版本不假定为 5.15.2；实际 OS 包和 source package 版本记录在 `UBUNTU-SOURCE-VERSIONS.json`。由于这些 Qt 和 OS 库没有随二进制复制，它们作为明确的系统前置依赖处理。系统组件版权文件随 provenance 保留。若后续改为把 OS/系统 Qt 库一起打包，必须另行附上逐版本匹配的完整源码和原始声明。

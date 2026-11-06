@@ -14,8 +14,6 @@ Windows 脚本调用的是 Windows NDK Clang，而不是 WSL/Linux Clang。不�
 
 ## 准备原始源码
 
-先从 [主仓库](https://github.com/lucky-ji/wenku8_reader) 克隆工程；下列第三方归档的固定下载地址和摘要见 [依赖来源](DEPENDENCIES.md)，不需要从 Release 下载源码包。
-
 将以下未经修改的上游源码目录或原始归档放在同一个目录内，每个组件任选一种：
 
 | 组件 | 解压后的目录名 | 支持的原始归档示例 |

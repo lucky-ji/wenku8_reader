@@ -21,11 +21,11 @@ Android 系统 WebView 由操作系统提供，不随本应用分发。
 
 对应源码
 
-应用、SDK 与构建脚本从主仓库 https://github.com/lucky-ji/wenku8_reader 获取；正式版本代码按标签定位。第三方依赖的匹配源码地址与摘要见主仓库 docs/DEPENDENCIES.md。再分发时应保留本许可目录，并按各许可证提供对应源码及必要构建信息。
+应用、SDK、构建脚本及所分发开源组件的对应源码随发布包的源码归档提供。再分发时应保留本许可目录，并按各许可证提供对应源码及必要构建信息。
 
 参考来源
 
-轻小说文库的协议实现参考 MewX/light-novel-library_Wenku8_Android 的公开资料。其 GPL v2 声明及完整来源说明保留在主仓库的许可证目录及 THIRD_PARTY_NOTICES.md 中。
+轻小说文库的协议实现参考 MewX/light-novel-library_Wenku8_Android 的公开资料。其 GPL v2 声明及完整来源说明保留在对应源码归档中。
 https://github.com/MewX/light-novel-library_Wenku8_Android
 
 软件按各许可证约定提供，不附加适销性、特定用途适用性等保证。具体权利与限制以完整许可证正文为准。
