@@ -41,7 +41,8 @@ namespace Wenku8::Reader
         std::function<void(QPoint)> m_fnTap;
         bool m_bEnabled = false, m_bActive = false, m_bMoved = false, m_bInterrupted = false;
         int m_nId = -1;
-        QPointF m_oStart;
+        QPointF m_oStart, m_oScrollPoint;
+        int m_nScrollDirection = 0;
         QElapsedTimer m_oTime;
         quint64 m_nTouchStartTimestamp = 0;
         qint64 m_nLastInputTimestamp = 0;
@@ -50,6 +51,7 @@ namespace Wenku8::Reader
         std::function<void(int)> m_fnTurn;
         std::function<void()> m_fnPress;
         void releaseFeedback();
+        void moveScroll(const QPointF&, qint64 nTimestamp);
         qint64 inputTimestamp(const QTouchEvent*);
         std::function<bool()> m_fnPullAllowed;
         std::function<void(qreal)> m_fnPullProgress;

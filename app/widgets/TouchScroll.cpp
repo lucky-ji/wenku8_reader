@@ -43,6 +43,8 @@ namespace Wenku8::Reader
         oProperties.setScrollMetric(QScrollerProperties::VerticalOvershootPolicy,
                                     QScrollerProperties::OvershootAlwaysOff);
         oProperties.setScrollMetric(QScrollerProperties::FrameRate, QScrollerProperties::Fps60);
+        // The default 5 mm threshold leaves short chapter-list drags behind the finger.
+        oProperties.setScrollMetric(QScrollerProperties::DragStartDistance, 0.001);
         oProperties.setScrollMetric(QScrollerProperties::MaximumVelocity, 0.5);
         oProperties.setScrollMetric(QScrollerProperties::AcceleratingFlickSpeedupFactor, 1.0);
         oProperties.setScrollMetric(QScrollerProperties::DecelerationFactor, 0.14);
@@ -56,6 +58,31 @@ namespace Wenku8::Reader
         m_bActive = false;
         releaseFeedback();
         QScroller::scroller(m_pArea->viewport())->stop();
+    }
+    void TouchScroll::moveScroll(const QPointF& oPoint, qint64 nTimestamp)
+    {
+        const qreal fDelta = oPoint.y() - m_oScrollPoint.y();
+        const int nDirection = fDelta > 0 ? 1 : fDelta < 0 ? -1 : 0;
+        // Qt 5 replaces flick velocity immediately on a direction change. Ignore
+        // small endpoint tremor, but accept an intentional reversal once it passes
+        // eight logical pixels measured from the last accepted position.
+        if (nDirection && m_nScrollDirection && nDirection != m_nScrollDirection &&
+            qAbs(fDelta) < 8)
+        {
+            return;
+        }
+        m_oScrollPoint = QPointF(m_oStart.x(), oPoint.y());
+        if (nDirection)
+        {
+            m_nScrollDirection = nDirection;
+        }
+        auto* pScroller = QScroller::scroller(m_pArea->viewport());
+        pScroller->handleInput(QScroller::InputMove, m_oScrollPoint, nTimestamp);
+        if (pScroller->state() == QScroller::Dragging)
+        {
+            m_bMoved = true;
+            releaseFeedback();
+        }
     }
     void TouchScroll::releaseFeedback()
     {
@@ -109,8 +136,10 @@ namespace Wenku8::Reader
                 // Withdrawing beyond the edge returns control to ordinary scrolling.
                 resetPull();
                 m_bPullBlocked = true;
+                m_oScrollPoint = QPointF(m_oStart.x(), oPoint.y());
+                m_nScrollDirection = 0;
                 QScroller::scroller(m_pArea->viewport())
-                    ->handleInput(QScroller::InputPress, oPoint, nTimestamp);
+                    ->handleInput(QScroller::InputPress, m_oScrollPoint, nTimestamp);
                 return true;
             }
             m_fPullAmount = qBound(qreal(0), fDistance / qreal(96), qreal(1.5));
@@ -206,6 +235,8 @@ namespace Wenku8::Reader
                 auto oPoint = pTouch->touchPoints().front();
                 m_nId = oPoint.id();
                 m_oStart = oPoint.pos();
+                m_oScrollPoint = m_oStart;
+                m_nScrollDirection = 0;
                 m_fPullAnchorY = m_oStart.y();
                 m_bPullAtTop = canPull() && m_pArea->verticalScrollBar()->value() <=
                                                 m_pArea->verticalScrollBar()->minimum();
@@ -256,8 +287,7 @@ namespace Wenku8::Reader
         if (pEvent->type() == QEvent::TouchUpdate)
         {
             if (!bPulled && !m_bPaged)
-                pScroller->handleInput(QScroller::InputMove,
-                                       QPointF(m_oStart.x(), oPoint.pos().y()), nTimestamp);
+                moveScroll(oPoint.pos(), nTimestamp);
         }
         else
         {
@@ -274,9 +304,13 @@ namespace Wenku8::Reader
                 return true;
             }
             resetPull();
+            // Release coordinates can jump as the contact patch lifts. The last
+            // move carries the intended direction; a stationary release still lets
+            // QScroller decay velocity using the actual release timestamp.
             if (!m_bPaged)
-                pScroller->handleInput(QScroller::InputRelease,
-                                       QPointF(m_oStart.x(), oPoint.pos().y()), nTimestamp);
+            {
+                pScroller->handleInput(QScroller::InputRelease, m_oScrollPoint, nTimestamp);
+            }
             if (m_bPaged && m_bMoved && m_fnTurn)
             {
                 const auto oDelta = oPoint.pos() - m_oStart;
