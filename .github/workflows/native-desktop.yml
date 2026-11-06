@@ -74,7 +74,8 @@ jobs:
           python3 platform/linux/collect_sources.py --metadata out/native/BUILD-METADATA.json --output out/native-provenance "${args[@]}"
       - name: Check deployed application and real WebEngine startup
         run: |
-          strBundle="out/native/wenku8-reader-1.0.0-linux-${{ matrix.arch }}"
+          strVersion=$(python3 -c 'import json; print(json.load(open("out/native/BUILD-METADATA.json"))["version"])')
+          strBundle="out/native/wenku8-reader-$strVersion-linux-${{ matrix.arch }}"
           xvfb-run -a "$strBundle/wenku8_reader" --version
           export LIBGL_ALWAYS_SOFTWARE=1
           export QTWEBENGINE_CHROMIUM_FLAGS="--disable-gpu --disable-dev-shm-usage"

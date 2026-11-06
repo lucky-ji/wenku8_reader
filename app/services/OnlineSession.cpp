@@ -694,10 +694,12 @@ namespace Wenku8::Reader
                 m_bAuthenticated = true;
                 m_strUser = oResult.m_strUsername;
                 m_oProbeTimer.stop();
-                if (m_pHost->visible())
-                    m_pHost->accept();
+                // Publish the verified account and unlock the Qt shell before the
+                // native login overlay returns input to it on Android's UI thread.
                 emit m_pQ->authenticationChanged(true);
                 setRestoring(false);
+                if (m_pHost->visible())
+                    m_pHost->accept();
                 emit m_pQ->statusChanged("已登录，欢迎回来。");
                 if (m_fnPending)
                 {

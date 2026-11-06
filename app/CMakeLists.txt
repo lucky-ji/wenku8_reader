@@ -2,8 +2,8 @@
 if(ANDROID)
     set(QT_ANDROID_APPLICATION_BINARY wenku8_client)
     set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../platform/android")
-    set(ANDROID_VERSION_CODE 1)
-    set(ANDROID_VERSION_NAME "1.0.0")
+    set(ANDROID_VERSION_CODE 3)
+    set(ANDROID_VERSION_NAME "${PROJECT_VERSION}")
 endif()
 
 find_package(Qt5 5.15 REQUIRED COMPONENTS Widgets Svg Concurrent)

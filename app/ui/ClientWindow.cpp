@@ -225,19 +225,18 @@ namespace Wenku8::Reader
             QSize sizeHint(const QStyleOptionViewItem& oO, const QModelIndex&) const override
             {
                 auto pView = qobject_cast<const QListWidget*>(parent());
-                int nWidth = pView ? pView->viewport()->width() : oO.rect.width();
+                // Reserve the scrollbar gutter in both layouts. Basing mobile cells
+                // on the live viewport creates a feedback loop at wrapping/height
+                // boundaries (for example three search results in two columns).
+                const int nWidth = pView ? qMax(1, pView->maximumViewportSize().width() -
+                                                     pView->verticalScrollBar()->sizeHint().width())
+                                        : oO.rect.width();
                 if (pView && pView->property("mobileCards").toBool())
                 {
                     int nColumns = qMax(2, nWidth / 176),
                         nCell = qMax(116, (nWidth - nColumns * 12 - 2) / nColumns);
                     return {nCell, qRound(qMin(130, nCell - 36) * 1.45) + 112};
                 }
-                // Reserve the scrollbar gutter even before it appears. Using the live
-                // viewport width here makes item size depend on the layout's result,
-                // causing card positions to change when history gains/loses a scrollbar.
-                if (pView)
-                    nWidth = qMax(1, pView->maximumViewportSize().width() -
-                                         pView->verticalScrollBar()->sizeHint().width());
                 int nColumns = qMax(1, (nWidth + 6) / 322);
                 return {qMax(240, (nWidth - 12 - (nColumns - 1) * 12) / nColumns), 188};
             }
@@ -362,15 +361,18 @@ namespace Wenku8::Reader
                              pP->fontMetrics().elidedText(oIndex.data(Qt::UserRole + 1).toString(),
                                                           Qt::ElideRight, nW));
                 auto strStatus = oIndex.data(Qt::UserRole + 2).toString();
-                QRect oBadge(nX, oR.top() + 106,
-                             std::min(nW, pP->fontMetrics().horizontalAdvance(strStatus) + 16), 23);
-                pP->setPen(Qt::NoPen);
-                pP->setBrush(oC.m_oSelection);
-                pP->drawRoundedRect(oBadge, 6, 6);
-                pP->setPen(oC.m_oSelectionText);
-                pP->drawText(
-                    oBadge.adjusted(8, 0, -5, 0), Qt::AlignVCenter,
-                    pP->fontMetrics().elidedText(strStatus, Qt::ElideRight, oBadge.width() - 12));
+                if (!strStatus.isEmpty())
+                {
+                    QRect oBadge(nX, oR.top() + 106,
+                                 std::min(nW, pP->fontMetrics().horizontalAdvance(strStatus) + 16), 23);
+                    pP->setPen(Qt::NoPen);
+                    pP->setBrush(oC.m_oSelection);
+                    pP->drawRoundedRect(oBadge, 6, 6);
+                    pP->setPen(oC.m_oSelectionText);
+                    pP->drawText(
+                        oBadge.adjusted(8, 0, -5, 0), Qt::AlignVCenter,
+                        pP->fontMetrics().elidedText(strStatus, Qt::ElideRight, oBadge.width() - 12));
+                }
                 pP->setPen(oC.m_oMuted);
                 pP->drawText(QRect(oR.left() + 18, oR.top() + 144, oR.width() - 36, 22),
                              Qt::AlignVCenter,
@@ -1524,7 +1526,18 @@ namespace Wenku8::Reader
 #endif
             );
             m_pLogin->setText("切换账号");
+            m_nSection = 0;
             m_pPages->setCurrentIndex(1);
+            // Interactive login does not emit a second restorationChanged(false).
+            // Complete the shell transition explicitly, including any stale busy
+            // overlay left by the request that led to authentication.
+            m_pStartupPages->setCurrentIndex(1);
+#ifdef WENKU8_CLIENT_ONLINE
+            updateBusy(m_pSession && m_pSession->busy());
+#else
+            updateBusy(false);
+#endif
+            adaptLayout();
         }
     }
     void ClientWindow::navigate(int nSection)
@@ -1648,12 +1661,9 @@ namespace Wenku8::Reader
         {
             auto pItem = new QListWidgetItem(text(oN.m_strTitle), m_pCards);
             pItem->setData(Qt::UserRole, oN.m_nId);
-            pItem->setData(Qt::UserRole + 1,
-                           text(oN.m_strAuthor).isEmpty() ? "轻小说文库" : text(oN.m_strAuthor));
-            pItem->setData(Qt::UserRole + 2, m_nSection == 2 ? "已下载"
-                                             : text(oN.m_strStatus).isEmpty()
-                                                 ? "查看小说"
-                                                 : text(oN.m_strStatus));
+            pItem->setData(Qt::UserRole + 1, text(oN.m_strAuthor));
+            pItem->setData(Qt::UserRole + 2,
+                           m_nSection == 2 ? "已下载" : text(oN.m_strStatus));
             pItem->setData(Qt::UserRole + 3, m_pCovers->image(oN.m_nId));
             pItem->setData(Qt::UserRole + 6, m_pCovers->placeholder(oN.m_nId));
             if (auto oSaved = m_pReadingState->position(oN.m_nId))

@@ -29,6 +29,7 @@ then
 fi
 python3 - "$strRoot" "$strQt" "$strApp" "$strOutput" <<'PY'
 import json
+import plistlib
 import re
 from pathlib import Path
 import subprocess
@@ -36,7 +37,7 @@ import sys
 pRoot,pQt,pApp,pOutput=map(Path,sys.argv[1:])
 def command(vArguments):
     return subprocess.check_output(vArguments,text=True).strip()
-vMetadata={"version":"1.0.0","platform":"macos","architecture":command(["uname","-m"]),"commit":command(["git","-C",str(pRoot),"rev-parse","HEAD"]),"tree":command(["git","-C",str(pRoot),"rev-parse","HEAD^{tree}"]),"qtVersion":command([str(pQt/"bin/qmake"),"-query","QT_VERSION"]),"curlTlsBackend":"Apple SecureTransport"}
+vMetadata={"version":plistlib.loads((pApp/"Contents/Info.plist").read_bytes())["CFBundleShortVersionString"],"platform":"macos","architecture":command(["uname","-m"]),"commit":command(["git","-C",str(pRoot),"rev-parse","HEAD"]),"tree":command(["git","-C",str(pRoot),"rev-parse","HEAD^{tree}"]),"qtVersion":command([str(pQt/"bin/qmake"),"-query","QT_VERSION"]),"curlTlsBackend":"Apple SecureTransport"}
 strLoadCommands=command(["otool","-l",str(pApp/"Contents/MacOS/wenku8_client")])
 oMinimum=re.search(r"\bminos\s+([0-9.]+)",strLoadCommands)
 if not oMinimum:
@@ -59,6 +60,7 @@ PY
 codesign --force --deep --sign - "$strApp"
 codesign --verify --deep --strict "$strApp"
 "$strApp/Contents/MacOS/wenku8_client" --version
-strArchive="$strOutput/wenku8-reader-1.0.0-macos-x86_64.zip"
+strVersion=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$strApp/Contents/Info.plist")
+strArchive="$strOutput/wenku8-reader-$strVersion-macos-x86_64.zip"
 ditto -c -k --sequesterRsrc --keepParent "$strApp" "$strArchive"
 (cd "$strOutput" && shasum -a 256 "$(basename "$strArchive")" > SHA256SUMS.txt)

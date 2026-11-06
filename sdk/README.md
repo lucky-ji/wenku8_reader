@@ -41,4 +41,4 @@ target_link_libraries(your_program PRIVATE Wenku8::Sdk)
 
 Android NDK r21 的共享 libc++ 缺少 `std::filesystem` 时，可通过 `WENKU8_ANDROID_FILESYSTEM_SOURCE_DIR` 指向匹配的 LLVM 9 filesystem 源码；不得以不匹配的 C++ 运行库替换 Qt 的运行库。
 
-本项目与 SDK 的许可证为 GPL-2.0-only。依赖原始许可证及对应源码安排见仓库 `licenses/` 与发布资产。
+本项目与 SDK 的许可证为 GPL-2.0-only。依赖原始许可证见仓库 `licenses/`，固定版本与源码来源见 [依赖说明](../docs/DEPENDENCIES.md)。

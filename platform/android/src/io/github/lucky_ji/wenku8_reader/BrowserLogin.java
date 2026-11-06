@@ -12,7 +12,6 @@ import android.net.http.SslError;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
-import android.view.ViewGroup;
 import android.webkit.*;
 import android.widget.*;
 import org.json.*;
@@ -30,7 +29,7 @@ public final class BrowserLogin
     private final String m_strOrigin;
     private final NavigationPolicy m_oNavigation;
     private final String m_strNavigationScript;
-    private final FrameLayout m_oOverlay;
+    private final LoginWindow m_oLoginWindow;
     private final WebView m_oWeb;
     private final TextView m_oHint;
     private final FrameLayout m_oPageLoading;
@@ -52,7 +51,7 @@ public final class BrowserLogin
     }
     private final Handler m_oHandler = new Handler(Looper.getMainLooper());
     private long m_nJob = 0;
-    private boolean m_bClosed = false, m_bLoaded = false;
+    private boolean m_bClosed = false, m_bLoaded = false, m_bReturning = false;
     private String m_strPageError = "";
     private static native void nativeEvent(long nToken, int nEvent, String strData);
     private static native void nativeReply(long nToken, long nRequest, String strJson);
@@ -80,6 +79,13 @@ public final class BrowserLogin
         m_oHint.setText("暂时无法打开登录页面，请检查网络后重试。");
         m_oHint.setVisibility(View.VISIBLE);
     }
+    private void networkError(String strMessage)
+    {
+        error(strMessage);
+        m_oHint.setText("登录网页无法加载，可能是当前网络异常，或应用的联网权限被关闭。\n" +
+                        "请检查网络，并在系统的应用联网设置中允许「轻小说文库」使用 WLAN／移动数据；" +
+                        "如系统单独管理 WebView／浏览器的联网权限，也请一并检查。");
+    }
     private boolean navigate(WebView oView, String strUrl, boolean bMain, String strMethod)
     {
         if (!bMain)
@@ -104,12 +110,11 @@ public final class BrowserLogin
         m_nToken = nId;
         m_oNavigation = new NavigationPolicy(strSite);
         m_strNavigationScript = strGuard;
-        m_oOverlay = new FrameLayout(oOwner);
-        m_oOverlay.setBackgroundColor(Color.WHITE);
-        m_oOverlay.setVisibility(View.GONE);
+        FrameLayout oContent = new FrameLayout(oOwner);
+        oContent.setBackgroundColor(Color.WHITE);
         LinearLayout oColumn = new LinearLayout(oOwner);
         oColumn.setOrientation(LinearLayout.VERTICAL);
-        m_oOverlay.addView(oColumn, new FrameLayout.LayoutParams(-1, -1));
+        oContent.addView(oColumn, new FrameLayout.LayoutParams(-1, -1));
         LinearLayout oBar = new LinearLayout(oOwner);
         oBar.setGravity(Gravity.CENTER_VERTICAL);
         oBar.setPadding(dp(12), dp(8), dp(16), dp(8));
@@ -136,7 +141,9 @@ public final class BrowserLogin
         oTitle.setTextSize(18);
         oBar.addView(oTitle, new LinearLayout.LayoutParams(0, -2, 1));
         m_oHint = new TextView(oOwner);
-        m_oHint.setPadding(16, 4, 16, 8);
+        m_oHint.setPadding(dp(16), dp(8), dp(16), dp(12));
+        m_oHint.setTextSize(14);
+        m_oHint.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         m_oHint.setTextColor(Color.DKGRAY);
         m_oHint.setVisibility(View.GONE);
         oColumn.addView(m_oHint);
@@ -280,7 +287,7 @@ public final class BrowserLogin
                 {
                     if (!m_bClosed && nGeneration == m_nNavigationGeneration &&
                         m_oPageLoading.getVisibility() == View.VISIBLE)
-                        error("网页加载超时，请检查网络后重试。");
+                        networkError("网页加载超时，请检查网络后重试。");
                 }, 30000);
             }
             @Override public void onPageCommitVisible(WebView oView, String strUrl)
@@ -293,15 +300,29 @@ public final class BrowserLogin
                                         WebResourceError oError)
             {
                 if (oRequest.isForMainFrame())
-                    error("网页加载失败（错误码 " + oError.getErrorCode() +
+                    networkError("网页加载失败（错误码 " + oError.getErrorCode() +
                           "），请检查网络并重试。");
+            }
+            @SuppressWarnings("deprecation")
+            @Override
+            public void onReceivedError(WebView oView, int nCode, String strDescription,
+                                        String strFailedUrl)
+            {
+                // Before Android 6, only this main-document callback is available.
+                // Newer WebViews use the request callback so subresource failures
+                // cannot display a permission warning over an otherwise usable page.
+                if (android.os.Build.VERSION.SDK_INT < 23 && strFailedUrl != null &&
+                    strFailedUrl.equals(oView.getUrl()))
+                {
+                    networkError("网页加载失败，请检查网络后重试。");
+                }
             }
             @Override
             public void onReceivedHttpError(WebView oView, WebResourceRequest oRequest,
                                             WebResourceResponse oResponse)
             {
                 if (oRequest.isForMainFrame())
-                    error("网站返回 HTTP " + oResponse.getStatusCode() +
+                    networkError("网站返回 HTTP " + oResponse.getStatusCode() +
                           "，请完成验证或稍后重试。");
             }
             @Override public void onPageFinished(WebView oView, String strUrl)
@@ -336,7 +357,7 @@ public final class BrowserLogin
         m_oWeb.setDownloadListener((strU, strA, strC, strM, nL) ->
         {
         });
-        m_oActivity.addContentView(m_oOverlay, new ViewGroup.LayoutParams(-1, -1));
+        m_oLoginWindow = new LoginWindow(oOwner, oContent, this::cancel);
         nativeEvent(m_nToken, 0, oSettings.getUserAgentString());
     }
     public static void create(Activity oOwner, String strOrigin, String strGuard, long nToken)
@@ -363,8 +384,7 @@ public final class BrowserLogin
                 return;
             if (nAction == 0)
             {
-                oB.m_oOverlay.setVisibility(View.VISIBLE);
-                oB.m_oOverlay.bringToFront();
+                oB.m_oLoginWindow.show();
                 oB.m_oWeb.requestFocus();
             }
             else if (nAction == 1)
@@ -396,13 +416,17 @@ public final class BrowserLogin
                 oB.abort("cancel");
                 oB.m_bClosed = true;
                 oB.m_oWeb.stopLoading();
+                oB.m_oLoginWindow.close();
                 oB.m_oWeb.destroy();
-                ((ViewGroup)oB.m_oOverlay.getParent()).removeView(oB.m_oOverlay);
                 m_oInstance = null;
             }
             else if (nAction == 6)
             {
                 oB.abort("cancel");
+            }
+            else if (nAction == 7 && oB.m_oActivity instanceof ReaderActivity)
+            {
+                ((ReaderActivity)oB.m_oActivity).qtSurfaceReleased();
             }
         });
     }
@@ -416,15 +440,40 @@ public final class BrowserLogin
     }
     private void hide()
     {
+        if (m_bReturning || !m_oLoginWindow.visible())
+        {
+            return;
+        }
+        m_bReturning = true;
         android.view.inputmethod.InputMethodManager oKeyboard =
             (android.view.inputmethod.InputMethodManager)m_oActivity.getSystemService(
                 android.content.Context.INPUT_METHOD_SERVICE);
         oKeyboard.hideSoftInputFromWindow(m_oWeb.getWindowToken(), 0);
         m_oWeb.clearFocus();
-        m_oOverlay.setVisibility(View.GONE);
+        Runnable fnReturn = () ->
+        {
+            m_bReturning = false;
+            if (!m_bClosed)
+            {
+                m_oLoginWindow.hide();
+                nativeEvent(m_nToken, 6, "");
+            }
+        };
+        if (m_oActivity instanceof ReaderActivity)
+        {
+            ((ReaderActivity)m_oActivity).rebuildQtSurface(fnReturn);
+        }
+        else
+        {
+            fnReturn.run();
+        }
     }
     private void cancel()
     {
+        if (m_bReturning)
+        {
+            return;
+        }
         abort("cancel");
         hide();
         nativeEvent(m_nToken, 2, "");
@@ -432,7 +481,7 @@ public final class BrowserLogin
     public static boolean showing()
     {
         BrowserLogin oB = m_oInstance;
-        return oB != null && oB.m_oOverlay.getVisibility() == View.VISIBLE;
+        return oB != null && oB.m_oLoginWindow.visible();
     }
     public static void persist()
     {
@@ -447,7 +496,7 @@ public final class BrowserLogin
     public static boolean back()
     {
         BrowserLogin oB = m_oInstance;
-        if (oB != null && oB.m_oOverlay.getVisibility() == View.VISIBLE)
+        if (oB != null && oB.m_oLoginWindow.visible())
         {
             oB.cancel();
             return true;
@@ -463,9 +512,8 @@ public final class BrowserLogin
             oB.m_bClosed = true;
             oB.abort("cancel");
             oB.m_oWeb.stopLoading();
+            oB.m_oLoginWindow.close();
             oB.m_oWeb.destroy();
-            if (oB.m_oOverlay.getParent() != null)
-                ((ViewGroup)oB.m_oOverlay.getParent()).removeView(oB.m_oOverlay);
             m_oInstance = null;
         }
     }

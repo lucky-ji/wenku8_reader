@@ -5,6 +5,7 @@
 #include <QAndroidJniObject>
 #include <QAndroidJniEnvironment>
 #include <QApplication>
+#include <QWidget>
 #include <QThread>
 #include <QPointer>
 #include <QFile>
@@ -164,17 +165,28 @@ namespace Wenku8::Reader
         class AndroidLoginHost final : public LoginHost
         {
             std::shared_ptr<Session> m_pState = std::make_shared<Session>();
+            QPointer<QWidget> m_pOwner;
             bool m_bVisible = false, m_bPage = false;
             std::string m_strAgent;
 
           public:
-            AndroidLoginHost(const QUrl& oOrigin)
+            AndroidLoginHost(QWidget* pOwner, const QUrl& oOrigin) : m_pOwner(pOwner)
             {
                 MobileBrowserProtocol::validateOrigin(oOrigin);
                 initMobileResources();
                 m_pState->m_oOrigin = oOrigin;
                 m_pState->m_nToken = oNextId.fetch_add(1);
                 vHosts[m_pState->m_nToken] = this;
+                connect(qApp, &QGuiApplication::applicationStateChanged, this,
+                        [this](Qt::ApplicationState eState)
+                        {
+                            // Qt's screen slot is registered before this host and
+                            // releases its native Surface on ApplicationHidden.
+                            if (eState == Qt::ApplicationHidden && !m_pState->m_oClosed)
+                            {
+                                command(m_pState->m_nToken, 7);
+                            }
+                        });
                 auto oSite = QAndroidJniObject::fromString(
                     oOrigin.toString(QUrl::RemovePath | QUrl::RemoveQuery | QUrl::RemoveFragment));
                 QFile oFile(":/mobile-browser/mobile_navigation.js");
@@ -239,6 +251,14 @@ namespace Wenku8::Reader
                 }
                 else if (nType == 5)
                     m_bPage = false;
+                else if (nType == 6 && !m_bVisible && m_pOwner)
+                {
+                    // Acknowledge the native overlay's asynchronous removal only
+                    // after Android has returned focus to the Qt content view.
+                    m_pOwner->activateWindow();
+                    m_pOwner->setFocus(Qt::OtherFocusReason);
+                    m_pOwner->update();
+                }
             }
             bool visible() const override
             {
@@ -305,9 +325,9 @@ namespace Wenku8::Reader
             }
         };
     } // namespace
-    std::unique_ptr<LoginHost> makeLoginHost(QWidget*, const QUrl& oOrigin, const QString&)
+    std::unique_ptr<LoginHost> makeLoginHost(QWidget* pOwner, const QUrl& oOrigin, const QString&)
     {
-        return std::make_unique<AndroidLoginHost>(oOrigin);
+        return std::make_unique<AndroidLoginHost>(pOwner, oOrigin);
     }
     void mobileHostEvent(quint64 nToken, int nEvent, const QString& strData)
     {
