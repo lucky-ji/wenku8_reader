@@ -445,6 +445,27 @@ public final class BrowserLogin
         oKeyboard.hideSoftInputFromWindow(m_oWeb.getWindowToken(), 0);
         m_oWeb.clearFocus();
         m_oOverlay.setVisibility(View.GONE);
+        ViewGroup oContent = m_oActivity.findViewById(android.R.id.content);
+        // The WebView and keyboard can retain the first focus transfer. Restore
+        // Android's Qt view before acknowledging the return on the Qt thread.
+        oContent.post(() ->
+        {
+            if (m_bClosed || m_oOverlay.getVisibility() == View.VISIBLE)
+            {
+                return;
+            }
+            for (int nIndex = 0; nIndex < oContent.getChildCount(); ++nIndex)
+            {
+                View oChild = oContent.getChildAt(nIndex);
+                if (oChild != m_oOverlay && oChild.getVisibility() == View.VISIBLE)
+                {
+                    oChild.requestFocus();
+                    oChild.requestLayout();
+                    oChild.invalidate();
+                }
+            }
+            nativeEvent(m_nToken, 6, "");
+        });
     }
     private void cancel()
     {

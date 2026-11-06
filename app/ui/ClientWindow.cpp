@@ -361,15 +361,18 @@ namespace Wenku8::Reader
                              pP->fontMetrics().elidedText(oIndex.data(Qt::UserRole + 1).toString(),
                                                           Qt::ElideRight, nW));
                 auto strStatus = oIndex.data(Qt::UserRole + 2).toString();
-                QRect oBadge(nX, oR.top() + 106,
-                             std::min(nW, pP->fontMetrics().horizontalAdvance(strStatus) + 16), 23);
-                pP->setPen(Qt::NoPen);
-                pP->setBrush(oC.m_oSelection);
-                pP->drawRoundedRect(oBadge, 6, 6);
-                pP->setPen(oC.m_oSelectionText);
-                pP->drawText(
-                    oBadge.adjusted(8, 0, -5, 0), Qt::AlignVCenter,
-                    pP->fontMetrics().elidedText(strStatus, Qt::ElideRight, oBadge.width() - 12));
+                if (!strStatus.isEmpty())
+                {
+                    QRect oBadge(nX, oR.top() + 106,
+                                 std::min(nW, pP->fontMetrics().horizontalAdvance(strStatus) + 16), 23);
+                    pP->setPen(Qt::NoPen);
+                    pP->setBrush(oC.m_oSelection);
+                    pP->drawRoundedRect(oBadge, 6, 6);
+                    pP->setPen(oC.m_oSelectionText);
+                    pP->drawText(
+                        oBadge.adjusted(8, 0, -5, 0), Qt::AlignVCenter,
+                        pP->fontMetrics().elidedText(strStatus, Qt::ElideRight, oBadge.width() - 12));
+                }
                 pP->setPen(oC.m_oMuted);
                 pP->drawText(QRect(oR.left() + 18, oR.top() + 144, oR.width() - 36, 22),
                              Qt::AlignVCenter,
@@ -1523,7 +1526,18 @@ namespace Wenku8::Reader
 #endif
             );
             m_pLogin->setText("切换账号");
+            m_nSection = 0;
             m_pPages->setCurrentIndex(1);
+            // Interactive login does not emit a second restorationChanged(false).
+            // Complete the shell transition explicitly, including any stale busy
+            // overlay left by the request that led to authentication.
+            m_pStartupPages->setCurrentIndex(1);
+#ifdef WENKU8_CLIENT_ONLINE
+            updateBusy(m_pSession && m_pSession->busy());
+#else
+            updateBusy(false);
+#endif
+            adaptLayout();
         }
     }
     void ClientWindow::navigate(int nSection)
@@ -1647,12 +1661,9 @@ namespace Wenku8::Reader
         {
             auto pItem = new QListWidgetItem(text(oN.m_strTitle), m_pCards);
             pItem->setData(Qt::UserRole, oN.m_nId);
-            pItem->setData(Qt::UserRole + 1,
-                           text(oN.m_strAuthor).isEmpty() ? "轻小说文库" : text(oN.m_strAuthor));
-            pItem->setData(Qt::UserRole + 2, m_nSection == 2 ? "已下载"
-                                             : text(oN.m_strStatus).isEmpty()
-                                                 ? "查看小说"
-                                                 : text(oN.m_strStatus));
+            pItem->setData(Qt::UserRole + 1, text(oN.m_strAuthor));
+            pItem->setData(Qt::UserRole + 2,
+                           m_nSection == 2 ? "已下载" : text(oN.m_strStatus));
             pItem->setData(Qt::UserRole + 3, m_pCovers->image(oN.m_nId));
             pItem->setData(Qt::UserRole + 6, m_pCovers->placeholder(oN.m_nId));
             if (auto oSaved = m_pReadingState->position(oN.m_nId))
