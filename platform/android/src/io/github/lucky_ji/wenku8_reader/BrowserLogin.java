@@ -51,7 +51,7 @@ public final class BrowserLogin
     }
     private final Handler m_oHandler = new Handler(Looper.getMainLooper());
     private long m_nJob = 0;
-    private boolean m_bClosed = false, m_bLoaded = false;
+    private boolean m_bClosed = false, m_bLoaded = false, m_bReturning = false;
     private String m_strPageError = "";
     private static native void nativeEvent(long nToken, int nEvent, String strData);
     private static native void nativeReply(long nToken, long nRequest, String strJson);
@@ -424,6 +424,10 @@ public final class BrowserLogin
             {
                 oB.abort("cancel");
             }
+            else if (nAction == 7 && oB.m_oActivity instanceof ReaderActivity)
+            {
+                ((ReaderActivity)oB.m_oActivity).qtSurfaceReleased();
+            }
         });
     }
     private void open()
@@ -436,16 +440,40 @@ public final class BrowserLogin
     }
     private void hide()
     {
+        if (m_bReturning || !m_oLoginWindow.visible())
+        {
+            return;
+        }
+        m_bReturning = true;
         android.view.inputmethod.InputMethodManager oKeyboard =
             (android.view.inputmethod.InputMethodManager)m_oActivity.getSystemService(
                 android.content.Context.INPUT_METHOD_SERVICE);
         oKeyboard.hideSoftInputFromWindow(m_oWeb.getWindowToken(), 0);
         m_oWeb.clearFocus();
-        m_oLoginWindow.hide();
-        nativeEvent(m_nToken, 6, "");
+        Runnable fnReturn = () ->
+        {
+            m_bReturning = false;
+            if (!m_bClosed)
+            {
+                m_oLoginWindow.hide();
+                nativeEvent(m_nToken, 6, "");
+            }
+        };
+        if (m_oActivity instanceof ReaderActivity)
+        {
+            ((ReaderActivity)m_oActivity).rebuildQtSurface(fnReturn);
+        }
+        else
+        {
+            fnReturn.run();
+        }
     }
     private void cancel()
     {
+        if (m_bReturning)
+        {
+            return;
+        }
         abort("cancel");
         hide();
         nativeEvent(m_nToken, 2, "");

@@ -21,8 +21,8 @@ final class LoginWindow
         m_oDialog.setCanceledOnTouchOutside(false);
         m_oDialog.setOnCancelListener(oDialog ->
         {
-            m_bVisible = false;
             fnCancel.run();
+            m_bVisible = false;
         });
         m_oDialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
         m_oDialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);

@@ -177,6 +177,16 @@ namespace Wenku8::Reader
                 m_pState->m_oOrigin = oOrigin;
                 m_pState->m_nToken = oNextId.fetch_add(1);
                 vHosts[m_pState->m_nToken] = this;
+                connect(qApp, &QGuiApplication::applicationStateChanged, this,
+                        [this](Qt::ApplicationState eState)
+                        {
+                            // Qt's screen slot is registered before this host and
+                            // releases its native Surface on ApplicationHidden.
+                            if (eState == Qt::ApplicationHidden && !m_pState->m_oClosed)
+                            {
+                                command(m_pState->m_nToken, 7);
+                            }
+                        });
                 auto oSite = QAndroidJniObject::fromString(
                     oOrigin.toString(QUrl::RemovePath | QUrl::RemoveQuery | QUrl::RemoveFragment));
                 QFile oFile(":/mobile-browser/mobile_navigation.js");

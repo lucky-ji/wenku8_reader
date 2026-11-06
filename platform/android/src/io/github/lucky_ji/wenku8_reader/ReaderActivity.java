@@ -3,11 +3,39 @@ package io.github.lucky_ji.wenku8_reader;
 import android.util.SparseBooleanArray;
 import android.view.KeyEvent;
 import org.qtproject.qt5.android.bindings.QtActivity;
+import org.qtproject.qt5.android.QtNative;
+import org.qtproject.qt5.android.QtActivityDelegate;
+import android.os.Handler;
+import android.os.Looper;
 
 public class ReaderActivity extends QtActivity
 {
     private static volatile boolean m_bVolumePagingEnabled = false;
     private final SparseBooleanArray m_oCaptured = new SparseBooleanArray();
+    private final Handler m_oMainHandler = new Handler(Looper.getMainLooper());
+    private final SurfaceRecovery m_oSurfaceRecovery = new SurfaceRecovery(
+        () -> QtNative.setApplicationState(QtActivityDelegate.ApplicationHidden),
+        () ->
+        {
+            QtNative.setApplicationState(QtActivityDelegate.ApplicationActive);
+            QtNative.updateWindow();
+        },
+        fnAction -> getWindow().getDecorView().postOnAnimation(fnAction),
+        (fnAction, nDelay) -> m_oMainHandler.postDelayed(fnAction, nDelay));
+
+    public void rebuildQtSurface(Runnable fnComplete)
+    {
+        m_oSurfaceRecovery.request(fnComplete);
+    }
+    public void qtSurfaceReleased()
+    {
+        m_oSurfaceRecovery.released();
+    }
+    @Override public void onResume()
+    {
+        super.onResume();
+        m_oSurfaceRecovery.setForeground(true);
+    }
     public static void setVolumePagingEnabled(boolean bEnabled)
     {
         m_bVolumePagingEnabled = bEnabled;
@@ -48,11 +76,13 @@ public class ReaderActivity extends QtActivity
     }
     @Override public void onDestroy()
     {
+        m_oSurfaceRecovery.close();
         BrowserLogin.destroy();
         super.onDestroy();
     }
     @Override public void onPause()
     {
+        m_oSurfaceRecovery.setForeground(false);
         BrowserLogin.persist();
         m_bVolumePagingEnabled = false;
         m_oCaptured.clear();
