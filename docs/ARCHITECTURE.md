@@ -21,6 +21,8 @@ flowchart TD
 
 构建目标从公共控件到服务、界面依次连接。平台库只依赖 SDK 与公共控件，避免平台登录引用主窗口而形成静态库循环。
 
+SDK 工程从 [主仓库](https://github.com/lucky-ji/wenku8_reader) 克隆后直接构建；不需要下载 Release 源码附件。依赖来源见 [依赖清单](DEPENDENCIES.md)。
+
 ## SDK 公共接口
 
 | 头文件 | 用途 |

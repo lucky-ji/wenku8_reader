@@ -1,5 +1,16 @@
 # 构建与打包
 
+## 获取工程源码
+
+```sh
+git clone https://github.com/lucky-ji/wenku8_reader.git
+cd wenku8_reader
+```
+
+默认获取 `main` 分支。若需对应正式版本的工程代码，可执行 `git switch --detach v1.0.0`；最新环境与构建说明以主仓库的 [构建指南](https://github.com/lucky-ji/wenku8_reader/blob/main/docs/BUILDING.md) 为准。
+
+工程与 SDK 源码、平台适配、构建脚本及许可证均在主仓库中。Qt、NDK 等环境另行安装；未随仓库保存的第三方依赖源码按 [依赖来源](DEPENDENCIES.md) 获取，不从 Release 附件取得工程源码。
+
 ## 通用要求
 
 - CMake 3.24 或更高版本、Ninja、支持 C++17 的编译器。
@@ -34,7 +45,7 @@ MSI 脚本使用 Python 3 与 WiX Toolset 3。先准备完整的部署目录：
 python platform/windows/build_msi.py --stage out/windows/bin --wix C:/Tools/WiX/bin --output out/installer --version 1.0.0
 ```
 
-`--stage` 指向经过检查的应用根目录；将许可证、图标及其他分发文件与程序一起放在该目录。发布时应生成并随附与二进制一致的对应源码归档，而不是把开发机的 Qt 或 VS 安装目录加入 Git。
+`--stage` 指向经过检查的应用根目录；将许可证、图标及其他分发文件与程序一起放在该目录。发布附件仅包含编译好的程序；源码入口为主仓库及 [匹配依赖来源](DEPENDENCIES.md)。保留完整许可证、实际依赖版本及必要构建信息，不把开发机的 Qt 或 VS 安装目录加入 Git。
 
 ## Android ARM64
 
@@ -102,29 +113,8 @@ iOS 仅保留启动界面与基础配置，WKWebView 会话适配尚未实现。
 1. 在干净构建目录生成程序，核对版本为 1.0.0、名称为轻小说文库。
 2. 检查首次登录、重启会话恢复、书架、搜索、正文、目录、下载与离线阅读。
 3. 检查明暗护眼主题、历史位置、书签，以及 Android 触控和音量键。
-4. 打包完整运行依赖、原始许可证、组件声明和匹配的对应源码。
+4. 打包完整运行依赖、原始许可证与组件声明，核对主仓库中的版本源码、依赖来源及必要构建信息。
 5. 检查包内不含账号、Cookie、正文缓存、历史、密钥或开发工具；更新 SHA-256 摘要并发布正式资产。
-
-## 对应源码归档
-
-使用 `platform/windows/package_sources.py` 与 `platform/android/package_sources.py` 生成正式源码包。工具从已核实的匹配依赖归档复用第三方源文件，忽略其中旧的 `project/` 内容，再加入当前 SDK、客户端、平台适配、CMake、编码规范、许可证与文档白名单。工具不删除旧归档，输出必须使用新路径。
-
-Windows 示例：
-
-```powershell
-python platform/windows/package_sources.py --previous C:/ReleaseSources/matching-qt5152-windows.zip --qt-source C:/Qt/5.15.2/Src --openssl-source C:/ReleaseSources/openssl-1.1.1t.tar.gz --zlib-source C:/ReleaseSources/zlib-1.2.13.tar.gz --output out/releases/v1.0.0/wenku8-reader-1.0.0-windows-sources.zip
-```
-
-Android 示例可复用相同的完整 Qt 5.15.2 依赖源归档，但该归档还需包含 Mbed TLS 3.6.5 和 libiconv 1.17 的原始源码压缩包：
-
-```powershell
-python platform/android/package_sources.py --previous C:/ReleaseSources/matching-qt5152-and-android-dependencies.zip --qt-source C:/Qt/5.15.2/Src --output out/releases/v1.0.0/wenku8-reader-1.0.0-android-sources.zip
-```
-
-`--qt-source` 只加入 Qt 超级工程的配置文件；各 Qt 模块的完整对应源码来自 `--previous`。Windows 保留 WebEngine 及 Chromium 源码，补齐实际 Qt 依赖的 OpenSSL/zlib 原始源码。Android 选择完整 qtbase、qtsvg、qtimageformats、qtandroidextras，加上 Mbed TLS/iconv；Android 系统 WebView 不随 APK 分发，因此不附带 Chromium 或 OpenSSL。Qt 原始源码中的测试和夹具保持原样；应用自己的旧测试、调试程序、旧目录、构建输出、Qt 开发环境及用户数据不进入源码包。
-
-可用 `--stage` 指定部署目录，额外提取 Qt 组件原始归属到 `licenses/qt-components/`。每个输出包含 `SOURCE-README.txt` 和 `SOURCE-MANIFEST.json`，并在打包后核验 ZIP CRC、必要源码路径和项目目录白名单，生成旁置 SHA-256 文件。修改正式源码后必须重新生成对应源码包，使其与最终二进制一致。
-
 
 ## 架构选择
 
@@ -144,6 +134,3 @@ Windows x86 打包时为 `build_msi.py` 添加 `--arch x86`，由 WiX 生成对�
 Android 四 ABI 的网络与编码依赖可使用 [原生依赖构建脚本](ANDROID_BUILD.md) 准备。选定预设后先执行 `cmake --preset <预设名>`，再执行 `cmake --build --preset <预设名>`；生成 APK 时为构建命令添加 `--target apk`，或使用 `CMakePresets.json` 中对应的 APK 构建预设。每次都应让 `ANDROID_ABI` 与依赖前缀一致。
 
 Linux x86_64、Linux ARM64 与 macOS Intel 的原生 runner、构建配置、部署、运行依赖、签名及对应源码安排见 [NATIVE_DESKTOP.md](NATIVE_DESKTOP.md)。Windows ARM64 和原生 macOS ARM64 尚无本项目可用的 Qt 5 WebEngine kit；iOS 登录适配尚未完成，因此不生成占位客户端。
-
-
-桌面统一对应源码可以使用 `--platform desktop`：输入归档应含 QtMacExtras、QtX11Extras 及其他实际分发的 Qt 5.15.2 模块；用 `--icu-source` 提供官方 Linux Qt kit 所用的 ICU 56.1 原始源码。该模式同时保留 Windows Qt 组件所用的 OpenSSL/zlib 源码。Ubuntu 系统 Qt 和 OS 库未随 Linux 包复制，准确系统包及 source package 版本由构建 provenance 记录。

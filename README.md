@@ -52,6 +52,15 @@ SDK 不依赖 Qt、JNI 或阅读器界面。主程序链接 `Wenku8::Sdk` 库，
 
 ## 从源码构建
 
+先从主仓库获取工程：
+
+```sh
+git clone https://github.com/lucky-ji/wenku8_reader.git
+cd wenku8_reader
+```
+
+默认获取 `main` 分支。若需对应正式版本的工程代码，可执行 `git switch --detach v1.0.0`；最新环境与构建说明以主仓库的 [构建指南](https://github.com/lucky-ji/wenku8_reader/blob/main/docs/BUILDING.md) 为准。
+
 需要 CMake 3.24+、支持 C++17 的编译器。客户端仅使用 Qt 5.15；Qt、Visual Studio、Android SDK/NDK 和 JDK 均由开发者自行安装，不包含在源码仓库中。
 
 Windows 在匹配 Qt 的 MSVC x64 开发者终端中执行：
@@ -68,6 +77,8 @@ cmake --build --preset windows-qt5
 cmake -S . -B build/sdk -DWENKU8_BUILD_CLIENT=OFF
 cmake --build build/sdk --config Release
 ```
+
+第三方依赖的版本、源码地址和摘要见 [依赖来源](docs/DEPENDENCIES.md)。Release 手动附件只保留编译好的发布包。
 
 Android 的 Qt、NDK、JDK 和目标原生依赖必须匹配，四 ABI 可使用 [依赖构建脚本](docs/ANDROID_BUILD.md) 分别准备。Linux/macOS 的原生构建与部署见 [原生桌面指南](docs/NATIVE_DESKTOP.md)。完整配置、APK 生成与打包说明见 [构建指南](docs/BUILDING.md)。
 
