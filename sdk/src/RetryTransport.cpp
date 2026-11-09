@@ -175,9 +175,16 @@ namespace Wenku8
                                        {
                                            return char(std::tolower(nC));
                                        });
+                        // Ordinary successful pages also contain Cloudflare's
+                        // background JSD script. Match the website backend's
+                        // distinction rather than retrying those valid pages.
+                        const bool bPlatform = strSample.find("challenge-platform") != std::string::npos;
+                        const bool bBackgroundDetection = strSample.find("/scripts/jsd/") != std::string::npos;
                         const bool bChallenge =
+                            (bPlatform && !bBackgroundDetection) ||
+                            strSample.find("__cf_chl_opt") != std::string::npos ||
+                            strSample.find("cf-chl-") != std::string::npos ||
                             strSample.find("<title>just a moment") != std::string::npos ||
-                            strSample.find("/cdn-cgi/challenge-platform/") != std::string::npos ||
                             strSample.find("you have been blocked") != std::string::npos;
                         if (oResponse->m_nStatus == 401)
                         {
