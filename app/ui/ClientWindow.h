@@ -54,6 +54,7 @@ namespace Wenku8::Reader
         std::unique_ptr<CoverStore> m_pCovers;
         QString m_strDirectory, m_strOrigin;
         Theme m_eTheme = Theme::Light;
+        bool m_bThemeApplied = false;
         bool m_bUnlocked = false, m_bRestoring = false, m_bLocalBook = false,
              m_bResumeOnOpen = false;
         quint64 m_nRestoreGeneration = 0;
@@ -66,7 +67,7 @@ namespace Wenku8::Reader
         QPointer<QWidget> m_pLoadingFocus;
         Qt::WindowStates m_oPreviousWindowState;
         QWidget* m_pHeading = nullptr;
-        bool m_bCompact = false, m_bReaderToolsOpen = false;
+        bool m_bCompact = false, m_bReaderToolsOpen = false, m_bAdaptingLayout = false;
         bool m_bReaderChrome = true;
         bool m_bVolumePaging = true;
         QVector<int> m_vMobileHistory;

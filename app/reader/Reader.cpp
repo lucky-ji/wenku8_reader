@@ -9,6 +9,7 @@
 #include <QTextCursor>
 #include <QScrollBar>
 #include <QResizeEvent>
+#include <QShowEvent>
 #include <QUrl>
 #include <QTextBlock>
 #include <QTextBlockFormat>
@@ -115,16 +116,15 @@ namespace Wenku8::Reader
         // character and toPlainText() maps both to '\n', preserving saved anchors.
         QTextCursor oEdit(this);
         oEdit.beginEditBlock();
-        for (int nPosition = 0; nPosition < characterCount() - 1; ++nPosition)
+        const QString strRaw = toRawText();
+        for (int nPosition = strRaw.indexOf(QChar::LineSeparator); nPosition >= 0;
+             nPosition = strRaw.indexOf(QChar::LineSeparator, nPosition + 1))
         {
-            if (characterAt(nPosition) == QChar::LineSeparator)
-            {
-                oEdit.setPosition(nPosition);
-                oEdit.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor);
-                auto oBlock = oEdit.blockFormat();
-                auto oCharacters = oEdit.charFormat();
-                oEdit.insertBlock(oBlock, oCharacters);
-            }
+            oEdit.setPosition(nPosition);
+            oEdit.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor);
+            auto oBlock = oEdit.blockFormat();
+            auto oCharacters = oEdit.charFormat();
+            oEdit.insertBlock(oBlock, oCharacters);
         }
         bool bPreviousBlank = false;
         for (auto oBlock = begin(); oBlock.isValid(); oBlock = oBlock.next())
@@ -285,6 +285,17 @@ namespace Wenku8::Reader
     {
         if (m_bRebuilding)
             return;
+        if (!isVisible() && !m_oChapter.m_strHtml.isEmpty())
+        {
+            // Layout changes from hidden settings pages and late illustration
+            // replies collapse into one rebuild at the final visible geometry.
+            m_bLayoutPending = true;
+            m_nPendingPosition = nPosition;
+            clearRasterCache();
+            m_oImageRefreshTimer.stop();
+            return;
+        }
+        m_bLayoutPending = false;
         cancelMotion();
         clearRasterCache();
         m_oImageRefreshTimer.stop();
@@ -317,11 +328,42 @@ namespace Wenku8::Reader
             oCursor.setBlockFormat(oFormat);
         }
         paginate();
+        m_oLayoutViewport = viewport()->size();
         restorePosition(nPosition);
         queueWarmBands();
     }
+    void ReadingView::reflow(int nPosition)
+    {
+        if (!isVisible())
+        {
+            rebuild(nPosition);
+            return;
+        }
+        cancelMotion();
+        clearRasterCache();
+        QScopedValueRollback<bool> oGuard(m_bRebuilding, true);
+        const int nPreferredMargin =
+            m_nSideMargin > 0 ? m_nSideMargin : viewport()->width() < 600 ? 16 : 24;
+        const int nMargin = qMin(nPreferredMargin, qMax(0, (viewport()->width() - 80) / 2));
+        m_pDocument->setDocumentMargin(nMargin);
+        m_pDocument->setTextWidth(viewport()->width());
+        if (m_eMode == ReadingMode::Paged)
+        {
+            QTextCursor oCursor(m_pDocument->lastBlock());
+            auto oFormat = oCursor.blockFormat();
+            oFormat.setBottomMargin(viewport()->height());
+            oCursor.setBlockFormat(oFormat);
+        }
+        paginate();
+        m_oLayoutViewport = viewport()->size();
+        restorePosition(nPosition);
+    }
     int ReadingView::readingPosition() const
     {
+        if (m_bLayoutPending)
+        {
+            return m_nPendingPosition;
+        }
         if (m_eMode == ReadingMode::Paged && !m_vPages.isEmpty())
             return m_vPages[m_nPage].m_nOffset;
         return cursorForPosition(QPoint(26, 2)).position();
@@ -337,6 +379,11 @@ namespace Wenku8::Reader
     }
     void ReadingView::restorePosition(int nPosition)
     {
+        if (m_bLayoutPending)
+        {
+            m_nPendingPosition = qMax(0, nPosition);
+            return;
+        }
         cancelMotion();
         QScopedValueRollback<bool> oGuard(m_bRebuilding, true);
         QTextCursor oCursor(m_pDocument);
@@ -380,26 +427,73 @@ namespace Wenku8::Reader
     }
     void ReadingView::appearance(int nSize, Theme eTheme)
     {
+        nSize = std::clamp(nSize, 10, 36);
+        if (m_bAppearanceSet && font().pointSize() == nSize && m_eAppearanceTheme == eTheme)
+        {
+            return;
+        }
         const int nPosition = readingPosition();
-        QFont oF = font();
-        oF.setPointSize(std::clamp(nSize, 10, 36));
-        setFont(oF);
-        const auto oC = colors(eTheme);
-        m_oPaper = oC.m_oPaper;
-        setStyleSheet("QTextBrowser { background:" + oC.m_oPaper.name() +
-                      "; color:" + oC.m_oText.name() +
-                      "; border:0; font-size:" + QString::number(std::clamp(nSize, 10, 36)) +
-                      "pt; }" + scrollBarStyle(eTheme));
-        verticalScrollBar()->setStyleSheet(scrollBarStyle(eTheme));
-        horizontalScrollBar()->setStyleSheet(scrollBarStyle(eTheme));
-        rebuild(nPosition);
+        const bool bFontChanged = font().pointSize() != nSize;
+        m_bAppearanceSet = true;
+        m_eAppearanceTheme = eTheme;
+        cancelMotion();
+        clearRasterCache();
+        // Style polish can resize scroll bars. Handle the resulting final size
+        // once after updating colors, rather than recursively recreating text.
+        {
+            QScopedValueRollback<bool> oGuard(m_bRebuilding, true);
+            QFont oF = font();
+            oF.setPointSize(nSize);
+            if (bFontChanged)
+            {
+                setFont(oF);
+            }
+            const auto oC = colors(eTheme);
+            m_oPaper = oC.m_oPaper;
+            setStyleSheet("QTextBrowser { background:" + oC.m_oPaper.name() +
+                          "; color:" + oC.m_oText.name() +
+                          "; border:0; font-size:" + QString::number(nSize) +
+                          "pt; }" + scrollBarStyle(eTheme));
+            verticalScrollBar()->setStyleSheet(scrollBarStyle(eTheme));
+            horizontalScrollBar()->setStyleSheet(scrollBarStyle(eTheme));
+        }
+        if (bFontChanged || m_bLayoutPending)
+        {
+            rebuild(nPosition);
+        }
+        else if (!m_oChapter.m_strHtml.isEmpty() && m_oLayoutViewport != viewport()->size())
+        {
+            reflow(nPosition);
+        }
+        viewport()->update();
     }
     void ReadingView::resizeEvent(QResizeEvent* pEvent)
     {
         int nPosition = readingPosition();
         QTextBrowser::resizeEvent(pEvent);
-        if (!m_bRebuilding && !m_oChapter.m_strHtml.isEmpty())
-            rebuild(nPosition);
+        if (m_bRebuilding || m_oChapter.m_strHtml.isEmpty())
+        {
+            return;
+        }
+        const bool bWidthChanged = viewport()->width() != m_oLayoutViewport.width();
+        const bool bHeightChanged = viewport()->height() != m_oLayoutViewport.height();
+        if (m_bLayoutPending || bWidthChanged || (bHeightChanged && m_eMode == ReadingMode::Paged))
+        {
+            if (m_bLayoutPending || !m_oChapter.m_vImages.isEmpty())
+            {
+                rebuild(nPosition);
+            }
+            else
+            {
+                // Width changes need line wrapping, not reparsing an entire
+                // chapter. Paged text also needs new page boundaries on height.
+                reflow(nPosition);
+            }
+        }
+        else
+        {
+            m_oLayoutViewport = viewport()->size();
+        }
     }
     namespace
     {
@@ -607,6 +701,11 @@ namespace Wenku8::Reader
     {
         if (m_oChapter.m_vImages.isEmpty())
             return;
+        if (!isVisible())
+        {
+            rebuild(readingPosition());
+            return;
+        }
         if (moving())
         {
             m_bImagesPending = true;
@@ -712,7 +811,8 @@ namespace Wenku8::Reader
     }
     void ReadingView::queueWarmBands()
     {
-        if (!isVisible() || textInteractionFlags() != Qt::NoTextInteraction || m_bRebuilding)
+        if (!isVisible() || textInteractionFlags() != Qt::NoTextInteraction || m_bRebuilding ||
+            m_bLayoutPending)
             return;
         validateRasterCache();
         m_vWarmBands.clear();
@@ -812,6 +912,20 @@ namespace Wenku8::Reader
         cancelMotion();
         m_oWarmTimer.stop();
         m_vWarmBands.clear();
+        m_oImageRefreshTimer.stop();
+        if (m_bImagesPending)
+        {
+            rebuild(readingPosition());
+        }
         QTextBrowser::hideEvent(pEvent);
+    }
+    void ReadingView::showEvent(QShowEvent* pEvent)
+    {
+        QTextBrowser::showEvent(pEvent);
+        if (m_bLayoutPending)
+        {
+            rebuild(m_nPendingPosition);
+        }
+        queueWarmBands();
     }
 } // namespace Wenku8::Reader

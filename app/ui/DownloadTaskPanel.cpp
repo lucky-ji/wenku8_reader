@@ -10,6 +10,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QSet>
+#include <QShowEvent>
 #include <algorithm>
 namespace Wenku8::Reader
 {
@@ -46,11 +47,26 @@ namespace Wenku8::Reader
 #else
         pTouch->setEnabled(false);
 #endif
-        connect(m_pManager, &DownloadManager::tasksChanged, this, &DownloadTaskPanel::refresh);
-        refresh();
+        connect(m_pManager, &DownloadManager::tasksChanged, this, [this]
+        {
+            m_bRefreshPending = true;
+            if (isVisible())
+            {
+                refresh();
+            }
+        });
+    }
+    void DownloadTaskPanel::showEvent(QShowEvent* pEvent)
+    {
+        QWidget::showEvent(pEvent);
+        if (m_bRefreshPending)
+        {
+            refresh();
+        }
     }
     void DownloadTaskPanel::refresh()
     {
+        m_bRefreshPending = false;
         auto vTasks = m_pManager->tasks();
         std::stable_sort(vTasks.begin(), vTasks.end(), [](const DownloadTask& oLeft, const DownloadTask& oRight)
         {

@@ -40,7 +40,8 @@ namespace Wenku8::Reader
     {
         DownloadManager* m_pQ;
         QString m_strCache, m_strRoot, m_strOrigin, m_strAccount, m_strActive;
-        mutable std::mutex m_oMutex;
+        mutable std::mutex m_oMutex, m_oSnapshotMutex;
+        QList<DownloadTask> m_vSnapshot;
         std::condition_variable m_oWake;
         QList<DownloadTask> m_vTasks;
         ClientOptions m_oOptions;
@@ -55,6 +56,7 @@ namespace Wenku8::Reader
               m_strRoot(QDir(m_strCache).filePath(".downloads")), m_strOrigin(std::move(strOrigin))
         {
             load();
+            m_vSnapshot = m_vTasks;
             m_oWorker = std::thread([this]
             {
                 work();
@@ -88,6 +90,12 @@ namespace Wenku8::Reader
         }
         void changed()
         {
+            // Publish a short-lived in-memory snapshot. Painting/navigating the
+            // task page must never wait for the checkpoint's filesystem commit.
+            {
+                std::lock_guard<std::mutex> oSnapshotLock(m_oSnapshotMutex);
+                m_vSnapshot = m_vTasks;
+            }
             post([this]
             {
                 emit m_pQ->tasksChanged();
@@ -234,6 +242,9 @@ namespace Wenku8::Reader
                     changed();
                     return false;
                 }
+                // Keep reads current even when the next UI notification is throttled.
+                std::lock_guard<std::mutex> oSnapshotLock(m_oSnapshotMutex);
+                m_vSnapshot = m_vTasks;
             }
             const auto oNow = std::chrono::steady_clock::now();
             if (bNew && oNow - m_oLastNotify >= std::chrono::milliseconds(250))
@@ -496,8 +507,8 @@ namespace Wenku8::Reader
     }
     QList<DownloadTask> DownloadManager::tasks() const
     {
-        std::lock_guard<std::mutex> oLock(m_pImpl->m_oMutex);
-        return m_pImpl->m_vTasks;
+        std::lock_guard<std::mutex> oLock(m_pImpl->m_oSnapshotMutex);
+        return m_pImpl->m_vSnapshot;
     }
     void DownloadManager::setSession(const ClientOptions& oOptions,
                                      std::shared_ptr<HttpTransport> pTransport,

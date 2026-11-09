@@ -120,14 +120,20 @@ namespace Wenku8::Reader
         void wheelEvent(QWheelEvent*) override;
         void keyPressEvent(QKeyEvent*) override;
         void hideEvent(QHideEvent*) override;
+        void showEvent(QShowEvent*) override;
 
       private:
         LocalDocument* m_pDocument;
         bool m_bRebuilding = false;
+        bool m_bLayoutPending = false, m_bAppearanceSet = false;
+        int m_nPendingPosition = 0;
+        QSize m_oLayoutViewport;
+        Theme m_eAppearanceTheme = Theme::Light;
         int m_nLineHeightPercent = 145, m_nParagraphSpacing = 8, m_nSideMargin = 0;
         ChapterText m_oChapter;
         LocalDocument::ImageLoader m_fnLoader;
         void rebuild(int nPosition);
+        void reflow(int nPosition);
         struct Page
         {
             int m_nY, m_nOffset, m_nEnd;

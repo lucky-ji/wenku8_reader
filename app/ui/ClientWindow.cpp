@@ -38,6 +38,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QTimer>
+#include <QScopedValueRollback>
 #include <QCloseEvent>
 #include <QStyledItemDelegate>
 #include <QPainter>
@@ -1449,6 +1450,11 @@ namespace Wenku8::Reader
     }
     void ClientWindow::setTheme(Theme eTheme)
     {
+        if (m_bThemeApplied && m_eTheme == eTheme)
+        {
+            return;
+        }
+        m_bThemeApplied = true;
         m_eTheme = eTheme;
         m_pLoading->setTheme(eTheme);
         m_pStartupLoading->setTheme(eTheme);
@@ -2253,6 +2259,11 @@ namespace Wenku8::Reader
 
     void ClientWindow::adaptLayout()
     {
+        if (m_bAdaptingLayout)
+        {
+            return;
+        }
+        QScopedValueRollback<bool> oLayoutGuard(m_bAdaptingLayout, true);
         if (m_pDownloadTasks)
         {
             m_pDownloadTasks->setVisible(m_bUnlocked && m_nSection == 2 && m_pPages->currentIndex() == 1);
@@ -2265,7 +2276,10 @@ namespace Wenku8::Reader
         const int nBreakpoint = 760;
 #endif
         m_bCompact = width() < nBreakpoint;
-        setProperty("compact", m_bCompact);
+        if (property("compact").toBool() != m_bCompact)
+        {
+            setProperty("compact", m_bCompact);
+        }
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
         // A maximized window already respects the platform's available area. When
         // fullscreen extends under system UI, inset only the part outside that area.
@@ -2326,18 +2340,32 @@ namespace Wenku8::Reader
                                             bMobile ? 10 : 28);
         m_pDetailLayout->setSpacing(bMobile ? 8 : 16);
         m_pDetailHeaderLayout->setSpacing(bMobile ? 12 : 26);
-        m_pDetailCover->setFixedSize(bMobile ? 80 : 132, bMobile ? 116 : 192);
-        if (auto oImage = m_pCovers->image(m_oBook.m_nId); !oImage.isNull())
-            m_pDetailCover->setPixmap(coverPixmap(oImage, m_pDetailCover->size() - QSize(4, 6),
-                                                  m_pDetailCover->devicePixelRatioF()));
+        const QSize oCoverSize(bMobile ? 80 : 132, bMobile ? 116 : 192);
+        const bool bCoverResized = m_pDetailCover->size() != oCoverSize;
+        m_pDetailCover->setFixedSize(oCoverSize);
+        if (bCoverResized)
+        {
+            if (auto oImage = m_pCovers->image(m_oBook.m_nId); !oImage.isNull())
+            {
+                m_pDetailCover->setPixmap(coverPixmap(oImage, m_pDetailCover->size() - QSize(4, 6),
+                                                      m_pDetailCover->devicePixelRatioF()));
+            }
+        }
         m_pDetailIntro->setVisible(!bMobile);
         findChild<QPushButton*>("showSynopsis")->setVisible(bMobile);
-        m_pDetailTitle->setStyleSheet(QString("font-size:%1px;font-weight:600;color:%2;")
-                                          .arg(bMobile ? 18 : 25)
-                                          .arg(colors(m_eTheme).m_oText.name()));
-        m_pTitle->setStyleSheet(QString("font-size:%1px;font-weight:600;color:%2;")
-                                    .arg(bMobile ? 22 : 28)
-                                    .arg(colors(m_eTheme).m_oText.name()));
+        const auto oColors = colors(m_eTheme);
+        const QString strDetailStyle = QString("font-size:%1px;font-weight:600;color:%2;")
+            .arg(bMobile ? 18 : 25).arg(oColors.m_oText.name());
+        const QString strTitleStyle = QString("font-size:%1px;font-weight:600;color:%2;")
+            .arg(bMobile ? 22 : 28).arg(oColors.m_oText.name());
+        if (m_pDetailTitle->styleSheet() != strDetailStyle)
+        {
+            m_pDetailTitle->setStyleSheet(strDetailStyle);
+        }
+        if (m_pTitle->styleSheet() != strTitleStyle)
+        {
+            m_pTitle->setStyleSheet(strTitleStyle);
+        }
         m_pToc->setColumnHidden(1, bMobile);
         m_pToc->setIndentation(bMobile ? 14 : 24);
         m_pToc->setHorizontalScrollBarPolicy(bMobile ? Qt::ScrollBarAlwaysOff

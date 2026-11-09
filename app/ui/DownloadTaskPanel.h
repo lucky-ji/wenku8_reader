@@ -14,6 +14,8 @@ namespace Wenku8::Reader
       public:
         explicit DownloadTaskPanel(DownloadManager* pManager, QWidget* pParent = nullptr);
         void refresh();
+      protected:
+        void showEvent(QShowEvent*) override;
       private:
         struct Row
         {
@@ -26,5 +28,6 @@ namespace Wenku8::Reader
         QVBoxLayout* m_pRows;
         QMap<QString, Row> m_vRows;
         QLabel* m_pEmpty;
+        bool m_bRefreshPending = true;
     };
 }

@@ -11,6 +11,17 @@
 #include <QLabel>
 namespace Wenku8::Reader
 {
+    namespace
+    {
+        void setWidgetStyle(QWidget* pWidget, const QString& strStyle)
+        {
+            if (pWidget->styleSheet() != strStyle)
+            {
+                pWidget->setStyleSheet(strStyle);
+            }
+        }
+    }
+
     Colors colors(Theme eTheme)
     {
         if (eTheme == Theme::Dark)
@@ -70,8 +81,15 @@ namespace Wenku8::Reader
         oP.setColor(QPalette::PlaceholderText, oC.m_oMuted);
         oP.setColor(QPalette::Disabled, QPalette::Text, oC.m_oDisabled);
         oP.setColor(QPalette::Disabled, QPalette::ButtonText, oC.m_oDisabled);
-        qApp->setPalette(oP);
-        pWidget->setPalette(oP);
+        // Creating a secondary page must not repolish every window and the reader.
+        if (qApp->palette() != oP)
+        {
+            qApp->setPalette(oP);
+        }
+        if (pWidget->palette() != oP)
+        {
+            pWidget->setPalette(oP);
+        }
         QString strSheet =
             QString(R"(
         QWidget { color:%1; font-size:13px; }
@@ -147,11 +165,11 @@ namespace Wenku8::Reader
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
         strSheet += "QPushButton, QToolButton { outline:0; }";
 #endif
-        pWidget->setStyleSheet(strSheet + scrollBarStyle(eTheme));
+        setWidgetStyle(pWidget, strSheet + scrollBarStyle(eTheme));
         for (auto pLabel : pWidget->findChildren<QLabel*>())
             if (pLabel->objectName() == "muted" || pLabel->objectName() == "subtitle" ||
                 pLabel->objectName() == "eyebrow")
-                pLabel->setStyleSheet("QLabel { color:" + oC.m_oMuted.name() + "; }");
+                setWidgetStyle(pLabel, "QLabel { color:" + oC.m_oMuted.name() + "; }");
         // Qt 5 caches inherited palettes on reparented/polished mobile controls.
         // Give the fixed chrome an explicit surface and text color in each theme.
         if (pWidget->property("touchUi").toBool())
@@ -160,25 +178,25 @@ namespace Wenku8::Reader
                               : eTheme == Theme::EyeCare ? QColor("#e3d9bf")
                                                          : QColor("#e7eef8");
             if (auto pNavigation = pWidget->findChild<QWidget*>("mobileNavigation"))
-                pNavigation->setStyleSheet(
+                setWidgetStyle(pNavigation,
                     QString("QWidget#mobileNavigation { background:%1; border:1px solid %2; "
                             "border-top:2px solid %2; border-radius:18px; }")
                         .arg(oBar.name(), oC.m_oBorder.name()));
             if (auto pFooter = pWidget->findChild<QWidget*>("readerFooter"))
-                pFooter->setStyleSheet(QString("QWidget#readerFooter { background:%1; "
+                setWidgetStyle(pFooter, QString("QWidget#readerFooter { background:%1; "
                                                "border-top:1px solid %2; border-radius:12px; }")
                                            .arg(oBar.name(), oC.m_oBorder.name()));
             if (auto pStatus = pWidget->findChild<QLabel*>("status"))
-                pStatus->setStyleSheet(
+                setWidgetStyle(pStatus,
                     QString("QLabel { color:%1; background:%2; border-radius:8px; padding:6px 8px; "
                             "font-size:11px; }")
                         .arg(oC.m_oMuted.name(), oC.m_oSection.name()));
             if (auto pHeading = pWidget->findChild<QWidget*>("mobileHeader"))
                 for (auto pLabel : pHeading->findChildren<QLabel*>())
-                    pLabel->setStyleSheet("QLabel { color:" + oC.m_oText.name() + "; }");
+                    setWidgetStyle(pLabel, "QLabel { color:" + oC.m_oText.name() + "; }");
         }
         for (auto pBar : pWidget->findChildren<QScrollBar*>())
-            pBar->setStyleSheet(scrollBarStyle(eTheme));
+            setWidgetStyle(pBar, scrollBarStyle(eTheme));
         // Local control styles avoid Qt 5 palette caching when switching an already polished
         // window.
         for (auto pInput : pWidget->findChildren<QLineEdit*>())
@@ -186,7 +204,7 @@ namespace Wenku8::Reader
             pInput->setPalette(oP);
             pInput->setProperty("hintColor", oC.m_oMuted);
             pInput->update();
-            pInput->setStyleSheet(
+            setWidgetStyle(pInput,
                 QString(
                     "QLineEdit { color:%1; background:%2; border:1px solid %3; border-radius:9px; "
                     "padding:10px 12px; selection-background-color:%4; } QLineEdit:hover { "
@@ -301,7 +319,7 @@ namespace Wenku8::Reader
                 strStyle += QString("QPushButton:checked, QPushButton:checked:hover { "
                                     "background:%1; color:%2; border:1px solid %2; }")
                                 .arg(oC.m_oSelection.name(), oC.m_oSelectionText.name());
-            pButton->setStyleSheet(strStyle);
+            setWidgetStyle(pButton, strStyle);
             if (pButton->property("wenkuIcon").isValid())
             {
                 const QColor oInk(strForeground);
