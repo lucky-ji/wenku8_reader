@@ -35,6 +35,7 @@ namespace Wenku8::Reader
         void openBook(int nId, bool bForce = false);
         void openChapter(int nNovel, int nChapter, bool bForce = false);
         void download(int nId, bool bImages);
+        void downloadToLocal(int nId, bool bImages, const QString& strDestination);
         void addToShelf(int nId);
         void cancel();
         bool hasRetryableRequest() const;
@@ -54,6 +55,7 @@ namespace Wenku8::Reader
         void retryAvailableChanged(bool);
         void verificationRequired();
         void downloadReady(int);
+        void localDownloadReady(int, const QString& strLocation);
 
       private:
         struct Impl;

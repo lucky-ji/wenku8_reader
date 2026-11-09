@@ -30,7 +30,8 @@ namespace Wenku8::Reader
         History,
         ShelfAdd,
         Fullscreen,
-        Profile
+        Profile,
+        Folder
     };
     QIcon makeIcon(Icon, const QColor& oNormal, const QColor& oDisabled, const QColor& oActive);
     void setButtonIcon(QAbstractButton*, Icon);

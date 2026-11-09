@@ -2,7 +2,7 @@
 if(ANDROID)
     set(QT_ANDROID_APPLICATION_BINARY wenku8_client)
     set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../platform/android")
-    set(ANDROID_VERSION_CODE 3)
+    set(ANDROID_VERSION_CODE 4)
     set(ANDROID_VERSION_NAME "${PROJECT_VERSION}")
 endif()
 
@@ -57,7 +57,7 @@ set_target_properties(wenku8_client_services PROPERTIES POSITION_INDEPENDENT_COD
 
 add_library(wenku8_client_ui STATIC
     ui/ClientWindow.cpp ui/ClientWindow.h
-    ui/MobilePages.cpp ui/DesktopInformation.cpp ui/ReaderContents.cpp
+    ui/MobilePages.cpp ui/DesktopInformation.cpp ui/ReaderContents.cpp ui/DownloadActions.cpp
 )
 target_include_directories(wenku8_client_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ui")
 target_link_libraries(wenku8_client_ui PUBLIC wenku8_client_services)

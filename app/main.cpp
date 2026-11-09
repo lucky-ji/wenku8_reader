@@ -38,7 +38,6 @@ int main(int nArgumentCount, char** ppArguments)
     oArguments.setApplicationDescription(applicationName());
     oArguments.addHelpOption();
     oArguments.addVersionOption();
-    oArguments.addOption({"store", "下载存储目录", "directory"});
     oArguments.addOption({"origin", "文库来源", "url", "https://www.wenku8.net"});
     oArguments.addOption({"novel", "登录后打开的小说 ID", "id"});
     oArguments.process(oApplication);
@@ -77,7 +76,7 @@ int main(int nArgumentCount, char** ppArguments)
                                                             oArguments.value("origin").toUtf8(),
                                                             QCryptographicHash::Sha256)
                                                             .toHex()));
-    ClientWindow oWindow(oArguments.value("store"), oArguments.value("origin"),
+    ClientWindow oWindow(QString(), oArguments.value("origin"),
                          strSessionDirectory);
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     QObject::connect(&oInstanceServer, &QLocalServer::newConnection, &oWindow,

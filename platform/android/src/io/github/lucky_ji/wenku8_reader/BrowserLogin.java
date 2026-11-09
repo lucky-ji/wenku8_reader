@@ -295,6 +295,7 @@ public final class BrowserLogin
                 if (same(strUrl))
                     oView.evaluateJavascript(m_strNavigationScript, null);
             }
+            @android.annotation.TargetApi(23)
             @Override
             public void onReceivedError(WebView oView, WebResourceRequest oRequest,
                                         WebResourceError oError)

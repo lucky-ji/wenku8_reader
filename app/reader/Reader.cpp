@@ -100,7 +100,7 @@ namespace Wenku8::Reader
     {
     }
     void LocalDocument::setChapter(const ChapterText& oText, ImageLoader fnLoader, int nWidth,
-                                   int nHeight)
+                                   int nHeight, int nLineHeightPercent, int nParagraphSpacing)
     {
         // Clear previous resource cache, including same-numbered images of the previous chapter.
         clear();
@@ -137,7 +137,8 @@ namespace Wenku8::Reader
             oFormat.setBottomMargin(0);
             if (bBlank)
             {
-                oFormat.setLineHeight(bPreviousBlank ? 1 : 8, QTextBlockFormat::FixedHeight);
+                oFormat.setLineHeight(bPreviousBlank ? 1 : std::clamp(nParagraphSpacing, 1, 24),
+                                      QTextBlockFormat::FixedHeight);
             }
             else if (strContent.contains(QChar::ObjectReplacementCharacter))
             {
@@ -151,7 +152,10 @@ namespace Wenku8::Reader
                 oFormat.setBottomMargin(18);
             }
             else
-                oFormat.setLineHeight(145, QTextBlockFormat::ProportionalHeight);
+            {
+                oFormat.setLineHeight(std::clamp(nLineHeightPercent, 120, 220),
+                                      QTextBlockFormat::ProportionalHeight);
+            }
             oCursor.setBlockFormat(oFormat);
             bPreviousBlank = bBlank;
         }
@@ -295,11 +299,14 @@ namespace Wenku8::Reader
         m_pDocument->setDefaultFont(font());
         m_pDocument->setDefaultStyleSheet(
             "p { margin-top:0; margin-bottom:0; } h2 { margin-bottom:18px; }");
-        const int nMargin = viewport()->width() < 600 ? 16 : 24;
+        const int nPreferredMargin =
+            m_nSideMargin > 0 ? m_nSideMargin : viewport()->width() < 600 ? 16 : 24;
+        const int nMargin = qMin(nPreferredMargin, qMax(0, (viewport()->width() - 80) / 2));
         m_pDocument->setDocumentMargin(nMargin);
         m_pDocument->setChapter(
             m_oChapter, m_fnLoader, std::max(1, viewport()->width() - 2 * nMargin - 8),
-            m_eMode == ReadingMode::Paged ? qMax(1, viewport()->height() - 2 * nMargin - 24) : 0);
+            m_eMode == ReadingMode::Paged ? qMax(1, viewport()->height() - 2 * nMargin - 24) : 0,
+            m_nLineHeightPercent, m_nParagraphSpacing);
         m_pDocument->setTextWidth(viewport()->width());
         if (m_eMode == ReadingMode::Paged)
         {
@@ -351,6 +358,25 @@ namespace Wenku8::Reader
         }
         verticalScrollBar()->setValue(verticalScrollBar()->value() + cursorRect(oCursor).top());
         emit pageStateChanged();
+    }
+    void ReadingView::setTypography(int nLineHeightPercent, int nParagraphSpacing, int nSideMargin)
+    {
+        nLineHeightPercent = std::clamp(nLineHeightPercent, 120, 220);
+        nParagraphSpacing = std::clamp(nParagraphSpacing, 0, 24);
+        nSideMargin = std::clamp(nSideMargin, 0, 48);
+        if (m_nLineHeightPercent == nLineHeightPercent &&
+            m_nParagraphSpacing == nParagraphSpacing && m_nSideMargin == nSideMargin)
+        {
+            return;
+        }
+        const int nPosition = readingPosition();
+        m_nLineHeightPercent = nLineHeightPercent;
+        m_nParagraphSpacing = nParagraphSpacing;
+        m_nSideMargin = nSideMargin;
+        if (!m_oChapter.m_strHtml.isEmpty())
+        {
+            rebuild(nPosition);
+        }
     }
     void ReadingView::appearance(int nSize, Theme eTheme)
     {

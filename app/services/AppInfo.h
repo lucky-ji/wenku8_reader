@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #pragma once
 #include <QString>
+#include <QUrl>
 #include <QVector>
 namespace Wenku8::Reader
 {
@@ -10,6 +11,9 @@ namespace Wenku8::Reader
     };
     QString applicationName();
     QString applicationVersion();
+    QUrl applicationRepositoryUrl();
+    QUrl applicationFeedbackUrl();
+    bool isApplicationLink(const QUrl& oUrl);
     QString versionDescription();
     QString releaseNotes();
     QString licenseOverview();

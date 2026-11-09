@@ -92,7 +92,7 @@ namespace Wenku8::Reader
                *m_pReadTitle = nullptr, *m_pChapterLabel = nullptr;
         QLineEdit* m_pSearch = nullptr;
         QPushButton *m_pRefresh = nullptr, *m_pLogin = nullptr, *m_pRead = nullptr,
-                    *m_pDownload = nullptr, *m_pShelfAdd = nullptr, *m_pFullscreen = nullptr,
+                    *m_pDownload = nullptr, *m_pLocalDownload = nullptr, *m_pShelfAdd = nullptr, *m_pFullscreen = nullptr,
                     *m_pPrevious = nullptr, *m_pNext = nullptr, *m_pPreviousPage = nullptr,
                     *m_pNextPage = nullptr;
         QPushButton* m_pReaderContents = nullptr;
@@ -136,6 +136,10 @@ namespace Wenku8::Reader
         void positionPullIndicators();
         void populate(const std::vector<Novel>&);
         void downloadedBooks();
+        void cacheBook();
+        void downloadBookToLocal();
+        void chooseLocalDownloadDirectory(std::function<void(bool)> fnAfter = {});
+        void showDownloadSettings();
         void openBook(int, bool bResume = false);
         void historyBooks();
         void requestCover(int);

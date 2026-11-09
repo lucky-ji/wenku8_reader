@@ -149,6 +149,9 @@ namespace Wenku8::Reader
                 {
                     showMobileAppearance();
                 });
+        auto* pDownloads = action("下载与存储\n缓存与本地保存位置", "mobileDownloadSettings", Icon::Folder);
+        pLayout->addWidget(pDownloads);
+        connect(pDownloads, &QPushButton::clicked, this, &ClientWindow::showDownloadSettings);
         auto pHistory = action("阅读历史", "mobileHistory", Icon::History);
         pLayout->addWidget(pHistory);
         connect(pHistory, &QPushButton::clicked, this,
@@ -180,6 +183,20 @@ namespace Wenku8::Reader
                         showAppInformation(nI);
                     });
         }
+        auto pFeedback = action("意见反馈\n在 GitHub 提交问题与建议", "mobileFeedback", Icon::Discover);
+        pLayout->addWidget(pFeedback);
+        connect(pFeedback, &QPushButton::clicked, pPage,
+                []
+                {
+                    QDesktopServices::openUrl(applicationFeedbackUrl());
+                });
+        auto pRepository = action("开源项目\n在 GitHub 查看源码", "mobileRepository", Icon::Book);
+        pLayout->addWidget(pRepository);
+        connect(pRepository, &QPushButton::clicked, pPage,
+                []
+                {
+                    QDesktopServices::openUrl(applicationRepositoryUrl());
+                });
         pLayout->addStretch();
         pushMobilePage(pPage, "我的");
     }
@@ -325,14 +342,35 @@ namespace Wenku8::Reader
             connect(pDocument, &QTextBrowser::anchorClicked, pPage,
                     [](const QUrl& oUrl)
                     {
-                        if (oUrl == QUrl("https://github.com/lucky-ji"))
+                        if (isApplicationLink(oUrl))
+                        {
                             QDesktopServices::openUrl(oUrl);
+                        }
                     });
             if (mobileMode())
             {
                 pDocument->setTextInteractionFlags(Qt::LinksAccessibleByMouse);
                 (new TouchScroll(pDocument))->setEnabled(true);
             }
+        }
+        if (nSection == 0)
+        {
+            auto pLinks = new QHBoxLayout;
+            auto pFeedback = action("意见反馈", "informationFeedback", Icon::Discover);
+            auto pRepository = action("开源项目", "informationRepository", Icon::Book);
+            pLinks->addWidget(pFeedback);
+            pLinks->addWidget(pRepository);
+            pLayout->addLayout(pLinks);
+            connect(pFeedback, &QPushButton::clicked, pPage,
+                    []
+                    {
+                        QDesktopServices::openUrl(applicationFeedbackUrl());
+                    });
+            connect(pRepository, &QPushButton::clicked, pPage,
+                    []
+                    {
+                        QDesktopServices::openUrl(applicationRepositoryUrl());
+                    });
         }
         if (mobileMode())
         {
@@ -355,8 +393,10 @@ namespace Wenku8::Reader
     }
     void ClientWindow::showMobileReaderTools()
     {
+        const bool bMobile = mobileMode();
         QVBoxLayout* pLayout;
         auto pPage = scrollPage(pLayout);
+        pPage->setProperty("touchUi", bMobile);
         pPage->setObjectName("mobileReadingSettings");
         pLayout->addWidget(paragraph("阅读偏好", "bookTitle"));
         pLayout->addWidget(
@@ -384,6 +424,7 @@ namespace Wenku8::Reader
         pVolume->setObjectName("volumePageKeys");
         pVolume->setChecked(m_bVolumePaging);
         pVolume->setMinimumHeight(48);
+        pVolume->setVisible(bMobile);
         pLayout->addWidget(pVolume);
         connect(pVolume, &QCheckBox::toggled, pPage,
                 [this](bool bEnabled)
@@ -412,6 +453,130 @@ namespace Wenku8::Reader
                     });
         }
         pLayout->addLayout(pFonts);
+        pLayout->addWidget(paragraph("文字排版", "bookTitle"));
+        pLayout->addWidget(paragraph("调节行距、段间空行和页边留白，设置会自动保存，阅读位置保持不变。"));
+        auto fnSaveTypography = [this]
+        {
+            m_oSettings.setValue("readerLineHeight", m_pReader->lineHeightPercent());
+            m_oSettings.setValue("readerParagraphSpacing", m_pReader->paragraphSpacing());
+            m_oSettings.setValue("readerSideMargin", m_pReader->sideMargin());
+        };
+        QVector<std::function<void()>> vTypographyUpdates;
+        auto fnAddTypography = [this, pPage, pLayout, fnSaveTypography, &vTypographyUpdates](
+                                   const QString& strTitle, const QString& strName,
+                                   int nMinimum, int nMaximum, int nStep,
+                                   std::function<int()> fnValue,
+                                   std::function<void(int)> fnApply)
+        {
+            auto pRow = new QHBoxLayout;
+            auto pValue = paragraph("");
+            pValue->setObjectName(strName + "Value");
+            pRow->addWidget(pValue, 1);
+            auto pLess = action("更紧凑", "typographyDecrease", Icon::TextSmaller);
+            auto pMore = action("更宽松", "typographyIncrease", Icon::TextLarger);
+            pLess->setObjectName(strName + "Decrease");
+            pMore->setObjectName(strName + "Increase");
+            pLess->setAccessibleName(strTitle + "更紧凑");
+            pMore->setAccessibleName(strTitle + "更宽松");
+            pRow->addWidget(pLess);
+            pRow->addWidget(pMore);
+            pLayout->addLayout(pRow);
+            auto fnEffectiveValue = [this, strName, fnValue]
+            {
+                const int nValue = fnValue();
+                return strName == "readerSideMargin" && nValue == 0
+                           ? (m_pReader->viewport()->width() < 600 ? 16 : 24)
+                           : nValue;
+            };
+            auto fnRefresh = [pValue, pLess, pMore, strTitle, strName, nMinimum, nMaximum,
+                              fnValue, fnEffectiveValue]
+            {
+                const int nValue = fnValue();
+                const QString strValue = strName == "readerSideMargin" && nValue == 0
+                                             ? QString("自动")
+                                         : strName == "readerParagraphSpacing" && nValue == 0
+                                             ? QString("紧凑")
+                                             : QString::number(nValue) +
+                                                   (strName == "readerLineHeight" ? "%" : "px");
+                pValue->setText(strTitle + "  " + strValue);
+                pLess->setEnabled(fnEffectiveValue() > nMinimum);
+                pMore->setEnabled(fnEffectiveValue() < nMaximum);
+            };
+            for (int nDirection : {-1, 1})
+            {
+                connect(nDirection < 0 ? pLess : pMore, &QPushButton::clicked, pPage,
+                        [fnEffectiveValue, fnApply, fnRefresh, fnSaveTypography,
+                         nDirection, nMinimum, nMaximum, nStep]
+                        {
+                            fnApply(qBound(nMinimum, fnEffectiveValue() + nDirection * nStep,
+                                           nMaximum));
+                            fnRefresh();
+                            fnSaveTypography();
+                        });
+            }
+            vTypographyUpdates.append(fnRefresh);
+            fnRefresh();
+        };
+        fnAddTypography("行距", "readerLineHeight", 120, 220, 10,
+                        [this]
+                        {
+                            return m_pReader->lineHeightPercent();
+                        },
+                        [this](int nValue)
+                        {
+                            m_pReader->setTypography(nValue, m_pReader->paragraphSpacing(),
+                                                     m_pReader->sideMargin());
+                        });
+        fnAddTypography("段间距", "readerParagraphSpacing", 0, 24, 2,
+                        [this]
+                        {
+                            return m_pReader->paragraphSpacing();
+                        },
+                        [this](int nValue)
+                        {
+                            m_pReader->setTypography(m_pReader->lineHeightPercent(), nValue,
+                                                     m_pReader->sideMargin());
+                        });
+        fnAddTypography("页边距", "readerSideMargin", 8, 48, 4,
+                        [this]
+                        {
+                            return m_pReader->sideMargin();
+                        },
+                        [this](int nValue)
+                        {
+                            m_pReader->setTypography(m_pReader->lineHeightPercent(),
+                                                     m_pReader->paragraphSpacing(), nValue);
+                        });
+        auto pResetTypography = action("恢复默认排版", "readerTypographyReset", Icon::RestoreBookmark);
+        pLayout->addWidget(pResetTypography);
+        connect(pResetTypography, &QPushButton::clicked, pPage,
+                [this, fnSaveTypography, vTypographyUpdates]
+                {
+                    m_pReader->setTypography(145, 8, 0);
+                    fnSaveTypography();
+                    for (const auto& fnRefresh : vTypographyUpdates)
+                    {
+                        fnRefresh();
+                    }
+                });
+        if (!bMobile)
+        {
+            pLayout->addStretch();
+            QDialog oDialog(this);
+            oDialog.setObjectName("readerPreferencesDialog");
+            oDialog.setWindowTitle("阅读设置");
+            auto pDialogLayout = new QVBoxLayout(&oDialog);
+            pDialogLayout->setContentsMargins(16, 16, 16, 16);
+            pDialogLayout->addWidget(pPage, 1);
+            auto pClose = new QPushButton("完成");
+            pClose->setMinimumHeight(40);
+            pDialogLayout->addWidget(pClose, 0, Qt::AlignRight);
+            connect(pClose, &QPushButton::clicked, &oDialog, &QDialog::accept);
+            applyTheme(&oDialog, m_eTheme);
+            oDialog.resize(qMin(720, width() - 40), qMin(680, height() - 40));
+            oDialog.exec();
+            return;
+        }
         auto pAppearance = action("阅读外观", "readingAppearance", Icon::Sun);
         pLayout->addWidget(pAppearance);
         connect(pAppearance, &QPushButton::clicked, this,
