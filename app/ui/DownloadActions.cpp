@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "ClientWindow.h"
 #include "OnlineSession.h"
+#include "DownloadManager.h"
+#include "Toast.h"
 #include "ExportDestination.h"
 #include "DownloadOption.h"
 #include "Icons.h"
@@ -48,7 +50,12 @@ namespace Wenku8::Reader
         {
             return;
         }
-        m_pSession->download(m_oBook.m_nId, m_pIllustrations->isChecked());
+        const QString strId = m_pSession->downloads()->enqueue(m_oBook.m_nId,
+            QString::fromUtf8(m_oBook.m_strTitle.c_str()), m_pIllustrations->isChecked());
+        if (!strId.isEmpty())
+        {
+            m_pToast->showText("已加入后台缓存，可在「下载缓存」查看进度", m_eTheme);
+        }
     }
 
     void ClientWindow::chooseLocalDownloadDirectory(std::function<void(bool)> fnAfter)
@@ -105,7 +112,12 @@ namespace Wenku8::Reader
             });
             return;
         }
-        m_pSession->downloadToLocal(m_oBook.m_nId, m_pIllustrations->isChecked(), strDestination);
+        const QString strId = m_pSession->downloads()->enqueue(m_oBook.m_nId,
+            QString::fromUtf8(m_oBook.m_strTitle.c_str()), m_pIllustrations->isChecked(), strDestination);
+        if (!strId.isEmpty())
+        {
+            m_pToast->showText("已加入后台下载，可在「下载缓存」查看进度", m_eTheme);
+        }
     }
 
     void ClientWindow::showDownloadSettings()
@@ -133,6 +145,10 @@ namespace Wenku8::Reader
         fnParagraph("下载缓存", "bookTitle");
         fnParagraph("保存在应用数据目录，仅供应用离线阅读，与用户选择的本地保存位置分开管理。"
                     "Android 使用应用私有存储；卸载应用会清除缓存。", "muted");
+        fnParagraph("任务与断点恢复", "bookTitle");
+        fnParagraph("两种下载都在后台排队，不影响浏览和阅读。在「下载缓存」查看进度、暂停或继续。"
+                    "已完成的章节与图片会实时保存；重新启动并验证原账号后，自动恢复未完成任务。"
+                    "手动暂停的任务需点击继续。Android 系统休眠或结束应用时下载可能暂停，重新打开后继续。", "muted");
         fnParagraph("下载到本地", "bookTitle");
         fnParagraph("选择目录后，将小说保存为 UTF-8 文本和可离线打开的 HTML。"
                     "勾选包含插图时一并保存图片。每次新建独立书籍目录，已有文件不会被覆盖。"

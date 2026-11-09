@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "ClientWindow.h"
+#include "DownloadManager.h"
+#include "DownloadTaskPanel.h"
+#include "Toast.h"
 #include "AppInfo.h"
 #include "DownloadOption.h"
 #include "ExportDestination.h"
@@ -456,6 +459,36 @@ namespace Wenku8::Reader
                 m_pDesktopMenuBar->hide();
             m_pSession = new OnlineSession(this, m_strOrigin, m_strDirectory, strSessionDirectory);
             m_pSession->setTheme(m_eTheme);
+            m_pToast = new Toast(m_pStartupPages);
+            m_pDownloadTasks = new DownloadTaskPanel(m_pSession->downloads());
+            static_cast<QVBoxLayout*>(m_pCards->parentWidget()->layout())->insertWidget(0, m_pDownloadTasks);
+            m_pDownloadTasks->hide();
+            connect(m_pSession->downloads(), &DownloadManager::completed, this,
+                [this](int nId, bool bLocal, const QString& strLocation)
+                {
+                    if (bLocal)
+                    {
+                        m_oSettings.setValue("lastLocalDownload", strLocation);
+                    }
+                    else
+                    {
+                        m_pCovers->retryFailures();
+                        if (m_bUnlocked)
+                        {
+                            requestCover(nId);
+                            if (m_nSection == 2 && m_pPages->currentIndex() == 1 && !m_bLoadingBusy)
+                            {
+                                downloadedBooks();
+                            }
+                        }
+                    }
+                    m_pToast->showText(bLocal ? "小说已保存到所选目录" : "下载缓存完成，可以离线阅读", m_eTheme);
+                });
+            connect(m_pSession->downloads(), &DownloadManager::notice, this,
+                [this](const QString& strMessage)
+                {
+                    m_pToast->showText(strMessage, m_eTheme);
+                });
             connect(m_pSession, &OnlineSession::restorationChanged, this,
                     [this](bool bChecking)
                     {
@@ -558,19 +591,7 @@ namespace Wenku8::Reader
                     {
                         renderChapter(m_pSession->chapterText());
                     });
-            connect(m_pSession, &OnlineSession::downloadReady, this,
-                    [this](int nId)
-                    {
-                        m_pCovers->retryFailures();
-                        requestCover(nId);
-                        message("已加入下载缓存，下次阅读无需重新下载。");
-                    });
-            connect(m_pSession, &OnlineSession::localDownloadReady, this,
-                    [this](int, const QString& strLocation)
-                    {
-                        m_oSettings.setValue("lastLocalDownload", strLocation);
-                        message("已保存到本地：" + strLocation);
-                    });
+
         }
 #endif
         authenticate(false);
@@ -1506,10 +1527,11 @@ namespace Wenku8::Reader
         {
             saveProgress();
             ++m_nBusinessContext;
-            m_bVerificationNeeded = false;
-            updateNetworkActions();
         }
         m_bUnlocked = bValue;
+        m_bVerificationNeeded = false;
+        m_nRetryContext = m_nBusinessContext;
+        updateNetworkActions();
         m_pOperations->setEnabled(bValue);
         m_pRefresh->setEnabled(bValue);
         for (auto pB : m_vNav)
@@ -1542,6 +1564,8 @@ namespace Wenku8::Reader
         }
         else
         {
+            // A verified session replaces the previous failure, before refresh starts.
+            message("已登录，欢迎回来。");
             m_pOperations->show();
             m_pRefresh->show();
             m_pTitle->setText("我的书架");
@@ -2253,6 +2277,10 @@ namespace Wenku8::Reader
 
     void ClientWindow::adaptLayout()
     {
+        if (m_pDownloadTasks)
+        {
+            m_pDownloadTasks->setVisible(m_bUnlocked && m_nSection == 2 && m_pPages->currentIndex() == 1);
+        }
         if (!m_pReader || !m_pMobileNavigation)
             return;
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)

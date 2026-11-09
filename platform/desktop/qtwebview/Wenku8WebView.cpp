@@ -181,6 +181,9 @@ namespace Wenku8::QtWebView
         QPointer<QWebEngineView> m_pView;
         QTimer m_oPoll;
         std::shared_ptr<Reply> m_pActive;
+        std::shared_ptr<Reply> m_pPreparing;
+        std::unique_ptr<BrowserBridge> m_pDownloadContext;
+        bool m_bOwnsProfile = true, m_bPreparationFailed = false;
         bool m_bPolling = false;
         QString m_strProfileRoot, m_strProfilePath, m_strPageStyle;
         std::unique_ptr<QLockFile> m_pProfileLock;
@@ -231,6 +234,21 @@ namespace Wenku8::QtWebView
         }
         void poll()
         {
+            if (m_pPreparing)
+            {
+                if (m_pPreparing->m_oAbort)
+                {
+                    auto pReply = std::move(m_pPreparing);
+                    m_bPreparationFailed = true;
+                    m_oPoll.stop();
+                    complete(pReply, {}, failure(ErrorCode::Cancelled, "Download context preparation cancelled"));
+                    if (m_pPage)
+                    {
+                        m_pPage->triggerAction(QWebEnginePage::Stop);
+                    }
+                }
+                return;
+            }
             auto pReply = m_pActive;
             if (!pReply)
                 return;
@@ -318,6 +336,17 @@ namespace Wenku8::QtWebView
       public:
         QUrl m_oOrigin;
         std::atomic<bool> m_oClosed{false};
+        // A download context borrows the exact profile object. Its owner always
+        // closes/destroys this bridge before replacing or destroying that profile.
+        BrowserBridge(QUrl oUrl, QWebEngineProfile* pProfile)
+            : m_pProfile(pProfile), m_bOwnsProfile(false), m_oOrigin(std::move(oUrl))
+        {
+            m_oPoll.setInterval(25);
+            connect(&m_oPoll, &QTimer::timeout, this, [this]
+            {
+                poll();
+            });
+        }
         BrowserBridge(QUrl oUrl, QWidget* pParent, const QString& strStorage)
             : m_oOrigin(std::move(oUrl))
         {
@@ -362,7 +391,10 @@ namespace Wenku8::QtWebView
             auto pPage = m_pPage.data();
             m_pPage = nullptr;
             delete pPage;
-            delete m_pProfile;
+            if (m_bOwnsProfile)
+            {
+                delete m_pProfile;
+            }
         }
         QWebEngineView* view() const
         {
@@ -376,6 +408,13 @@ namespace Wenku8::QtWebView
         {
             if (m_oClosed.exchange(true))
                 return;
+            // No borrowed-profile page may outlive the owning session's profile.
+            m_pDownloadContext.reset();
+            if (m_pPreparing)
+            {
+                auto pReply = std::move(m_pPreparing);
+                complete(pReply, {}, failure(ErrorCode::Cancelled, "Download context closed"));
+            }
             if (m_pActive)
             {
                 auto pReply = m_pActive;
@@ -384,11 +423,17 @@ namespace Wenku8::QtWebView
             }
             if (m_pView)
                 m_pView->stop();
+            else if (m_pPage)
+            {
+                m_pPage->triggerAction(QWebEnginePage::Stop);
+            }
+            m_oPoll.stop();
         }
         void reset(bool bForget = true)
         {
             if (m_oClosed)
                 throw Error(ErrorCode::Cancelled, "Browser session closed");
+            m_pDownloadContext.reset();
             if (m_pActive)
             {
                 auto pReply = m_pActive;
@@ -531,6 +576,85 @@ namespace Wenku8::QtWebView
                     m_oPoll.start();
                 });
         }
+        void beginDownload(const std::shared_ptr<Reply>& pReply, const HttpRequest& oRequest,
+                           std::size_t nLimit, bool bFollow)
+        {
+            if (m_oClosed || pReply->m_oAbort)
+            {
+                complete(pReply, {}, failure(ErrorCode::Cancelled, "Browser session closed or request cancelled"));
+                return;
+            }
+            try
+            {
+                if (m_pDownloadContext &&
+                    (m_pDownloadContext->m_bPreparationFailed ||
+                     (m_pDownloadContext->m_pPreparing && m_pDownloadContext->m_pPreparing->m_oAbort)))
+                {
+                    m_pDownloadContext.reset();
+                }
+                if (!m_pDownloadContext)
+                {
+                    m_pDownloadContext = std::make_unique<BrowserBridge>(m_oOrigin, m_pProfile);
+                }
+                auto* pContext = m_pDownloadContext.get();
+                if (pContext->m_pPreparing)
+                {
+                    complete(pReply, {}, failure(ErrorCode::InvalidArgument, "Download transport already preparing"));
+                    return;
+                }
+                if (pContext->m_pPage)
+                {
+                    pContext->begin(pReply, oRequest, nLimit, bFollow);
+                    return;
+                }
+                pContext->m_pPreparing = pReply;
+                pContext->m_pPage = new RestrictedPage(m_pProfile, m_oOrigin);
+                pContext->m_pPage->settings()->setAttribute(QWebEngineSettings::LocalStorageEnabled, false);
+                pContext->m_pPage->settings()->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, false);
+                connect(pContext->m_pPage, &QWebEnginePage::loadFinished, pContext,
+                    [pContext, pReply, oRequest, nLimit, bFollow](bool bOk)
+                    {
+                        if (pContext->m_pPreparing != pReply)
+                        {
+                            return;
+                        }
+                        pContext->m_pPreparing.reset();
+                        pContext->m_oPoll.stop();
+                        if (pContext->m_oClosed || pReply->m_oAbort)
+                        {
+                            pContext->m_bPreparationFailed = true;
+                            complete(pReply, {}, failure(ErrorCode::Cancelled, "Download context preparation cancelled"));
+                        }
+                        else if (!bOk || !sameOrigin(pContext->m_pPage->url(), pContext->m_oOrigin))
+                        {
+                            pContext->m_bPreparationFailed = true;
+                            complete(pReply, {}, failure(ErrorCode::Network, "Download context document could not load"));
+                        }
+                        else
+                        {
+                            pContext->begin(pReply, oRequest, nLimit, bFollow);
+                        }
+                    });
+                connect(pContext->m_pPage, &QWebEnginePage::loadStarted, pContext, [pContext]
+                {
+                    if (pContext->m_pActive)
+                    {
+                        auto pActive = pContext->m_pActive;
+                        complete(pActive, {}, failure(ErrorCode::Cancelled, "Download context navigated during request"));
+                        pContext->cleanup(pActive);
+                    }
+                });
+                pContext->m_oPoll.start();
+                // Bootstrap a real origin document without replaying an arbitrary
+                // URL the user may have followed in the foreground login window.
+                pContext->m_pPage->load(m_oOrigin.resolved(QUrl("/")));
+            }
+            catch (...)
+            {
+                m_pDownloadContext.reset();
+                complete(pReply, {}, std::current_exception());
+            }
+        }
     };
 
     namespace
@@ -538,6 +662,7 @@ namespace Wenku8::QtWebView
         class BrowserTransport final : public HttpTransport
         {
             std::shared_ptr<BrowserBridge> m_pBridge;
+            bool m_bDownload;
             HttpResponse wait(const std::shared_ptr<Reply>& pReply, const TransferOptions& oOptions)
             {
                 const auto oUntil = std::chrono::steady_clock::now() + oOptions.m_oTimeout;
@@ -583,8 +708,8 @@ namespace Wenku8::QtWebView
             }
 
           public:
-            explicit BrowserTransport(std::shared_ptr<BrowserBridge> pBridge)
-                : m_pBridge(std::move(pBridge))
+            explicit BrowserTransport(std::shared_ptr<BrowserBridge> pBridge, bool bDownload = false)
+                : m_pBridge(std::move(pBridge)), m_bDownload(bDownload)
             {
             }
             bool supportsSameOriginGetRedirects() const noexcept override
@@ -624,15 +749,26 @@ namespace Wenku8::QtWebView
                 QMetaObject::invokeMethod(
                     m_pBridge.get(),
                     [pBridge = m_pBridge, pReply, oRequest, nLimit = oOptions.m_nMaxResponseBytes,
-                     bFollow = oOptions.m_bFollowRedirects]
+                     bFollow = oOptions.m_bFollowRedirects, bDownload = m_bDownload]
                     {
-                        pBridge->begin(pReply, oRequest, nLimit, bFollow);
+                        if (bDownload)
+                        {
+                            pBridge->beginDownload(pReply, oRequest, nLimit, bFollow);
+                        }
+                        else
+                        {
+                            pBridge->begin(pReply, oRequest, nLimit, bFollow);
+                        }
                     },
                     Qt::QueuedConnection);
                 return wait(pReply, oOptions);
             }
             void clearCookies() override
             {
+                if (m_bDownload)
+                {
+                    throw Error(ErrorCode::Unsupported, "Download transport cannot reset the shared browser profile");
+                }
                 if (QThread::currentThread() == m_pBridge->thread())
                 {
                     m_pBridge->reset();
@@ -729,5 +865,9 @@ namespace Wenku8::QtWebView
     std::shared_ptr<HttpTransport> BrowserSession::transport() const
     {
         return std::make_shared<BrowserTransport>(m_pBridge);
+    }
+    std::shared_ptr<HttpTransport> BrowserSession::downloadTransport() const
+    {
+        return std::make_shared<BrowserTransport>(m_pBridge, true);
     }
 } // namespace Wenku8::QtWebView

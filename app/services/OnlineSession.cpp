@@ -6,9 +6,7 @@
 #include "NetworkRetry.h"
 #include "LoginHost.h"
 #include "RasterImage.h"
-#include "ExportDestination.h"
-#include <QTemporaryDir>
-#include <QDir>
+#include "DownloadManager.h"
 #include <QCache>
 #include <QDateTime>
 #include <QSet>
@@ -134,8 +132,6 @@ namespace Wenku8::Reader
             Novels,
             Book,
             Chapter,
-            Download,
-            Export,
             ShelfAdd
         };
         struct Result
@@ -143,7 +139,7 @@ namespace Wenku8::Reader
             std::vector<Novel> m_vNovels;
             Novel m_oNovel;
             std::vector<Volume> m_vVolumes;
-            QString m_strText, m_strUsername, m_strLoginHint, m_strStatusOverride, m_strExportedLocation;
+            QString m_strText, m_strUsername, m_strLoginHint, m_strStatusOverride;
             QMap<QString, QByteArray> m_vImages;
             bool m_bSuccess = false, m_bNeedsLogin = false, m_bVerification = false,
                  m_bTransient = false, m_bCancelled = false, m_bFromCache = false, m_bStale = false,
@@ -244,6 +240,7 @@ namespace Wenku8::Reader
     {
         OnlineSession* m_pQ;
         std::unique_ptr<LoginHost> m_pHost;
+        std::unique_ptr<DownloadManager> m_pDownloads;
         QTimer m_oProbeTimer, m_oRestoreDeadline;
         QFutureWatcher<Result> m_oWatcher;
         QFutureWatcher<ImageResult> m_oImageWatcher;
@@ -262,6 +259,7 @@ namespace Wenku8::Reader
              m_bShuttingDown = false, m_bOpenAfterTask = false, m_bResumed = false;
         Kind m_eKind = Kind::Login, m_ePendingKind = Kind::Novels;
         Job m_fnCurrent, m_fnPending;
+        quint64 m_nRequestGeneration = 0;
         std::shared_ptr<ShelfSessionSlot> m_pShelfSession = std::make_shared<ShelfSessionSlot>();
         Result m_oData;
         std::shared_ptr<std::atomic_bool> m_pCancelled = std::make_shared<std::atomic_bool>(false);
@@ -270,6 +268,15 @@ namespace Wenku8::Reader
             : m_pQ(pOwner), m_pHost(makeLoginHost(pWindow, QUrl(strSite), strStorage)),
               m_strOrigin(std::move(strSite)), m_strDirectory(std::move(strStore))
         {
+            m_pDownloads = std::make_unique<DownloadManager>(m_strDirectory, m_strOrigin);
+            QObject::connect(m_pQ, &OnlineSession::authenticationChanged, m_pDownloads.get(),
+                [this](bool bAuthenticated)
+                {
+                    if (!bAuthenticated)
+                    {
+                        m_pDownloads->suspend();
+                    }
+                });
             QObject::connect(m_pHost.get(), &LoginHost::checkRequested, m_pQ,
                              [this]
                              {
@@ -368,18 +375,19 @@ namespace Wenku8::Reader
             m_oProbeTimer.stop();
             m_pCancelled->store(true);
             m_pImageCancelled->store(true);
+            m_pDownloads->suspend();
             m_pHost->close();
+            m_pDownloads->shutdown();
             m_oWatcher.waitForFinished();
             m_oImageWatcher.waitForFinished();
         }
         void clearRetry()
         {
-            if (m_fnFailedJob)
-            {
-                m_fnFailedJob = {};
-                m_strFailedKey.clear();
-                emit m_pQ->retryAvailableChanged(false);
-            }
+            m_fnFailedJob = {};
+            m_strFailedKey.clear();
+            // Verification can be required by a write request without a retry job.
+            // Always reset both recovery actions when starting a new request/session.
+            emit m_pQ->retryAvailableChanged(false);
         }
         void clearReads(bool bPreserveVerifiedClient = false)
         {
@@ -512,6 +520,7 @@ namespace Wenku8::Reader
         }
         void showLogin(bool bReset = false)
         {
+            m_pDownloads->suspend();
             if (m_bActive)
             {
                 m_bOpenAfterTask = true;
@@ -563,6 +572,7 @@ namespace Wenku8::Reader
                 return;
             }
             m_bActive = true;
+            const quint64 nRequestGeneration = ++m_nRequestGeneration;
             m_eKind = eType;
             m_fnCurrent = fnJob;
             m_strCurrentKey = strKey;
@@ -577,8 +587,6 @@ namespace Wenku8::Reader
                 emit m_pQ->progressChanged(0, 0);
                 emit m_pQ->statusChanged(eType == Kind::Book       ? "正在加载小说与目录…"
                                          : eType == Kind::Chapter  ? "正在加载章节内容…"
-                                         : eType == Kind::Download ? "正在准备下载缓存…"
-                                         : eType == Kind::Export   ? "正在准备下载到本地…"
                                          : eType == Kind::ShelfAdd ? "正在加入书架…"
                                                                    : "正在加载小说列表…");
             }
@@ -612,16 +620,18 @@ namespace Wenku8::Reader
             {
                 return !pFlag->load();
             };
-            auto oRetry = clientRetryOptions(true, (eType != Kind::Download && eType != Kind::Export));
-            if (eType == Kind::Download || eType == Kind::Export)
-                oRetry.m_oDelay = std::chrono::seconds(2);
-            oRetry.m_fnOnRetry = [this, eType](unsigned nAttempt, int)
+            auto oRetry = clientRetryOptions(true, true);
+            oRetry.m_fnOnRetry = [this, eType, nRequestGeneration](unsigned nAttempt, int)
             {
                 if (eType != Kind::Login)
                     QMetaObject::invokeMethod(
                         m_pQ,
-                        [this, nAttempt]
+                        [this, nAttempt, nRequestGeneration]
                         {
+                            if (!m_bActive || nRequestGeneration != m_nRequestGeneration)
+                            {
+                                return;
+                            }
                             emit m_pQ->statusChanged(
                                 QString("网络波动，正在进行第 %1/3 次尝试…").arg(nAttempt));
                         },
@@ -629,11 +639,10 @@ namespace Wenku8::Reader
             };
             std::shared_ptr<HttpTransport> pTransport = makeRetryingTransport(
                 std::make_shared<BrowserOwnedSession>(m_pHost->transport()), oRetry);
-            if (eType != Kind::Download && eType != Kind::Export)
-                pTransport = makeClientDeadlineTransport(
-                    std::move(pTransport), std::chrono::seconds(eType == Kind::Login ? 8 : 30));
+            pTransport = makeClientDeadlineTransport(
+                std::move(pTransport), std::chrono::seconds(eType == Kind::Login ? 8 : 30));
             m_oWatcher.setFuture(QtConcurrent::run(
-                [fnJob, oOptions, pTransport, eType]
+                [fnJob, oOptions, pTransport]
                 {
                     try
                     {
@@ -641,12 +650,7 @@ namespace Wenku8::Reader
                     }
                     catch (const Error& oError)
                     {
-                        auto oResult = failure(oError);
-                        if (eType == Kind::Export && oError.code() == ErrorCode::Io)
-                        {
-                            oResult.m_strText = "保存到本地失败，请检查保存位置的权限和剩余空间，或重新选择目录。";
-                        }
-                        return oResult;
+                        return failure(oError);
                     }
                     catch (const std::exception&)
                     {
@@ -660,14 +664,11 @@ namespace Wenku8::Reader
         {
             if (m_bShuttingDown)
                 return;
-            if (m_eKind != Kind::Login && m_pCancelled->load() &&
-                !(m_eKind == Kind::Export && oResult.m_bSuccess))
+            if (m_eKind != Kind::Login && m_pCancelled->load())
             {
                 oResult = {};
                 oResult.m_bCancelled = true;
-                oResult.m_strText = m_eKind == Kind::Export
-                    ? "已取消下载到本地，本次临时文件会清理。"
-                    : "操作已取消，已下载的内容会保留。";
+                oResult.m_strText = "操作已取消。";
             }
             m_bActive = false;
             const bool bBusiness = m_eKind != Kind::Login;
@@ -704,8 +705,16 @@ namespace Wenku8::Reader
                 }
                 if (m_strUser != oResult.m_strUsername)
                     clearReads(true);
+                clearRetry();
                 m_bAuthenticated = true;
                 m_strUser = oResult.m_strUsername;
+                ClientOptions oDownloadOptions;
+                oDownloadOptions.m_strEndpoint = m_strOrigin.toStdString();
+                oDownloadOptions.m_eProtocol = Protocol::Website;
+                oDownloadOptions.m_strUserAgent = m_pHost->userAgent();
+                oDownloadOptions.m_oTransfer.m_oTimeout = std::chrono::seconds(45);
+                m_pDownloads->setSession(oDownloadOptions,
+                    std::make_shared<BrowserOwnedSession>(m_pHost->downloadTransport()), m_strUser);
                 m_oProbeTimer.stop();
                 // Publish the verified account and unlock the Qt shell before the
                 // native login overlay returns input to it on Android's UI thread.
@@ -794,12 +803,6 @@ namespace Wenku8::Reader
             case Kind::Chapter:
                 emit m_pQ->chapterReady();
                 scheduleImages();
-                break;
-            case Kind::Download:
-                emit m_pQ->downloadReady(m_oData.m_nId);
-                break;
-            case Kind::Export:
-                emit m_pQ->localDownloadReady(m_oData.m_nId, m_oData.m_strExportedLocation);
                 break;
             case Kind::ShelfAdd:
                 emit m_pQ->bookshelfAdded(m_oData.m_nId);
@@ -982,172 +985,9 @@ namespace Wenku8::Reader
             },
             false, QString("chapter:%1:%2").arg(nNovel).arg(nChapter), !bForce);
     }
-    void OnlineSession::download(int nId, bool bImages)
+    DownloadManager* OnlineSession::downloads() const
     {
-        auto strDirectory = m_pImpl->m_strDirectory;
-        auto pFlag = m_pImpl->m_pCancelled;
-        m_pImpl->run(
-            Kind::Download,
-            [this, nId, bImages, strDirectory, pFlag](ClientOptions oO,
-                                                      std::shared_ptr<HttpTransport> pT)
-            {
-                DownloadStoreOptions oStore;
-                oStore.m_oDirectory = nativePath(strDirectory);
-                oStore.m_vImageOrigins.push_back("https://pic.777743.xyz");
-                auto oAssetRetry = clientAssetRetryOptions(false);
-                oAssetRetry.m_oDelay = std::chrono::seconds(2);
-                NovelDownloader oDownload(
-                    oO, oStore, pT, makeRetryingTransport(makeClientAssetTransport(), oAssetRetry));
-                DownloadRequest oRequest;
-                oRequest.m_bIncludeImages = bImages;
-                oRequest.m_bIncludeCover = bImages;
-                oRequest.m_fnProgress =
-                    [this, pFlag, oLast = std::chrono::steady_clock::time_point{}](
-                        const DownloadStatus& oS) mutable
-                {
-                    auto oNow = std::chrono::steady_clock::now();
-                    if (oNow - oLast > std::chrono::milliseconds(250))
-                    {
-                        oLast = oNow;
-                        QString strMessage = QString("正在下载 · 章节 %1/%2 · 插图 %3/%4")
-                                                 .arg(oS.m_nChaptersCompleted)
-                                                 .arg(oS.m_nChaptersTotal)
-                                                 .arg(oS.m_nImagesCompleted)
-                                                 .arg(oS.m_nImagesTotal);
-                        const auto nCompleted =
-                                       qint64(oS.m_nChaptersCompleted + oS.m_nImagesCompleted),
-                                   nTotal = qint64(oS.m_nChaptersTotal + oS.m_nImagesTotal);
-                        QMetaObject::invokeMethod(
-                            this,
-                            [this, strMessage, nCompleted, nTotal]
-                            {
-                                emit statusChanged(strMessage);
-                                emit progressChanged(nCompleted, nTotal);
-                            },
-                            Qt::QueuedConnection);
-                    }
-                    return !pFlag->load();
-                };
-                oDownload.download(nId, oRequest);
-                Result oR;
-                oR.m_bSuccess = true;
-                oR.m_nId = nId;
-                oR.m_strText = "缓存完成，可以在「下载缓存」中离线阅读。";
-                return oR;
-            });
-    }
-    void OnlineSession::downloadToLocal(int nId, bool bImages, const QString& strDestination)
-    {
-        const QString strCacheDirectory = m_pImpl->m_strDirectory;
-        const auto pFlag = m_pImpl->m_pCancelled;
-        m_pImpl->run(
-            Kind::Export,
-            [this, nId, bImages, strDestination, strCacheDirectory, pFlag](
-                ClientOptions oOptions, std::shared_ptr<HttpTransport> pTransport)
-            {
-                if (!exportDirectoryAvailable(strDestination))
-                {
-                    throw Error(ErrorCode::Io, "保存位置不可用，请重新选择目录。");
-                }
-                QDir().mkpath(strCacheDirectory);
-                QTemporaryDir oWork(QDir(strCacheDirectory).filePath(".local-download-XXXXXX"));
-                if (!oWork.isValid())
-                {
-                    throw Error(ErrorCode::Io, "无法准备临时下载空间。");
-                }
-                auto pLastReport = std::make_shared<std::chrono::steady_clock::time_point>();
-                auto pLastStage = std::make_shared<QString>();
-                auto fnReport = [this, pFlag, pLastReport, pLastStage](
-                    const QString& strMessage, qint64 nDone, qint64 nTotal)
-                {
-                    if (pFlag->load())
-                    {
-                        return false;
-                    }
-                    const auto oNow = std::chrono::steady_clock::now();
-                    if (strMessage == *pLastStage && nDone != nTotal &&
-                        oNow - *pLastReport < std::chrono::milliseconds(250))
-                    {
-                        return true;
-                    }
-                    *pLastReport = oNow;
-                    *pLastStage = strMessage;
-                    QMetaObject::invokeMethod(this, [this, strMessage, nDone, nTotal]
-                    {
-                        emit statusChanged(strMessage);
-                        emit progressChanged(nDone, nTotal);
-                    }, Qt::QueuedConnection);
-                    return !pFlag->load();
-                };
-                ExportOptions oExport;
-                oExport.m_oDirectory = nativePath(oWork.path() + "/portable");
-                oExport.m_bIncludeImages = bImages;
-                oExport.m_fnProgress = [fnReport](const ExportProgress& oProgress)
-                {
-                    return fnReport("正在整理小说文件…",
-                                    qint64(oProgress.m_nChaptersCompleted + oProgress.m_nImagesCompleted),
-                                    qint64(oProgress.m_nChaptersTotal + oProgress.m_nImagesTotal));
-                };
-                ExportResult oExported;
-                bool bExported = false;
-                auto pCached = openStore(strCacheDirectory, QString::fromStdString(oOptions.m_strEndpoint));
-                try
-                {
-                    if (pCached->status(nId).m_bHasReadableVersion)
-                    {
-                        oExported = exportNovel(*pCached, nId, oExport);
-                        bExported = true;
-                    }
-                }
-                catch (const Error& oError)
-                {
-                    if (oError.code() != ErrorCode::CacheMiss)
-                    {
-                        throw;
-                    }
-                }
-                if (!bExported)
-                {
-                    DownloadStoreOptions oStore;
-                    oStore.m_oDirectory = nativePath(oWork.path() + "/source");
-                    oStore.m_vImageOrigins.push_back("https://pic.777743.xyz");
-                    NovelDownloader oDownload(oOptions, oStore, pTransport,
-                        makeRetryingTransport(makeClientAssetTransport(), clientAssetRetryOptions(false)));
-                    DownloadRequest oRequest;
-                    oRequest.m_bIncludeImages = bImages;
-                    oRequest.m_bIncludeCover = bImages;
-                    oRequest.m_fnProgress = [fnReport, pFlag, oLast = std::chrono::steady_clock::time_point{}](
-                        const DownloadStatus& oStatus) mutable
-                    {
-                        const auto oNow = std::chrono::steady_clock::now();
-                        if (oNow - oLast < std::chrono::milliseconds(250))
-                        {
-                            return !pFlag->load();
-                        }
-                        oLast = oNow;
-                        return fnReport(QString("正在下载到本地 · 章节 %1/%2 · 插图 %3/%4")
-                            .arg(oStatus.m_nChaptersCompleted).arg(oStatus.m_nChaptersTotal)
-                            .arg(oStatus.m_nImagesCompleted).arg(oStatus.m_nImagesTotal),
-                            qint64(oStatus.m_nChaptersCompleted + oStatus.m_nImagesCompleted),
-                            qint64(oStatus.m_nChaptersTotal + oStatus.m_nImagesTotal));
-                    };
-                    oDownload.download(nId, oRequest);
-                    oExported = exportNovel(oDownload, nId, oExport);
-                }
-                fnReport("正在保存到所选目录…", 0, 0);
-                const QString strLocation = publishExportDirectory(
-                    QString::fromStdString(oExported.m_oDirectory.u8string()), strDestination,
-                    [pFlag]
-                    {
-                        return !pFlag->load();
-                    });
-                Result oResult;
-                oResult.m_bSuccess = true;
-                oResult.m_nId = nId;
-                oResult.m_strExportedLocation = strLocation;
-                oResult.m_strText = "已保存到本地：" + strLocation;
-                return oResult;
-            });
+        return m_pImpl->m_pDownloads.get();
     }
     void OnlineSession::addToShelf(int nId)
     {

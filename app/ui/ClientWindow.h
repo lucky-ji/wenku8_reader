@@ -30,6 +30,8 @@ namespace Wenku8::Reader
     class LoadingPanel;
     class PullRefreshIndicator;
     class DownloadOption;
+    class DownloadTaskPanel;
+    class Toast;
     class ClientWindow final : public QMainWindow
     {
       public:
@@ -57,6 +59,8 @@ namespace Wenku8::Reader
         quint64 m_nRestoreGeneration = 0;
         QSet<int> m_vShelfIds;
         bool m_bReaderFullscreen = false, m_bLoadingBusy = false;
+        DownloadTaskPanel* m_pDownloadTasks = nullptr;
+        Toast* m_pToast = nullptr;
         LoadingPanel* m_pLoading = nullptr;
         LoadingPanel* m_pStartupLoading = nullptr;
         QPointer<QWidget> m_pLoadingFocus;
