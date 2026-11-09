@@ -12,6 +12,7 @@ namespace Wenku8::Reader
         oOptions.m_oMaxDelay = std::chrono::seconds(15);
         oOptions.m_oAttemptTimeout = std::chrono::seconds(12);
         oOptions.m_bRetryBrowserNetworkErrors = bBrowser;
+        oOptions.m_bRetryRefusedResponses = bBrowser;
         oOptions.m_vHttpStatuses = {408, 425, 500, 502, 503, 504};
         if (bRateLimit)
             oOptions.m_vHttpStatuses.push_back(429);

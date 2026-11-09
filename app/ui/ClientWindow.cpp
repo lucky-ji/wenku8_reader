@@ -519,19 +519,10 @@ namespace Wenku8::Reader
                     {
                         if (bAvailable)
                             m_nRetryContext = m_nActiveRequestContext;
-                        else
-                            m_bVerificationNeeded = false;
                         updateNetworkActions();
                         if (bAvailable && m_pPages->currentIndex() == 1 && m_pCards->count() > 0)
                             m_pCount->setText(
                                 QString("暂未更新 · 保留上次列表（%1 本）").arg(m_pCards->count()));
-                    });
-            connect(m_pSession, &OnlineSession::verificationRequired, this,
-                    [this]
-                    {
-                        m_bVerificationNeeded = true;
-                        m_nRetryContext = m_nActiveRequestContext;
-                        updateNetworkActions();
                     });
             connect(m_pSession, &OnlineSession::chapterImagesReady, this,
                     [this](int nNovel, int nChapter)
@@ -1324,10 +1315,6 @@ namespace Wenku8::Reader
         setButtonIcon(m_pRetryNetwork, Icon::Refresh);
         m_pRetryNetwork->hide();
         pStatusRow->addWidget(m_pRetryNetwork);
-        m_pVerifyNetwork = button("网页验证", "verifyNetwork");
-        setButtonIcon(m_pVerifyNetwork, Icon::Shield);
-        m_pVerifyNetwork->hide();
-        pStatusRow->addWidget(m_pVerifyNetwork);
         pBody->addWidget(m_pStatusArea);
         connect(m_pRetryNetwork, &QPushButton::clicked, this,
                 [this]
@@ -1335,14 +1322,6 @@ namespace Wenku8::Reader
 #ifdef WENKU8_CLIENT_ONLINE
                     if (m_pSession && m_nRetryContext == m_nBusinessContext)
                         m_pSession->retryLastRequest();
-#endif
-                });
-        connect(m_pVerifyNetwork, &QPushButton::clicked, this,
-                [this]
-                {
-#ifdef WENKU8_CLIENT_ONLINE
-                    if (m_pSession && m_nRetryContext == m_nBusinessContext)
-                        m_pSession->signIn(false);
 #endif
                 });
         m_pMobileNavigation = new QWidget;
@@ -1529,7 +1508,6 @@ namespace Wenku8::Reader
             ++m_nBusinessContext;
         }
         m_bUnlocked = bValue;
-        m_bVerificationNeeded = false;
         m_nRetryContext = m_nBusinessContext;
         updateNetworkActions();
         m_pOperations->setEnabled(bValue);
@@ -2264,11 +2242,9 @@ namespace Wenku8::Reader
 #endif
         const bool bRecoverable =
             m_bUnlocked && !m_bLoadingBusy && m_nRetryContext == m_nBusinessContext;
-        const bool bVerifyVisible = bRecoverable && m_bVerificationNeeded,
-                   bRetryVisible = bRecoverable && !m_bVerificationNeeded && bRetry;
-        m_pVerifyNetwork->setVisible(bVerifyVisible);
+        const bool bRetryVisible = bRecoverable && bRetry;
         m_pRetryNetwork->setVisible(bRetryVisible);
-        const bool bAction = bVerifyVisible || bRetryVisible;
+        const bool bAction = bRetryVisible;
         const bool bNormal = !mobileMode() || (m_pPages->currentIndex() != 3 &&
                                                m_pPages->currentIndex() < 4 && height() >= 520);
         m_pStatus->setVisible(bNormal || bAction);

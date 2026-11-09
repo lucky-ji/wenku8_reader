@@ -119,6 +119,10 @@ namespace Wenku8
         // Opt-in response retries; permitted: 404 (assets), 408, 425, 429, 500, 502, 503, 504.
         std::vector<long> m_vHttpStatuses;
         bool m_bRetryBrowserNetworkErrors = false; // Network errors with native code 0.
+        // Explicitly retry read-only GET refusals (403 or recognised challenge
+        // responses/errors), at most three attempts. No verification bypass,
+        // cookie reset or 401 retry is performed.
+        bool m_bRetryRefusedResponses = false;
         bool m_bExponentialBackoff = false;
         std::chrono::milliseconds m_oAttemptTimeout{0}; // 0: use the remaining total budget.
         std::chrono::milliseconds m_oMaxDelay{
@@ -131,7 +135,8 @@ namespace Wenku8
         // the client.
         std::function<void(unsigned, int)> m_fnOnRetry;
     };
-    // Opt-in for read-only GETs. Never retries POST, 401/403 or certificate errors.
+    // Opt-in for read-only GETs. Never retries POST, 401 or certificate errors.
+    // 403/challenges require m_bRetryRefusedResponses; they are excluded by default.
     // HTTP/status and browser retries are disabled unless explicitly configured.
     // TransferOptions::timeout bounds all attempts and waits for each perform().
     WENKU8_API std::shared_ptr<HttpTransport> makeRetryingTransport(std::shared_ptr<HttpTransport>,

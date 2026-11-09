@@ -169,6 +169,10 @@ namespace Wenku8::Reader
                 oTask.m_strDestination = oJson.value("destination").toString();
                 oTask.m_strLocation = oJson.value("location").toString();
                 oTask.m_strMessage = oJson.value("message").toString();
+                if (oTask.m_strMessage.contains("拒绝") || oTask.m_strMessage.contains("登录验证后"))
+                {
+                    oTask.m_strMessage = "网络访问失败，进度已保留，可稍后继续。";
+                }
                 oTask.m_bLocal = oJson.value("local").toBool();
                 oTask.m_bImages = oJson.value("images").toBool(true);
                 const int nState = oJson.value("state").toInt(-1);
@@ -416,13 +420,16 @@ namespace Wenku8::Reader
                 {
                     if (oError.code() == ErrorCode::Cancelled || oError.code() == ErrorCode::Network ||
                         oError.code() == ErrorCode::Authentication || oError.httpStatus() == 403 ||
-                        oError.httpStatus() == 429 || oError.code() == ErrorCode::BrowserVerificationRequired)
+                        oError.httpStatus() == 429 || oError.code() == ErrorCode::BrowserVerificationRequired ||
+                        oError.code() == ErrorCode::CaptchaRequired)
                     {
                         eFailure = DownloadTaskState::Paused;
                     }
                     strError = oError.code() == ErrorCode::Cancelled ? "下载已暂停，可继续。"
-                        : oError.httpStatus() == 403 ? "网站暂时拒绝访问，请完成登录验证后继续。"
-                        : oError.code() == ErrorCode::Network ? "网络连接中断，进度已保留，请稍后继续。"
+                        : oError.httpStatus() == 403 || oError.code() == ErrorCode::Network ||
+                          oError.code() == ErrorCode::BrowserVerificationRequired ||
+                          oError.code() == ErrorCode::CaptchaRequired
+                            ? "网络访问失败，进度已保留，可稍后继续。"
                         : oError.code() == ErrorCode::Io ? "存储不可用，请检查目录权限和剩余空间后继续。"
                         : "下载未完成，已保留进度，可稍后继续。";
                 }

@@ -201,23 +201,17 @@ namespace Wenku8::Reader
                 !oR.m_bNeedsLogin && (oError.httpStatus() == 403 ||
                                       oError.code() == ErrorCode::BrowserVerificationRequired ||
                                       oError.code() == ErrorCode::CaptchaRequired);
-            oR.m_bTransient = oError.code() == ErrorCode::Network || oError.httpStatus() == 408 ||
+            oR.m_bTransient = oR.m_bVerification || oError.code() == ErrorCode::Network ||
+                              oError.httpStatus() == 408 ||
                               oError.httpStatus() == 425 || oError.httpStatus() == 429 ||
                               oError.httpStatus() == 500 || oError.httpStatus() == 502 ||
                               oError.httpStatus() == 503 || oError.httpStatus() == 504;
-            if (oError.httpStatus() > 0)
-                oR.m_strLoginHint = QString("登录检查返回 HTTP %1，请完成网页验证后再检查。")
-                                        .arg(oError.httpStatus());
-            else if (oError.code() == ErrorCode::Network)
-                oR.m_strLoginHint = "登录检查连接失败，请稍后重试。";
-            else if (oError.code() == ErrorCode::Authentication ||
-                     oError.code() == ErrorCode::Parse)
-                oR.m_strLoginHint = "尚未核实到有效账号资料，请完成网页登录。";
+            oR.m_strLoginHint = oR.m_bNeedsLogin
+                ? "尚未核实到有效账号资料，请完成网页登录。"
+                : "网络访问失败，请稍后重试。";
             oR.m_strText = oR.m_bNeedsLogin ? "登录状态已过期，请重新登录。"
-                           : oR.m_bVerification
-                               ? "本次访问被网站拒绝；已保留登录状态，可稍后重试或打开网站验证。"
-                           : oR.m_bCancelled ? "操作已取消，已下载的内容会保留。"
-                                             : "加载失败，请检查网络后重试。";
+                           : oR.m_bCancelled ? "操作已取消。"
+                                             : "网络访问失败，请稍后重试。";
             return oR;
         }
         QString assetUrl(const QString& strOriginal)
@@ -385,8 +379,7 @@ namespace Wenku8::Reader
         {
             m_fnFailedJob = {};
             m_strFailedKey.clear();
-            // Verification can be required by a write request without a retry job.
-            // Always reset both recovery actions when starting a new request/session.
+            // Always discard recovery state when starting a new request/session.
             emit m_pQ->retryAvailableChanged(false);
         }
         void clearReads(bool bPreserveVerifiedClient = false)
@@ -691,11 +684,11 @@ namespace Wenku8::Reader
                     {
                         setRestoring(false);
                         m_oProbeTimer.stop();
-                        if (oResult.m_bNeedsLogin || oResult.m_bVerification)
+                        if (oResult.m_bNeedsLogin)
                             showLogin();
                         else
                             emit m_pQ->statusChanged(
-                                "暂时无法连接；本机登录状态已保留，点击登录文库可重试。");
+                                "网络访问失败，请稍后重试。");
                     }
                     else
                         m_pHost->setHint(oResult.m_strLoginHint.isEmpty()
@@ -745,7 +738,7 @@ namespace Wenku8::Reader
                         oCached.m_bFromCache = true;
                         oCached.m_bStale = true;
                         oCached.m_strStatusOverride =
-                            "网络暂不可用，正在显示本次会话中上次成功读取的内容；可重试更新。";
+                            "网络访问失败，已保留上次内容，请稍后重试。";
                         oResult = std::move(oCached);
                     }
                 }
@@ -770,8 +763,6 @@ namespace Wenku8::Reader
                         showLogin();
                     }
                 }
-                else if (oResult.m_bVerification)
-                    emit m_pQ->verificationRequired();
                 if (bBusiness)
                     emit m_pQ->busyChanged(false);
                 return;

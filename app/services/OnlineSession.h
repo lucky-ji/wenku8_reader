@@ -53,7 +53,6 @@ namespace Wenku8::Reader
         void chapterReady();
         void chapterImagesReady(int nNovel, int nChapter);
         void retryAvailableChanged(bool);
-        void verificationRequired();
 
       private:
         struct Impl;

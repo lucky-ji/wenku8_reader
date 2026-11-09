@@ -108,8 +108,7 @@ namespace Wenku8::Reader
         ReadingView* m_pReader = nullptr;
         QWidget* m_pOperations = nullptr;
         QWidget* m_pStatusArea = nullptr;
-        QPushButton *m_pRetryNetwork = nullptr, *m_pVerifyNetwork = nullptr;
-        bool m_bVerificationNeeded = false;
+        QPushButton* m_pRetryNetwork = nullptr;
         quint64 m_nBusinessContext = 0, m_nActiveRequestContext = 0, m_nRetryContext = 0;
         QString m_strActiveSearch;
         void build();
