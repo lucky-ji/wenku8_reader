@@ -30,7 +30,7 @@ SDK 工程从 [主仓库](https://github.com/lucky-ji/wenku8_reader) 克隆后�
 | `Wenku8Sdk.h` | 数据模型、Client、传输抽象、错误、缓存与重试 |
 | `Wenku8Api.h` | 历史协议请求和解析 |
 | `Wenku8Catalog.h` | OPDS 目录与文本包入口 |
-| `Wenku8Download.h` | 可取消、可续传下载及离线读取 |
+| `Wenku8Download.h` | 可取消、可续传下载、离线读取及 TXT/HTML 导出 |
 
 其他 CMake 工程可以直接链接库：
 
@@ -54,3 +54,12 @@ SDK 接口为同步接口，GUI 应放入工作线程。调用方可注入自己
 ## 本地数据
 
 密码由登录网页处理，不写入项目源码或 SDK 缓存。登录状态由本机浏览器资料目录管理；阅读位置、历史、书签与下载保存在应用数据目录。升级 Windows 版本时继续使用既有应用数据标识，避免重复登录或丢失阅读记录。用户数据不进入 Git 或对应源码归档。
+
+
+## 缓存与用户导出
+
+`NovelDownloader` 管理应用内离线缓存，`exportNovel` 将已提交的完整内容导出到普通文件目录。导出接口只使用 C++17 的 `std::filesystem` 和回调，不依赖 Qt；支持取消、进度、可选图片，生成 UTF-8 文本与离线 HTML，并避免覆盖已有目录。
+
+客户端的「下载缓存」写入应用数据目录的 `books`，Android 使用 `getFilesDir()` 下的私有目录。此功能不提供用户自选路径。「下载到本地」先复用完整缓存，缺失时只下载到私有临时空间，导出成功后由 `ExportDestination` 复制到用户选择的目录；成功、失败与取消均回收本次临时空间，不向缓存书库添加临时下载。
+
+`platform/ExportDestination.h` 是客户端平台接口：桌面使用目录选择器和普通文件路径，Android 使用 Storage Access Framework 文档树 URI 及持久授权，不要求共享存储的广泛权限。SDK 不处理 Android URI。目录选择、授权失效、发布副本与平台错误均由平台层处理。导出已有完整缓存可不联网；当前应用的账号登录门禁保持不变。
