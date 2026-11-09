@@ -50,6 +50,30 @@ namespace Wenku8
         std::vector<std::string> m_vImageOrigins{"https://img.wenku8.com",
                                                  "https://pic.wenku8.com"};
     };
+    struct DownloadContentVisitor
+    {
+        std::function<void(const Novel&, const std::vector<Volume>&,
+                           const std::vector<std::string>&)> m_fnBook;
+        std::function<void(int, const std::string&)> m_fnChapter;
+        std::function<void(const std::string&, const std::string&)> m_fnImage;
+    };
+    struct ExportProgress
+    {
+        std::size_t m_nChaptersCompleted = 0, m_nChaptersTotal = 0;
+        std::size_t m_nImagesCompleted = 0, m_nImagesTotal = 0;
+    };
+    struct ExportOptions
+    {
+        std::filesystem::path m_oDirectory;
+        bool m_bIncludeImages = true;
+        // False cancels the export. The callback runs on the calling thread.
+        std::function<bool(const ExportProgress&)> m_fnProgress;
+    };
+    struct ExportResult
+    {
+        std::filesystem::path m_oDirectory, m_oTextFile, m_oHtmlFile;
+        std::size_t m_nChapters = 0, m_nImages = 0;
+    };
     // Pure C++ persisted download store. One instance/novel directory at a time.
     // Separate content and asset transports: a browser session can fetch protected
     // text while a dedicated curl session fetches public image nodes.
@@ -72,9 +96,18 @@ namespace Wenku8
         std::vector<std::string> imageUrls(int nNovelId) const;
         std::string image(int nNovelId, const std::string& strUrl) const;
         std::filesystem::path bookDirectory(int nNovelId) const;
+        // Offline streaming: metadata, requested images, then ordered chapters.
+        // Each content object is validated when read; a later failure can follow
+        // earlier callbacks. Omit m_fnImage to read/export text without images.
+        void visitContent(int nNovelId, const DownloadContentVisitor&) const;
 
       private:
         struct Impl;
         std::unique_ptr<Impl> m_pImpl;
     };
+    // Exports a committed cache into a new, uniquely named book directory.
+    // Produces UTF-8 novel.txt, index.html and optional local images; no HTTP,
+    // cookies, cache manifests or source URLs are copied into the public files.
+    WENKU8_API ExportResult exportNovel(const NovelDownloader&, int nNovelId,
+                                       const ExportOptions&);
 } // namespace Wenku8

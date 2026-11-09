@@ -928,4 +928,46 @@ namespace Wenku8
                 return m_pImpl->object(nNovelId, oA.m_strObject);
         throw Error(ErrorCode::CacheMiss, "Image is not in the committed download");
     }
+    void NovelDownloader::visitContent(int nNovelId, const DownloadContentVisitor& oVisitor) const
+    {
+        positive(nNovelId);
+        const auto oPlan = m_pImpl->load(nNovelId, "book.xml");
+        if (oPlan.m_eState != DownloadState::Complete)
+        {
+            throw Error(ErrorCode::CacheMiss, "No complete readable download");
+        }
+        std::vector<std::string> vImages;
+        for (const auto& oAsset : oPlan.m_vAssets)
+        {
+            vImages.push_back(oAsset.m_strUrl);
+        }
+        if (oVisitor.m_fnBook)
+        {
+            oVisitor.m_fnBook(oPlan.m_oNovel, oPlan.m_vVolumes, vImages);
+        }
+        if (oVisitor.m_fnImage)
+        {
+            for (const auto& oAsset : oPlan.m_vAssets)
+            {
+                oVisitor.m_fnImage(oAsset.m_strUrl,
+                                   m_pImpl->object(nNovelId, oAsset.m_strObject));
+            }
+        }
+        if (oVisitor.m_fnChapter)
+        {
+            std::map<int, std::string> vObjects;
+            for (const auto& oPart : oPlan.m_vChapters)
+            {
+                vObjects.emplace(oPart.m_nId, oPart.m_strObject);
+            }
+            for (const auto& oVolume : oPlan.m_vVolumes)
+            {
+                for (const auto& oChapter : oVolume.m_vChapters)
+                {
+                    oVisitor.m_fnChapter(oChapter.m_nId,
+                                         m_pImpl->object(nNovelId, vObjects.at(oChapter.m_nId)));
+                }
+            }
+        }
+    }
 } // namespace Wenku8
