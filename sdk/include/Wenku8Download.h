@@ -95,6 +95,9 @@ namespace Wenku8
         NovelDownloader& operator=(const NovelDownloader&) = delete;
         DownloadStatus download(int nNovelId, const DownloadRequest& = {});
         DownloadStatus status(int nNovelId) const; // Checks persisted files; never performs HTTP.
+        // Metadata comes from the published Complete manifest, without scanning
+        // every content object. chapter()/image() validate the requested object;
+        // use status() for an explicit full-book integrity check.
         Novel novel(int nNovelId) const;
         std::vector<Volume> index(int nNovelId) const;
         std::string chapter(int nNovelId, int nChapterId) const;

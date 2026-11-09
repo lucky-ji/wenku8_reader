@@ -514,9 +514,18 @@ namespace Wenku8
             }
             return oS;
         }
-        Plan committed(int nNovelId) const
+        Plan published(int nNovelId) const
         {
             auto oP = load(nNovelId, "book.xml");
+            if (oP.m_eState != DownloadState::Complete)
+            {
+                throw Error(ErrorCode::CacheMiss, "No complete readable download");
+            }
+            return oP;
+        }
+        Plan committed(int nNovelId) const
+        {
+            auto oP = published(nNovelId);
             auto oS = describe(oP);
             if (oS.m_eState != DownloadState::Complete)
                 throw Error(ErrorCode::CacheMiss, "No complete readable download");
@@ -895,16 +904,16 @@ namespace Wenku8
     }
     Novel NovelDownloader::novel(int nNovelId) const
     {
-        return m_pImpl->committed(nNovelId).m_oNovel;
+        return m_pImpl->published(nNovelId).m_oNovel;
     }
     std::vector<Volume> NovelDownloader::index(int nNovelId) const
     {
-        return m_pImpl->committed(nNovelId).m_vVolumes;
+        return m_pImpl->published(nNovelId).m_vVolumes;
     }
     std::string NovelDownloader::chapter(int nNovelId, int nChapterId) const
     {
         positive(nChapterId);
-        auto oP = m_pImpl->committed(nNovelId);
+        auto oP = m_pImpl->published(nNovelId);
         for (const auto& oPart : oP.m_vChapters)
             if (oPart.m_nId == nChapterId)
                 return m_pImpl->object(nNovelId, oPart.m_strObject);
@@ -912,7 +921,7 @@ namespace Wenku8
     }
     std::vector<std::string> NovelDownloader::imageUrls(int nNovelId) const
     {
-        auto oP = m_pImpl->committed(nNovelId);
+        auto oP = m_pImpl->published(nNovelId);
         std::vector<std::string> vUrls;
         for (const auto& oA : oP.m_vAssets)
             vUrls.push_back(oA.m_strUrl);
@@ -920,7 +929,7 @@ namespace Wenku8
     }
     std::string NovelDownloader::image(int nNovelId, const std::string& strUrl) const
     {
-        auto oP = m_pImpl->committed(nNovelId);
+        auto oP = m_pImpl->published(nNovelId);
         for (const auto& oA : oP.m_vAssets)
             if (oA.m_strUrl == strUrl)
                 return m_pImpl->object(nNovelId, oA.m_strObject);
