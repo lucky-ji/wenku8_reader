@@ -13,6 +13,9 @@ namespace Wenku8
     };
     enum class DownloadMode
     {
+        // Reuse the last task checkpoint with matching image/cover options.
+        // Completed objects are verified and skipped; an interrupted HTTP
+        // response is downloaded again from the start of that chapter/image.
         Resume,
         Refresh,
         Offline
@@ -36,6 +39,8 @@ namespace Wenku8
         std::chrono::seconds m_oRateLimitWait{
             60}; // Retry-After upper bound; also fallback if absent.
         // Called on the downloading thread, including while transfers run.
+        // Completed chapter/image counts are checkpointed before notification;
+        // a restarted Resume reports those counts from its first callback.
         // False cancels; callbacks must not re-enter this downloader.
         std::function<bool(const DownloadStatus&)> m_fnProgress;
     };

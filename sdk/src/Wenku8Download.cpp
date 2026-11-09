@@ -658,9 +658,12 @@ namespace Wenku8
         }
         oP.m_eState = DownloadState::Running;
         oP.m_oError.reset();
-        DownloadStatus oCurrent;
-        oCurrent.m_nNovelId = nNovelId;
+        // Restore persisted counters before the first progress callback. A resumed
+        // task must not briefly report zero completed chapters/images while its
+        // already verified objects are being reused.
+        DownloadStatus oCurrent = m_pImpl->describe(oP);
         oCurrent.m_eState = DownloadState::Running;
+        oCurrent.m_oLastError.reset();
         oCurrent.m_bHasReadableVersion = m_pImpl->readable(nNovelId);
         auto fnNotify = [&]
         {
@@ -753,11 +756,6 @@ namespace Wenku8
                     m_pImpl->allowed(strUrl);
                     oP.m_vAssets.push_back({strUrl, {}});
                 }
-            }
-            {
-                const auto bReadable = oCurrent.m_bHasReadableVersion;
-                oCurrent = m_pImpl->describe(oP);
-                oCurrent.m_bHasReadableVersion = bReadable;
             }
             fnCheckpoint();
             for (auto& oPart : oP.m_vChapters)
