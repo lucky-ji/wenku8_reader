@@ -41,7 +41,7 @@ def main():
         "SHA-256: 3a530d1b243b5dec00bc54937455471aaa3e56849d2593edb8ded07228202240\n"
     )
     (pOutput / "SOURCE-PROVENANCE.txt").write_text(
-        "Light Novel Library 1.0.0 native build provenance\n\n" + strQtProvenance
+        "轻小说文库 " + str(vMetadata["version"]) + " native build provenance\n\n" + strQtProvenance
         + "Project commit and tree hashes are recorded in BUILD-METADATA.json; project.tar.gz is the exact git tree.\n"
         "Bundled curl, libxml2 and TinyXML-2 sources are inside project.tar.gz.\n"
         "Linux TLS uses OS-provided Mbed TLS (GPL-2.0-or-later option), not OpenSSL. OS libraries are not bundled.\n"
