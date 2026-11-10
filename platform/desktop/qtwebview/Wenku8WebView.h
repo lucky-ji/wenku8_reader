@@ -25,6 +25,9 @@ namespace Wenku8::QtWebView
         void reset(); // Discards this app's profile, never another browser's cookies.
         void close(); // Cancels pending work; call before shutting down QApplication.
         std::shared_ptr<HttpTransport> transport() const;
+        // Independent hidden document, sharing this session's in-memory profile.
+        // Remains usable after reset; closed permanently with the session.
+        std::shared_ptr<HttpTransport> downloadTransport() const;
 
       private:
         std::shared_ptr<BrowserBridge> m_pBridge;

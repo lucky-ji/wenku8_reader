@@ -2,7 +2,7 @@
 if(ANDROID)
     set(QT_ANDROID_APPLICATION_BINARY wenku8_client)
     set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../platform/android")
-    set(ANDROID_VERSION_CODE 3)
+    set(ANDROID_VERSION_CODE 4)
     set(ANDROID_VERSION_NAME "${PROJECT_VERSION}")
 endif()
 
@@ -20,6 +20,7 @@ add_library(reader_widgets STATIC
     widgets/TouchScroll.cpp widgets/TouchScroll.h
     widgets/LoadingPanel.cpp widgets/LoadingPanel.h
     widgets/DownloadOption.cpp widgets/DownloadOption.h
+    widgets/Toast.cpp widgets/Toast.h
     widgets/PullRefreshIndicator.cpp widgets/PullRefreshIndicator.h
     resources/icons.qrc
 )
@@ -49,6 +50,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../platform" "${CMAKE_CURRENT_BINA
 
 add_library(wenku8_client_services STATIC
     services/OnlineSession.cpp services/OnlineSession.h
+    services/DownloadManager.cpp services/DownloadManager.h
 )
 target_include_directories(wenku8_client_services PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/services")
 target_link_libraries(wenku8_client_services PUBLIC wenku8_reader reader_platform Qt5::Concurrent)
@@ -57,7 +59,8 @@ set_target_properties(wenku8_client_services PROPERTIES POSITION_INDEPENDENT_COD
 
 add_library(wenku8_client_ui STATIC
     ui/ClientWindow.cpp ui/ClientWindow.h
-    ui/MobilePages.cpp ui/DesktopInformation.cpp ui/ReaderContents.cpp
+    ui/MobilePages.cpp ui/DesktopInformation.cpp ui/ReaderContents.cpp ui/DownloadActions.cpp
+    ui/DownloadTaskPanel.cpp ui/DownloadTaskPanel.h
 )
 target_include_directories(wenku8_client_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ui")
 target_link_libraries(wenku8_client_ui PUBLIC wenku8_client_services)

@@ -514,9 +514,18 @@ namespace Wenku8
             }
             return oS;
         }
-        Plan committed(int nNovelId) const
+        Plan published(int nNovelId) const
         {
             auto oP = load(nNovelId, "book.xml");
+            if (oP.m_eState != DownloadState::Complete)
+            {
+                throw Error(ErrorCode::CacheMiss, "No complete readable download");
+            }
+            return oP;
+        }
+        Plan committed(int nNovelId) const
+        {
+            auto oP = published(nNovelId);
             auto oS = describe(oP);
             if (oS.m_eState != DownloadState::Complete)
                 throw Error(ErrorCode::CacheMiss, "No complete readable download");
@@ -658,9 +667,12 @@ namespace Wenku8
         }
         oP.m_eState = DownloadState::Running;
         oP.m_oError.reset();
-        DownloadStatus oCurrent;
-        oCurrent.m_nNovelId = nNovelId;
+        // Restore persisted counters before the first progress callback. A resumed
+        // task must not briefly report zero completed chapters/images while its
+        // already verified objects are being reused.
+        DownloadStatus oCurrent = m_pImpl->describe(oP);
         oCurrent.m_eState = DownloadState::Running;
+        oCurrent.m_oLastError.reset();
         oCurrent.m_bHasReadableVersion = m_pImpl->readable(nNovelId);
         auto fnNotify = [&]
         {
@@ -753,11 +765,6 @@ namespace Wenku8
                     m_pImpl->allowed(strUrl);
                     oP.m_vAssets.push_back({strUrl, {}});
                 }
-            }
-            {
-                const auto bReadable = oCurrent.m_bHasReadableVersion;
-                oCurrent = m_pImpl->describe(oP);
-                oCurrent.m_bHasReadableVersion = bReadable;
             }
             fnCheckpoint();
             for (auto& oPart : oP.m_vChapters)
@@ -897,16 +904,16 @@ namespace Wenku8
     }
     Novel NovelDownloader::novel(int nNovelId) const
     {
-        return m_pImpl->committed(nNovelId).m_oNovel;
+        return m_pImpl->published(nNovelId).m_oNovel;
     }
     std::vector<Volume> NovelDownloader::index(int nNovelId) const
     {
-        return m_pImpl->committed(nNovelId).m_vVolumes;
+        return m_pImpl->published(nNovelId).m_vVolumes;
     }
     std::string NovelDownloader::chapter(int nNovelId, int nChapterId) const
     {
         positive(nChapterId);
-        auto oP = m_pImpl->committed(nNovelId);
+        auto oP = m_pImpl->published(nNovelId);
         for (const auto& oPart : oP.m_vChapters)
             if (oPart.m_nId == nChapterId)
                 return m_pImpl->object(nNovelId, oPart.m_strObject);
@@ -914,7 +921,7 @@ namespace Wenku8
     }
     std::vector<std::string> NovelDownloader::imageUrls(int nNovelId) const
     {
-        auto oP = m_pImpl->committed(nNovelId);
+        auto oP = m_pImpl->published(nNovelId);
         std::vector<std::string> vUrls;
         for (const auto& oA : oP.m_vAssets)
             vUrls.push_back(oA.m_strUrl);
@@ -922,10 +929,52 @@ namespace Wenku8
     }
     std::string NovelDownloader::image(int nNovelId, const std::string& strUrl) const
     {
-        auto oP = m_pImpl->committed(nNovelId);
+        auto oP = m_pImpl->published(nNovelId);
         for (const auto& oA : oP.m_vAssets)
             if (oA.m_strUrl == strUrl)
                 return m_pImpl->object(nNovelId, oA.m_strObject);
         throw Error(ErrorCode::CacheMiss, "Image is not in the committed download");
+    }
+    void NovelDownloader::visitContent(int nNovelId, const DownloadContentVisitor& oVisitor) const
+    {
+        positive(nNovelId);
+        const auto oPlan = m_pImpl->load(nNovelId, "book.xml");
+        if (oPlan.m_eState != DownloadState::Complete)
+        {
+            throw Error(ErrorCode::CacheMiss, "No complete readable download");
+        }
+        std::vector<std::string> vImages;
+        for (const auto& oAsset : oPlan.m_vAssets)
+        {
+            vImages.push_back(oAsset.m_strUrl);
+        }
+        if (oVisitor.m_fnBook)
+        {
+            oVisitor.m_fnBook(oPlan.m_oNovel, oPlan.m_vVolumes, vImages);
+        }
+        if (oVisitor.m_fnImage)
+        {
+            for (const auto& oAsset : oPlan.m_vAssets)
+            {
+                oVisitor.m_fnImage(oAsset.m_strUrl,
+                                   m_pImpl->object(nNovelId, oAsset.m_strObject));
+            }
+        }
+        if (oVisitor.m_fnChapter)
+        {
+            std::map<int, std::string> vObjects;
+            for (const auto& oPart : oPlan.m_vChapters)
+            {
+                vObjects.emplace(oPart.m_nId, oPart.m_strObject);
+            }
+            for (const auto& oVolume : oPlan.m_vVolumes)
+            {
+                for (const auto& oChapter : oVolume.m_vChapters)
+                {
+                    oVisitor.m_fnChapter(oChapter.m_nId,
+                                         m_pImpl->object(nNovelId, vObjects.at(oChapter.m_nId)));
+                }
+            }
+        }
     }
 } // namespace Wenku8

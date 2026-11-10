@@ -131,8 +131,11 @@ namespace Wenku8
             HttpResponse perform(const HttpRequest& oRequest,
                                  const TransferOptions& oOptions) override
             {
+                const auto nAttempts = m_oRetry.m_bRetryRefusedResponses
+                                           ? (std::min)(m_oRetry.m_nMaxAttempts, 3U)
+                                           : m_oRetry.m_nMaxAttempts;
                 if (oRequest.m_strMethod != "GET" || !oRequest.m_bAllowRetries ||
-                    m_oRetry.m_nMaxAttempts == 1)
+                    nAttempts == 1)
                     return m_pInner->perform(oRequest, oOptions);
                 if (oOptions.m_oTimeout.count() <= 0)
                     throw Error(ErrorCode::InvalidArgument, "Invalid retry timeout");
@@ -172,22 +175,55 @@ namespace Wenku8
                                        {
                                            return char(std::tolower(nC));
                                        });
+                        // Ordinary successful pages also contain Cloudflare's
+                        // background JSD script. Match the website backend's
+                        // distinction rather than retrying those valid pages.
+                        const bool bPlatform = strSample.find("challenge-platform") != std::string::npos;
+                        const bool bBackgroundDetection = strSample.find("/scripts/jsd/") != std::string::npos;
                         const bool bChallenge =
+                            (bPlatform && !bBackgroundDetection) ||
+                            strSample.find("__cf_chl_opt") != std::string::npos ||
+                            strSample.find("cf-chl-") != std::string::npos ||
                             strSample.find("<title>just a moment") != std::string::npos ||
-                            strSample.find("/cdn-cgi/challenge-platform/") != std::string::npos ||
                             strSample.find("you have been blocked") != std::string::npos;
-                        if (bChallenge)
+                        if (oResponse->m_nStatus == 401)
+                        {
                             return std::move(*oResponse);
-                        if (oResponse->m_nStatus >= 200 && oResponse->m_nStatus < 300 &&
+                        }
+                        if (bChallenge)
+                        {
+                            if (!m_oRetry.m_bRetryRefusedResponses)
+                            {
+                                return std::move(*oResponse);
+                            }
+                            bAgain = true;
+                        }
+                        else if (oResponse->m_nStatus == 403 && m_oRetry.m_bRetryRefusedResponses)
+                        {
+                            bAgain = true;
+                        }
+                        else if (oResponse->m_nStatus >= 200 && oResponse->m_nStatus < 300 &&
                             m_oRetry.m_fnAcceptResponse)
+                        {
                             bAgain = !m_oRetry.m_fnAcceptResponse(*oResponse);
+                        }
                     }
                     catch (const Error& oE)
                     {
-                        if (oE.code() != ErrorCode::Network ||
-                            (!transient(oE.transportCode()) &&
-                             !(oE.transportCode() == 0 && m_oRetry.m_bRetryBrowserNetworkErrors)))
+                        const bool bRefused = oE.httpStatus() == 403 ||
+                                              oE.code() == ErrorCode::BrowserVerificationRequired ||
+                                              oE.code() == ErrorCode::CaptchaRequired;
+                        if (oE.httpStatus() == 401 ||
+                            (oE.code() == ErrorCode::Authentication && oE.httpStatus() != 403) ||
+                            oE.code() == ErrorCode::Cancelled ||
+                            (bRefused && !m_oRetry.m_bRetryRefusedResponses) ||
+                            (!bRefused &&
+                             (oE.code() != ErrorCode::Network ||
+                              (!transient(oE.transportCode()) &&
+                               !(oE.transportCode() == 0 && m_oRetry.m_bRetryBrowserNetworkErrors)))))
+                        {
                             throw;
+                        }
                         oFailure = std::current_exception();
                         nNativeCode = oE.transportCode();
                         bAgain = true;
@@ -198,7 +234,7 @@ namespace Wenku8
                             std::rethrow_exception(oFailure);
                         return std::move(*oResponse);
                     };
-                    if (!bAgain || nAttempt >= m_oRetry.m_nMaxAttempts)
+                    if (!bAgain || nAttempt >= nAttempts)
                         return fnFinish();
                     auto oDelay = m_oRetry.m_oDelay;
                     if (m_oRetry.m_bExponentialBackoff)

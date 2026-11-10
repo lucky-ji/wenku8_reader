@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 set(strAppResources "${CMAKE_CURRENT_SOURCE_DIR}/../app/resources")
-add_library(reader_platform STATIC LoginHost.h "${strAppResources}/mobile_browser.qrc")
+add_library(reader_platform STATIC LoginHost.h ExportDestination.h "${strAppResources}/mobile_browser.qrc")
 target_include_directories(reader_platform PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/android/nativebridge"
@@ -11,6 +11,7 @@ if(ANDROID)
     find_package(Qt5 5.15 REQUIRED COMPONENTS AndroidExtras)
     target_sources(reader_platform PRIVATE
         android/nativebridge/AndroidLoginHost.cpp
+        android/nativebridge/AndroidExportDestination.cpp
         android/nativebridge/AndroidKeys.cpp android/nativebridge/AndroidKeys.h
         android/nativebridge/MobileBrowserProtocol.cpp android/nativebridge/MobileBrowserProtocol.h
     )
@@ -31,6 +32,6 @@ else()
     if(MSVC)
         target_compile_options(Wenku8WebView PRIVATE /W4 /utf-8)
     endif()
-    target_sources(reader_platform PRIVATE desktop/DesktopLoginHost.cpp)
+    target_sources(reader_platform PRIVATE desktop/DesktopLoginHost.cpp desktop/ExportDestination.cpp)
     target_link_libraries(reader_platform PUBLIC Wenku8::WebView)
 endif()

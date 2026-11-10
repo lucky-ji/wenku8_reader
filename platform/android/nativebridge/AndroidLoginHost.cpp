@@ -70,6 +70,8 @@ namespace Wenku8::Reader
             QUrl m_oOrigin;
             quint64 m_nToken;
             std::atomic<bool> m_oClosed{false};
+            bool m_bDownload = false;
+            quint64 m_nDownloadEpoch = 0;
             std::timed_mutex m_oSerial;
         };
         class AndroidTransport final : public HttpTransport
@@ -125,9 +127,18 @@ namespace Wenku8::Reader
                 try
                 {
                     auto oSource = QAndroidJniObject::fromString(strScript);
-                    QAndroidJniObject::callStaticMethod<void>(
-                        pJavaClass, "fetch", "(JJLjava/lang/String;)V", jlong(m_pState->m_nToken),
-                        jlong(nId), oSource.object<jstring>());
+                    if (m_pState->m_bDownload)
+                    {
+                        QAndroidJniObject::callStaticMethod<void>(pJavaClass, "fetchDownload",
+                            "(JJJLjava/lang/String;)V", jlong(m_pState->m_nToken),
+                            jlong(m_pState->m_nDownloadEpoch), jlong(nId), oSource.object<jstring>());
+                    }
+                    else
+                    {
+                        QAndroidJniObject::callStaticMethod<void>(pJavaClass, "fetch",
+                            "(JJLjava/lang/String;)V", jlong(m_pState->m_nToken),
+                            jlong(nId), oSource.object<jstring>());
+                    }
                     if (!jniOK())
                         throw Error(ErrorCode::Network, "Cannot dispatch mobile browser request");
                     std::unique_lock<std::mutex> oLock(pP->m_oMutex);
@@ -157,7 +168,16 @@ namespace Wenku8::Reader
                         std::lock_guard<std::mutex> oLock(oRegistryMutex);
                         vPending.erase(nId);
                     }
-                    command(m_pState->m_nToken, 6);
+                    if (m_pState->m_bDownload)
+                    {
+                        QAndroidJniObject::callStaticMethod<void>(pJavaClass, "abortDownload", "(JJJ)V",
+                            jlong(m_pState->m_nToken), jlong(m_pState->m_nDownloadEpoch), jlong(nId));
+                        jniOK();
+                    }
+                    else
+                    {
+                        command(m_pState->m_nToken, 6);
+                    }
                     throw;
                 }
             }
@@ -165,6 +185,20 @@ namespace Wenku8::Reader
         class AndroidLoginHost final : public LoginHost
         {
             std::shared_ptr<Session> m_pState = std::make_shared<Session>();
+            std::shared_ptr<Session> m_pDownloadState;
+            void resetDownload()
+            {
+                if (m_pDownloadState)
+                {
+                    m_pDownloadState->m_oClosed.store(true);
+                }
+                m_pDownloadState = std::make_shared<Session>();
+                m_pDownloadState->m_oOrigin = m_pState->m_oOrigin;
+                m_pDownloadState->m_nToken = m_pState->m_nToken;
+                m_pDownloadState->m_bDownload = true;
+                m_pDownloadState->m_nDownloadEpoch = oNextId.fetch_add(1);
+                command(m_pState->m_nToken, 8, QString::number(m_pDownloadState->m_nDownloadEpoch));
+            }
             QPointer<QWidget> m_pOwner;
             bool m_bVisible = false, m_bPage = false;
             std::string m_strAgent;
@@ -176,6 +210,7 @@ namespace Wenku8::Reader
                 initMobileResources();
                 m_pState->m_oOrigin = oOrigin;
                 m_pState->m_nToken = oNextId.fetch_add(1);
+                resetDownload();
                 vHosts[m_pState->m_nToken] = this;
                 connect(qApp, &QGuiApplication::applicationStateChanged, this,
                         [this](Qt::ApplicationState eState)
@@ -274,6 +309,7 @@ namespace Wenku8::Reader
             }
             void show(bool bReset) override
             {
+                resetDownload();
                 bool bOpening = !m_bVisible;
                 m_bVisible = true;
                 command(m_pState->m_nToken, 0);
@@ -287,6 +323,7 @@ namespace Wenku8::Reader
             }
             void openLogin() override
             {
+                resetDownload();
                 m_bPage = false;
                 command(m_pState->m_nToken, 1);
             }
@@ -310,10 +347,18 @@ namespace Wenku8::Reader
             {
                 return std::make_shared<AndroidTransport>(m_pState);
             }
+            std::shared_ptr<HttpTransport> downloadTransport() const override
+            {
+                return std::make_shared<AndroidTransport>(m_pDownloadState);
+            }
             void close() override
             {
                 if (m_pState->m_oClosed.exchange(true))
                     return;
+                if (m_pDownloadState)
+                {
+                    m_pDownloadState->m_oClosed.store(true);
+                }
                 m_bVisible = false;
                 {
                     std::lock_guard<std::mutex> oLock(oRegistryMutex);

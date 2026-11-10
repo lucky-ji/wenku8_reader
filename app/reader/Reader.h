@@ -34,7 +34,8 @@ namespace Wenku8::Reader
       public:
         using ImageLoader = std::function<QByteArray(const QString&)>;
         explicit LocalDocument(QObject* pParent = nullptr);
-        void setChapter(const ChapterText&, ImageLoader, int nImageWidth, int nImageHeight = 0);
+        void setChapter(const ChapterText&, ImageLoader, int nImageWidth, int nImageHeight = 0,
+                        int nLineHeightPercent = 145, int nParagraphSpacing = 8);
         int loadedImages() const
         {
             return m_nLoadedImages;
@@ -62,6 +63,19 @@ namespace Wenku8::Reader
         void appearance(int nPointSize, bool bDark)
         {
             appearance(nPointSize, bDark ? Theme::Dark : Theme::Light);
+        }
+        void setTypography(int nLineHeightPercent, int nParagraphSpacing, int nSideMargin);
+        int lineHeightPercent() const
+        {
+            return m_nLineHeightPercent;
+        }
+        int paragraphSpacing() const
+        {
+            return m_nParagraphSpacing;
+        }
+        int sideMargin() const
+        {
+            return m_nSideMargin;
         }
         int loadedImages() const
         {
@@ -106,13 +120,20 @@ namespace Wenku8::Reader
         void wheelEvent(QWheelEvent*) override;
         void keyPressEvent(QKeyEvent*) override;
         void hideEvent(QHideEvent*) override;
+        void showEvent(QShowEvent*) override;
 
       private:
         LocalDocument* m_pDocument;
         bool m_bRebuilding = false;
+        bool m_bLayoutPending = false, m_bAppearanceSet = false;
+        int m_nPendingPosition = 0;
+        QSize m_oLayoutViewport;
+        Theme m_eAppearanceTheme = Theme::Light;
+        int m_nLineHeightPercent = 145, m_nParagraphSpacing = 8, m_nSideMargin = 0;
         ChapterText m_oChapter;
         LocalDocument::ImageLoader m_fnLoader;
         void rebuild(int nPosition);
+        void reflow(int nPosition);
         struct Page
         {
             int m_nY, m_nOffset, m_nEnd;

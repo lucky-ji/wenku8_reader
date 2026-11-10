@@ -6,6 +6,7 @@
 #include "NetworkRetry.h"
 #include "LoginHost.h"
 #include "RasterImage.h"
+#include "DownloadManager.h"
 #include <QCache>
 #include <QDateTime>
 #include <QSet>
@@ -131,7 +132,6 @@ namespace Wenku8::Reader
             Novels,
             Book,
             Chapter,
-            Download,
             ShelfAdd
         };
         struct Result
@@ -201,23 +201,17 @@ namespace Wenku8::Reader
                 !oR.m_bNeedsLogin && (oError.httpStatus() == 403 ||
                                       oError.code() == ErrorCode::BrowserVerificationRequired ||
                                       oError.code() == ErrorCode::CaptchaRequired);
-            oR.m_bTransient = oError.code() == ErrorCode::Network || oError.httpStatus() == 408 ||
+            oR.m_bTransient = oR.m_bVerification || oError.code() == ErrorCode::Network ||
+                              oError.httpStatus() == 408 ||
                               oError.httpStatus() == 425 || oError.httpStatus() == 429 ||
                               oError.httpStatus() == 500 || oError.httpStatus() == 502 ||
                               oError.httpStatus() == 503 || oError.httpStatus() == 504;
-            if (oError.httpStatus() > 0)
-                oR.m_strLoginHint = QString("登录检查返回 HTTP %1，请完成网页验证后再检查。")
-                                        .arg(oError.httpStatus());
-            else if (oError.code() == ErrorCode::Network)
-                oR.m_strLoginHint = "登录检查连接失败，请稍后重试。";
-            else if (oError.code() == ErrorCode::Authentication ||
-                     oError.code() == ErrorCode::Parse)
-                oR.m_strLoginHint = "尚未核实到有效账号资料，请完成网页登录。";
+            oR.m_strLoginHint = oR.m_bNeedsLogin
+                ? "尚未核实到有效账号资料，请完成网页登录。"
+                : "网络访问失败，请稍后重试。";
             oR.m_strText = oR.m_bNeedsLogin ? "登录状态已过期，请重新登录。"
-                           : oR.m_bVerification
-                               ? "本次访问被网站拒绝；已保留登录状态，可稍后重试或打开网站验证。"
-                           : oR.m_bCancelled ? "操作已取消，已下载的内容会保留。"
-                                             : "加载失败，请检查网络后重试。";
+                           : oR.m_bCancelled ? "操作已取消。"
+                                             : "网络访问失败，请稍后重试。";
             return oR;
         }
         QString assetUrl(const QString& strOriginal)
@@ -240,6 +234,7 @@ namespace Wenku8::Reader
     {
         OnlineSession* m_pQ;
         std::unique_ptr<LoginHost> m_pHost;
+        std::unique_ptr<DownloadManager> m_pDownloads;
         QTimer m_oProbeTimer, m_oRestoreDeadline;
         QFutureWatcher<Result> m_oWatcher;
         QFutureWatcher<ImageResult> m_oImageWatcher;
@@ -258,6 +253,7 @@ namespace Wenku8::Reader
              m_bShuttingDown = false, m_bOpenAfterTask = false, m_bResumed = false;
         Kind m_eKind = Kind::Login, m_ePendingKind = Kind::Novels;
         Job m_fnCurrent, m_fnPending;
+        quint64 m_nRequestGeneration = 0;
         std::shared_ptr<ShelfSessionSlot> m_pShelfSession = std::make_shared<ShelfSessionSlot>();
         Result m_oData;
         std::shared_ptr<std::atomic_bool> m_pCancelled = std::make_shared<std::atomic_bool>(false);
@@ -266,6 +262,15 @@ namespace Wenku8::Reader
             : m_pQ(pOwner), m_pHost(makeLoginHost(pWindow, QUrl(strSite), strStorage)),
               m_strOrigin(std::move(strSite)), m_strDirectory(std::move(strStore))
         {
+            m_pDownloads = std::make_unique<DownloadManager>(m_strDirectory, m_strOrigin);
+            QObject::connect(m_pQ, &OnlineSession::authenticationChanged, m_pDownloads.get(),
+                [this](bool bAuthenticated)
+                {
+                    if (!bAuthenticated)
+                    {
+                        m_pDownloads->suspend();
+                    }
+                });
             QObject::connect(m_pHost.get(), &LoginHost::checkRequested, m_pQ,
                              [this]
                              {
@@ -364,18 +369,18 @@ namespace Wenku8::Reader
             m_oProbeTimer.stop();
             m_pCancelled->store(true);
             m_pImageCancelled->store(true);
+            m_pDownloads->suspend();
             m_pHost->close();
+            m_pDownloads->shutdown();
             m_oWatcher.waitForFinished();
             m_oImageWatcher.waitForFinished();
         }
         void clearRetry()
         {
-            if (m_fnFailedJob)
-            {
-                m_fnFailedJob = {};
-                m_strFailedKey.clear();
-                emit m_pQ->retryAvailableChanged(false);
-            }
+            m_fnFailedJob = {};
+            m_strFailedKey.clear();
+            // Always discard recovery state when starting a new request/session.
+            emit m_pQ->retryAvailableChanged(false);
         }
         void clearReads(bool bPreserveVerifiedClient = false)
         {
@@ -508,6 +513,7 @@ namespace Wenku8::Reader
         }
         void showLogin(bool bReset = false)
         {
+            m_pDownloads->suspend();
             if (m_bActive)
             {
                 m_bOpenAfterTask = true;
@@ -559,6 +565,7 @@ namespace Wenku8::Reader
                 return;
             }
             m_bActive = true;
+            const quint64 nRequestGeneration = ++m_nRequestGeneration;
             m_eKind = eType;
             m_fnCurrent = fnJob;
             m_strCurrentKey = strKey;
@@ -573,7 +580,6 @@ namespace Wenku8::Reader
                 emit m_pQ->progressChanged(0, 0);
                 emit m_pQ->statusChanged(eType == Kind::Book       ? "正在加载小说与目录…"
                                          : eType == Kind::Chapter  ? "正在加载章节内容…"
-                                         : eType == Kind::Download ? "正在准备下载…"
                                          : eType == Kind::ShelfAdd ? "正在加入书架…"
                                                                    : "正在加载小说列表…");
             }
@@ -607,16 +613,18 @@ namespace Wenku8::Reader
             {
                 return !pFlag->load();
             };
-            auto oRetry = clientRetryOptions(true, eType != Kind::Download);
-            if (eType == Kind::Download)
-                oRetry.m_oDelay = std::chrono::seconds(2);
-            oRetry.m_fnOnRetry = [this, eType](unsigned nAttempt, int)
+            auto oRetry = clientRetryOptions(true, true);
+            oRetry.m_fnOnRetry = [this, eType, nRequestGeneration](unsigned nAttempt, int)
             {
                 if (eType != Kind::Login)
                     QMetaObject::invokeMethod(
                         m_pQ,
-                        [this, nAttempt]
+                        [this, nAttempt, nRequestGeneration]
                         {
+                            if (!m_bActive || nRequestGeneration != m_nRequestGeneration)
+                            {
+                                return;
+                            }
                             emit m_pQ->statusChanged(
                                 QString("网络波动，正在进行第 %1/3 次尝试…").arg(nAttempt));
                         },
@@ -624,9 +632,8 @@ namespace Wenku8::Reader
             };
             std::shared_ptr<HttpTransport> pTransport = makeRetryingTransport(
                 std::make_shared<BrowserOwnedSession>(m_pHost->transport()), oRetry);
-            if (eType != Kind::Download)
-                pTransport = makeClientDeadlineTransport(
-                    std::move(pTransport), std::chrono::seconds(eType == Kind::Login ? 8 : 30));
+            pTransport = makeClientDeadlineTransport(
+                std::move(pTransport), std::chrono::seconds(eType == Kind::Login ? 8 : 30));
             m_oWatcher.setFuture(QtConcurrent::run(
                 [fnJob, oOptions, pTransport]
                 {
@@ -654,7 +661,7 @@ namespace Wenku8::Reader
             {
                 oResult = {};
                 oResult.m_bCancelled = true;
-                oResult.m_strText = "操作已取消，已下载的内容会保留。";
+                oResult.m_strText = "操作已取消。";
             }
             m_bActive = false;
             const bool bBusiness = m_eKind != Kind::Login;
@@ -677,11 +684,11 @@ namespace Wenku8::Reader
                     {
                         setRestoring(false);
                         m_oProbeTimer.stop();
-                        if (oResult.m_bNeedsLogin || oResult.m_bVerification)
+                        if (oResult.m_bNeedsLogin)
                             showLogin();
                         else
                             emit m_pQ->statusChanged(
-                                "暂时无法连接；本机登录状态已保留，点击登录文库可重试。");
+                                "网络访问失败，请稍后重试。");
                     }
                     else
                         m_pHost->setHint(oResult.m_strLoginHint.isEmpty()
@@ -691,8 +698,16 @@ namespace Wenku8::Reader
                 }
                 if (m_strUser != oResult.m_strUsername)
                     clearReads(true);
+                clearRetry();
                 m_bAuthenticated = true;
                 m_strUser = oResult.m_strUsername;
+                ClientOptions oDownloadOptions;
+                oDownloadOptions.m_strEndpoint = m_strOrigin.toStdString();
+                oDownloadOptions.m_eProtocol = Protocol::Website;
+                oDownloadOptions.m_strUserAgent = m_pHost->userAgent();
+                oDownloadOptions.m_oTransfer.m_oTimeout = std::chrono::seconds(45);
+                m_pDownloads->setSession(oDownloadOptions,
+                    std::make_shared<BrowserOwnedSession>(m_pHost->downloadTransport()), m_strUser);
                 m_oProbeTimer.stop();
                 // Publish the verified account and unlock the Qt shell before the
                 // native login overlay returns input to it on Android's UI thread.
@@ -723,7 +738,7 @@ namespace Wenku8::Reader
                         oCached.m_bFromCache = true;
                         oCached.m_bStale = true;
                         oCached.m_strStatusOverride =
-                            "网络暂不可用，正在显示本次会话中上次成功读取的内容；可重试更新。";
+                            "网络访问失败，已保留上次内容，请稍后重试。";
                         oResult = std::move(oCached);
                     }
                 }
@@ -748,8 +763,6 @@ namespace Wenku8::Reader
                         showLogin();
                     }
                 }
-                else if (oResult.m_bVerification)
-                    emit m_pQ->verificationRequired();
                 if (bBusiness)
                     emit m_pQ->busyChanged(false);
                 return;
@@ -781,9 +794,6 @@ namespace Wenku8::Reader
             case Kind::Chapter:
                 emit m_pQ->chapterReady();
                 scheduleImages();
-                break;
-            case Kind::Download:
-                emit m_pQ->downloadReady(m_oData.m_nId);
                 break;
             case Kind::ShelfAdd:
                 emit m_pQ->bookshelfAdded(m_oData.m_nId);
@@ -966,59 +976,9 @@ namespace Wenku8::Reader
             },
             false, QString("chapter:%1:%2").arg(nNovel).arg(nChapter), !bForce);
     }
-    void OnlineSession::download(int nId, bool bImages)
+    DownloadManager* OnlineSession::downloads() const
     {
-        auto strDirectory = m_pImpl->m_strDirectory;
-        auto pFlag = m_pImpl->m_pCancelled;
-        m_pImpl->run(
-            Kind::Download,
-            [this, nId, bImages, strDirectory, pFlag](ClientOptions oO,
-                                                      std::shared_ptr<HttpTransport> pT)
-            {
-                DownloadStoreOptions oStore;
-                oStore.m_oDirectory = nativePath(strDirectory);
-                oStore.m_vImageOrigins.push_back("https://pic.777743.xyz");
-                auto oAssetRetry = clientAssetRetryOptions(false);
-                oAssetRetry.m_oDelay = std::chrono::seconds(2);
-                NovelDownloader oDownload(
-                    oO, oStore, pT, makeRetryingTransport(makeClientAssetTransport(), oAssetRetry));
-                DownloadRequest oRequest;
-                oRequest.m_bIncludeImages = bImages;
-                oRequest.m_bIncludeCover = bImages;
-                oRequest.m_fnProgress =
-                    [this, pFlag, oLast = std::chrono::steady_clock::time_point{}](
-                        const DownloadStatus& oS) mutable
-                {
-                    auto oNow = std::chrono::steady_clock::now();
-                    if (oNow - oLast > std::chrono::milliseconds(250))
-                    {
-                        oLast = oNow;
-                        QString strMessage = QString("正在下载 · 章节 %1/%2 · 插图 %3/%4")
-                                                 .arg(oS.m_nChaptersCompleted)
-                                                 .arg(oS.m_nChaptersTotal)
-                                                 .arg(oS.m_nImagesCompleted)
-                                                 .arg(oS.m_nImagesTotal);
-                        const auto nCompleted =
-                                       qint64(oS.m_nChaptersCompleted + oS.m_nImagesCompleted),
-                                   nTotal = qint64(oS.m_nChaptersTotal + oS.m_nImagesTotal);
-                        QMetaObject::invokeMethod(
-                            this,
-                            [this, strMessage, nCompleted, nTotal]
-                            {
-                                emit statusChanged(strMessage);
-                                emit progressChanged(nCompleted, nTotal);
-                            },
-                            Qt::QueuedConnection);
-                    }
-                    return !pFlag->load();
-                };
-                oDownload.download(nId, oRequest);
-                Result oR;
-                oR.m_bSuccess = true;
-                oR.m_nId = nId;
-                oR.m_strText = "下载完成，可以在「已下载」中阅读。";
-                return oR;
-            });
+        return m_pImpl->m_pDownloads.get();
     }
     void OnlineSession::addToShelf(int nId)
     {

@@ -16,7 +16,20 @@ namespace Wenku8::Reader
     }
     QString applicationVersion()
     {
-        return "1.0.1";
+        return "1.0.2";
+    }
+    QUrl applicationRepositoryUrl()
+    {
+        return QUrl("https://github.com/lucky-ji/wenku8_reader");
+    }
+    QUrl applicationFeedbackUrl()
+    {
+        return QUrl("https://github.com/lucky-ji/wenku8_reader/issues/new");
+    }
+    bool isApplicationLink(const QUrl& oUrl)
+    {
+        return oUrl == applicationRepositoryUrl() || oUrl == applicationFeedbackUrl() ||
+               oUrl == QUrl("https://github.com/lucky-ji");
     }
     QString licenseText(const QString& strResource)
     {
@@ -37,10 +50,16 @@ namespace Wenku8::Reader
                        "<p><b>开发者</b>　lucky_ji</p><p><a "
                        "href=\"https://github.com/lucky-ji\">GitHub · lucky-ji</a></p>"
                        "<p>"
-                       "用于浏览和阅读轻小说，提供书架、小说发现、阅读历史、书签与离线下载，支持明"
+                       "用于浏览和阅读轻小说，提供书架、小说发现、阅读历史、书签、下载缓存与下载到本地，支持明"
                        "亮、暗色和护眼外观。</p>"
+                       "<p><b>开源项目</b><br/><a href=\"%2\">"
+                       "github.com/lucky-ji/wenku8_reader</a></p>"
+                       "<p><a href=\"%3\">意见反馈 · GitHub Issues</a></p>"
+                       "<p>反馈链接会在系统浏览器中打开，由你自行填写和提交问题或建议。</p>"
                        "<p>正式版本的功能更新与问题修复在「更新日志」中独立维护。</p>")
-            .arg(applicationVersion().toHtmlEscaped());
+            .arg(applicationVersion().toHtmlEscaped(),
+                 applicationRepositoryUrl().toString().toHtmlEscaped(),
+                 applicationFeedbackUrl().toString().toHtmlEscaped());
     }
     QString releaseNotes()
     {

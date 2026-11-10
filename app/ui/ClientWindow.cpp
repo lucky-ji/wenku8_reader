@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "ClientWindow.h"
+#include "DownloadManager.h"
+#include "DownloadTaskPanel.h"
+#include "Toast.h"
 #include "AppInfo.h"
 #include "DownloadOption.h"
+#include "ExportDestination.h"
+#include <QDesktopServices>
 #include "PullRefreshIndicator.h"
 #include <QMenuBar>
 #include <QMenu>
@@ -33,6 +38,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QTimer>
+#include <QScopedValueRollback>
 #include <QCloseEvent>
 #include <QStyledItemDelegate>
 #include <QPainter>
@@ -389,14 +395,7 @@ namespace Wenku8::Reader
                                const QString& strSessionDirectory)
         : m_strOrigin(strOrigin)
     {
-        m_strDirectory =
-            strDirectory.isEmpty()
-                ? m_oSettings
-                      .value("store",
-                             QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) +
-                                 "/books")
-                      .toString()
-                : strDirectory;
+        m_strDirectory = strDirectory.isEmpty() ? privateDownloadDirectory() : strDirectory;
         m_pReadingState = std::make_unique<ReadingState>(m_oSettings, m_strOrigin);
         m_pCovers = std::make_unique<CoverStore>(
             m_strOrigin, QDir(m_strDirectory).filePath(".ui-cache"), nullptr);
@@ -447,6 +446,9 @@ namespace Wenku8::Reader
         resize(1280, 860);
         setMinimumSize(320, 360);
         build();
+        m_pReader->setTypography(m_oSettings.value("readerLineHeight", 145).toInt(),
+                                m_oSettings.value("readerParagraphSpacing", 8).toInt(),
+                                m_oSettings.value("readerSideMargin", 0).toInt());
         m_bVolumePaging = m_oSettings.value("volumePageKeys", true).toBool();
         setReadingMode(ReadingMode(qBound(0, m_oSettings.value("readingMode", 0).toInt(), 1)));
         setTheme(m_eTheme);
@@ -458,6 +460,36 @@ namespace Wenku8::Reader
                 m_pDesktopMenuBar->hide();
             m_pSession = new OnlineSession(this, m_strOrigin, m_strDirectory, strSessionDirectory);
             m_pSession->setTheme(m_eTheme);
+            m_pToast = new Toast(m_pStartupPages);
+            m_pDownloadTasks = new DownloadTaskPanel(m_pSession->downloads());
+            static_cast<QVBoxLayout*>(m_pCards->parentWidget()->layout())->insertWidget(0, m_pDownloadTasks);
+            m_pDownloadTasks->hide();
+            connect(m_pSession->downloads(), &DownloadManager::completed, this,
+                [this](int nId, bool bLocal, const QString& strLocation)
+                {
+                    if (bLocal)
+                    {
+                        m_oSettings.setValue("lastLocalDownload", strLocation);
+                    }
+                    else
+                    {
+                        m_pCovers->retryFailures();
+                        if (m_bUnlocked)
+                        {
+                            requestCover(nId);
+                            if (m_nSection == 2 && m_pPages->currentIndex() == 1 && !m_bLoadingBusy)
+                            {
+                                downloadedBooks();
+                            }
+                        }
+                    }
+                    m_pToast->showText(bLocal ? "小说已保存到所选目录" : "下载缓存完成，可以离线阅读", m_eTheme);
+                });
+            connect(m_pSession->downloads(), &DownloadManager::notice, this,
+                [this](const QString& strMessage)
+                {
+                    m_pToast->showText(strMessage, m_eTheme);
+                });
             connect(m_pSession, &OnlineSession::restorationChanged, this,
                     [this](bool bChecking)
                     {
@@ -488,19 +520,10 @@ namespace Wenku8::Reader
                     {
                         if (bAvailable)
                             m_nRetryContext = m_nActiveRequestContext;
-                        else
-                            m_bVerificationNeeded = false;
                         updateNetworkActions();
                         if (bAvailable && m_pPages->currentIndex() == 1 && m_pCards->count() > 0)
                             m_pCount->setText(
                                 QString("暂未更新 · 保留上次列表（%1 本）").arg(m_pCards->count()));
-                    });
-            connect(m_pSession, &OnlineSession::verificationRequired, this,
-                    [this]
-                    {
-                        m_bVerificationNeeded = true;
-                        m_nRetryContext = m_nActiveRequestContext;
-                        updateNetworkActions();
                     });
             connect(m_pSession, &OnlineSession::chapterImagesReady, this,
                     [this](int nNovel, int nChapter)
@@ -560,13 +583,7 @@ namespace Wenku8::Reader
                     {
                         renderChapter(m_pSession->chapterText());
                     });
-            connect(m_pSession, &OnlineSession::downloadReady, this,
-                    [this](int nId)
-                    {
-                        m_pCovers->retryFailures();
-                        requestCover(nId);
-                        message("已加入下载书库，下次阅读无需重新下载。");
-                    });
+
         }
 #endif
         authenticate(false);
@@ -640,6 +657,18 @@ namespace Wenku8::Reader
                         showAppInformation(nI);
                     });
         }
+        auto* pRepository = pHelp->addAction("GitHub 开源项目");
+        auto* pFeedback = pHelp->addAction("意见反馈");
+        connect(pRepository, &QAction::triggered, this, []
+        {
+            QDesktopServices::openUrl(applicationRepositoryUrl());
+        });
+        connect(pFeedback, &QAction::triggered, this, []
+        {
+            QDesktopServices::openUrl(applicationFeedbackUrl());
+        });
+        auto* pDownloadSettings = pHelp->addAction("下载与存储");
+        connect(pDownloadSettings, &QAction::triggered, this, &ClientWindow::showDownloadSettings);
         pHelp->addSeparator();
         auto pNotices = pHelp->addAction("完整第三方版权声明");
         pNotices->setObjectName("aboutThirdParty");
@@ -675,7 +704,7 @@ namespace Wenku8::Reader
         pSide->addWidget(label(applicationName(), "brand"));
         pSide->addWidget(label("轻小说，随时继续。", "muted"));
         pSide->addSpacing(32);
-        QStringList vNames{"我的书架", "发现小说", "已下载", "阅读历史"};
+        QStringList vNames{"我的书架", "发现小说", "下载缓存", "阅读历史"};
         for (int nI = 0; nI < vNames.size(); ++nI)
         {
             auto pB = button(vNames[nI], "nav");
@@ -849,6 +878,20 @@ namespace Wenku8::Reader
         auto pPrivacy = label("账号由文库网站验证 · 密码不会保存在客户端", "muted");
         pPrivacy->setWordWrap(true);
         pGate->addWidget(pPrivacy);
+        auto* pWelcomeLinks = label(
+            "<a href=\"" + applicationRepositoryUrl().toString() + "\">开源项目</a> · "
+            "<a href=\"" + applicationFeedbackUrl().toString() + "\">意见反馈</a>", "welcomeLinks");
+        pWelcomeLinks->setTextFormat(Qt::RichText);
+        pWelcomeLinks->setTextInteractionFlags(Qt::LinksAccessibleByMouse | Qt::LinksAccessibleByKeyboard);
+        connect(pWelcomeLinks, &QLabel::linkActivated, this, [](const QString& strLink)
+        {
+            const QUrl oUrl(strLink);
+            if (isApplicationLink(oUrl))
+            {
+                QDesktopServices::openUrl(oUrl);
+            }
+        });
+        pGate->addWidget(pWelcomeLinks);
         m_pPages->addWidget(pLocked);
         auto pLibrary = new QWidget;
         auto pLibraryLayout = new QVBoxLayout(pLibrary);
@@ -943,7 +986,9 @@ namespace Wenku8::Reader
         m_pRead->setObjectName("readBook");
         m_pRead->setProperty("primary", true);
         setButtonIcon(m_pRead, Icon::Book);
-        m_pDownload = button("下载到本地", "downloadBook");
+        m_pDownload = button("下载缓存", "downloadBook");
+        m_pLocalDownload = button("下载到本地", "downloadLocalBook");
+        setButtonIcon(m_pLocalDownload, Icon::Folder);
         setButtonIcon(m_pDownload, Icon::Download);
         m_pShelfAdd = button("加入书架", "addToShelf");
         setButtonIcon(m_pShelfAdd, Icon::ShelfAdd);
@@ -951,6 +996,7 @@ namespace Wenku8::Reader
         m_pIllustrations->setChecked(true);
         pBookActions->addWidget(m_pRead);
         pBookActions->addWidget(m_pDownload);
+        pBookActions->addWidget(m_pLocalDownload);
         pBookActions->addWidget(m_pShelfAdd);
         pBookActions->addWidget(m_pIllustrations);
         auto pSynopsis = button("查看简介", "showSynopsis");
@@ -1015,14 +1061,8 @@ namespace Wenku8::Reader
                         m_pSession->addToShelf(m_oBook.m_nId);
 #endif
                 });
-        connect(m_pDownload, &QPushButton::clicked, this,
-                [this]
-                {
-#ifdef WENKU8_CLIENT_ONLINE
-                    if (m_bUnlocked && m_pSession)
-                        m_pSession->download(m_oBook.m_nId, m_pIllustrations->isChecked());
-#endif
-                });
+        connect(m_pDownload, &QPushButton::clicked, this, &ClientWindow::cacheBook);
+        connect(m_pLocalDownload, &QPushButton::clicked, this, &ClientWindow::downloadBookToLocal);
         connect(m_pToc, &QTreeWidget::itemClicked, this,
                 [this](QTreeWidgetItem* pItem, int)
                 {
@@ -1134,6 +1174,10 @@ namespace Wenku8::Reader
         setButtonIcon(pLarge, Icon::TextLarger);
         pReaderTools->addWidget(pSmall);
         pReaderTools->addWidget(pLarge);
+        auto* pTypography = button("排版", "readerTypography");
+        setButtonIcon(pTypography, Icon::Book);
+        pReaderTools->addWidget(pTypography);
+        connect(pTypography, &QPushButton::clicked, this, &ClientWindow::showMobileReaderTools);
         auto fnChangeFont = [this](int nDelta)
         {
             m_nFontSize = std::clamp(m_nFontSize + nDelta, 10, 36);
@@ -1272,10 +1316,6 @@ namespace Wenku8::Reader
         setButtonIcon(m_pRetryNetwork, Icon::Refresh);
         m_pRetryNetwork->hide();
         pStatusRow->addWidget(m_pRetryNetwork);
-        m_pVerifyNetwork = button("网页验证", "verifyNetwork");
-        setButtonIcon(m_pVerifyNetwork, Icon::Shield);
-        m_pVerifyNetwork->hide();
-        pStatusRow->addWidget(m_pVerifyNetwork);
         pBody->addWidget(m_pStatusArea);
         connect(m_pRetryNetwork, &QPushButton::clicked, this,
                 [this]
@@ -1285,21 +1325,13 @@ namespace Wenku8::Reader
                         m_pSession->retryLastRequest();
 #endif
                 });
-        connect(m_pVerifyNetwork, &QPushButton::clicked, this,
-                [this]
-                {
-#ifdef WENKU8_CLIENT_ONLINE
-                    if (m_pSession && m_nRetryContext == m_nBusinessContext)
-                        m_pSession->signIn(false);
-#endif
-                });
         m_pMobileNavigation = new QWidget;
         m_pMobileNavigation->setObjectName("mobileNavigation");
         auto pTabs = new QHBoxLayout(m_pMobileNavigation);
         pTabs->setContentsMargins(8, 8, 8, 6);
         pTabs->setSpacing(2);
         m_pMobileNavigation->setAttribute(Qt::WA_StyledBackground);
-        const QStringList vShortNames{"书架", "发现", "下载", "我的"};
+        const QStringList vShortNames{"书架", "发现", "下载缓存", "我的"};
         for (int nI = 0; nI < 4; ++nI)
         {
             auto pTab = new NavigationButton(vShortNames[nI]);
@@ -1418,6 +1450,11 @@ namespace Wenku8::Reader
     }
     void ClientWindow::setTheme(Theme eTheme)
     {
+        if (m_bThemeApplied && m_eTheme == eTheme)
+        {
+            return;
+        }
+        m_bThemeApplied = true;
         m_eTheme = eTheme;
         m_pLoading->setTheme(eTheme);
         m_pStartupLoading->setTheme(eTheme);
@@ -1475,10 +1512,10 @@ namespace Wenku8::Reader
         {
             saveProgress();
             ++m_nBusinessContext;
-            m_bVerificationNeeded = false;
-            updateNetworkActions();
         }
         m_bUnlocked = bValue;
+        m_nRetryContext = m_nBusinessContext;
+        updateNetworkActions();
         m_pOperations->setEnabled(bValue);
         m_pRefresh->setEnabled(bValue);
         for (auto pB : m_vNav)
@@ -1511,6 +1548,8 @@ namespace Wenku8::Reader
         }
         else
         {
+            // A verified session replaces the previous failure, before refresh starts.
+            message("已登录，欢迎回来。");
             m_pOperations->show();
             m_pRefresh->show();
             m_pTitle->setText("我的书架");
@@ -1562,7 +1601,7 @@ namespace Wenku8::Reader
             m_vNav[nI]->setChecked(nI == nSection);
             m_vMobileNav[nI]->setChecked(nI == nSection);
         }
-        m_pTitle->setText(QStringList{"我的书架", "发现小说", "已下载", "阅读历史"}[nSection]);
+        m_pTitle->setText(QStringList{"我的书架", "发现小说", "下载缓存", "阅读历史"}[nSection]);
         m_pSubtitle->setText(QStringList{"收藏的故事，留在触手可及的地方。",
                                          "看看文库最近更新了哪些故事。", "把喜欢的故事带在身边。",
                                          "每本小说，都停在你上次读到的地方。"}[nSection]);
@@ -1663,7 +1702,7 @@ namespace Wenku8::Reader
             pItem->setData(Qt::UserRole, oN.m_nId);
             pItem->setData(Qt::UserRole + 1, text(oN.m_strAuthor));
             pItem->setData(Qt::UserRole + 2,
-                           m_nSection == 2 ? "已下载" : text(oN.m_strStatus));
+                           m_nSection == 2 ? "已缓存" : text(oN.m_strStatus));
             pItem->setData(Qt::UserRole + 3, m_pCovers->image(oN.m_nId));
             pItem->setData(Qt::UserRole + 6, m_pCovers->placeholder(oN.m_nId));
             if (auto oSaved = m_pReadingState->position(oN.m_nId))
@@ -1808,7 +1847,7 @@ namespace Wenku8::Reader
         m_pDetailTitle->setText(text(m_oBook.m_strTitle));
         m_pDetailMeta->setText(text(m_oBook.m_strAuthor) +
                                QString("   ·   %1 章").arg(m_vFlat.size()) +
-                               (bLocal ? "   ·   已下载" : ""));
+                               (bLocal ? "   ·   已缓存" : ""));
         m_pDetailIntro->setText(text(m_oBook.m_strIntro).isEmpty()
                                     ? "故事已经准备好，选择一个章节开始阅读。"
                                     : text(m_oBook.m_strIntro));
@@ -1945,7 +1984,7 @@ namespace Wenku8::Reader
                                saveProgress(true);
                                highlightChapter();
                            });
-        message(m_bLocalBook ? "已下载 · 阅读位置自动保存" : "在线阅读 · 阅读位置自动保存");
+        message(m_bLocalBook ? "缓存阅读 · 阅读位置自动保存" : "在线阅读 · 阅读位置自动保存");
     }
     QString ClientWindow::progressKey() const
     {
@@ -2176,7 +2215,8 @@ namespace Wenku8::Reader
         for (auto pB : m_vMobileNav)
             pB->setEnabled(m_bUnlocked && !bBusy);
         m_pRead->setEnabled(!bBusy && !m_vFlat.isEmpty());
-        m_pDownload->setEnabled(!bBusy && !m_bLocalBook);
+        m_pDownload->setEnabled(m_bUnlocked && !bBusy && !m_bLocalBook && m_oBook.m_nId > 0);
+        m_pLocalDownload->setEnabled(m_bUnlocked && !bBusy && m_oBook.m_nId > 0);
         m_pToc->setEnabled(!bBusy);
         m_pPrevious->setEnabled(
             !bBusy && (m_nChapter > 0 || (m_pReader->readingMode() == ReadingMode::Paged &&
@@ -2208,11 +2248,9 @@ namespace Wenku8::Reader
 #endif
         const bool bRecoverable =
             m_bUnlocked && !m_bLoadingBusy && m_nRetryContext == m_nBusinessContext;
-        const bool bVerifyVisible = bRecoverable && m_bVerificationNeeded,
-                   bRetryVisible = bRecoverable && !m_bVerificationNeeded && bRetry;
-        m_pVerifyNetwork->setVisible(bVerifyVisible);
+        const bool bRetryVisible = bRecoverable && bRetry;
         m_pRetryNetwork->setVisible(bRetryVisible);
-        const bool bAction = bVerifyVisible || bRetryVisible;
+        const bool bAction = bRetryVisible;
         const bool bNormal = !mobileMode() || (m_pPages->currentIndex() != 3 &&
                                                m_pPages->currentIndex() < 4 && height() >= 520);
         m_pStatus->setVisible(bNormal || bAction);
@@ -2221,6 +2259,15 @@ namespace Wenku8::Reader
 
     void ClientWindow::adaptLayout()
     {
+        if (m_bAdaptingLayout)
+        {
+            return;
+        }
+        QScopedValueRollback<bool> oLayoutGuard(m_bAdaptingLayout, true);
+        if (m_pDownloadTasks)
+        {
+            m_pDownloadTasks->setVisible(m_bUnlocked && m_nSection == 2 && m_pPages->currentIndex() == 1);
+        }
         if (!m_pReader || !m_pMobileNavigation)
             return;
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
@@ -2229,7 +2276,10 @@ namespace Wenku8::Reader
         const int nBreakpoint = 760;
 #endif
         m_bCompact = width() < nBreakpoint;
-        setProperty("compact", m_bCompact);
+        if (property("compact").toBool() != m_bCompact)
+        {
+            setProperty("compact", m_bCompact);
+        }
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
         // A maximized window already respects the platform's available area. When
         // fullscreen extends under system UI, inset only the part outside that area.
@@ -2290,18 +2340,32 @@ namespace Wenku8::Reader
                                             bMobile ? 10 : 28);
         m_pDetailLayout->setSpacing(bMobile ? 8 : 16);
         m_pDetailHeaderLayout->setSpacing(bMobile ? 12 : 26);
-        m_pDetailCover->setFixedSize(bMobile ? 80 : 132, bMobile ? 116 : 192);
-        if (auto oImage = m_pCovers->image(m_oBook.m_nId); !oImage.isNull())
-            m_pDetailCover->setPixmap(coverPixmap(oImage, m_pDetailCover->size() - QSize(4, 6),
-                                                  m_pDetailCover->devicePixelRatioF()));
+        const QSize oCoverSize(bMobile ? 80 : 132, bMobile ? 116 : 192);
+        const bool bCoverResized = m_pDetailCover->size() != oCoverSize;
+        m_pDetailCover->setFixedSize(oCoverSize);
+        if (bCoverResized)
+        {
+            if (auto oImage = m_pCovers->image(m_oBook.m_nId); !oImage.isNull())
+            {
+                m_pDetailCover->setPixmap(coverPixmap(oImage, m_pDetailCover->size() - QSize(4, 6),
+                                                      m_pDetailCover->devicePixelRatioF()));
+            }
+        }
         m_pDetailIntro->setVisible(!bMobile);
         findChild<QPushButton*>("showSynopsis")->setVisible(bMobile);
-        m_pDetailTitle->setStyleSheet(QString("font-size:%1px;font-weight:600;color:%2;")
-                                          .arg(bMobile ? 18 : 25)
-                                          .arg(colors(m_eTheme).m_oText.name()));
-        m_pTitle->setStyleSheet(QString("font-size:%1px;font-weight:600;color:%2;")
-                                    .arg(bMobile ? 22 : 28)
-                                    .arg(colors(m_eTheme).m_oText.name()));
+        const auto oColors = colors(m_eTheme);
+        const QString strDetailStyle = QString("font-size:%1px;font-weight:600;color:%2;")
+            .arg(bMobile ? 18 : 25).arg(oColors.m_oText.name());
+        const QString strTitleStyle = QString("font-size:%1px;font-weight:600;color:%2;")
+            .arg(bMobile ? 22 : 28).arg(oColors.m_oText.name());
+        if (m_pDetailTitle->styleSheet() != strDetailStyle)
+        {
+            m_pDetailTitle->setStyleSheet(strDetailStyle);
+        }
+        if (m_pTitle->styleSheet() != strTitleStyle)
+        {
+            m_pTitle->setStyleSheet(strTitleStyle);
+        }
         m_pToc->setColumnHidden(1, bMobile);
         m_pToc->setIndentation(bMobile ? 14 : 24);
         m_pToc->setHorizontalScrollBarPolicy(bMobile ? Qt::ScrollBarAlwaysOff

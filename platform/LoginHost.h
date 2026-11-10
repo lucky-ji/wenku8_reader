@@ -28,6 +28,8 @@ namespace Wenku8::Reader
         virtual void setTheme(Theme) = 0;
         virtual std::string userAgent() const = 0;
         virtual std::shared_ptr<HttpTransport> transport() const = 0;
+        // Independent request context, sharing browser-owned authentication only.
+        virtual std::shared_ptr<HttpTransport> downloadTransport() const = 0;
       signals:
         void pageLoaded();
         void cancelled();

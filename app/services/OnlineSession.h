@@ -9,6 +9,7 @@
 class QWidget;
 namespace Wenku8::Reader
 {
+    class DownloadManager;
     class OnlineSession final : public QObject
     {
         Q_OBJECT
@@ -34,7 +35,7 @@ namespace Wenku8::Reader
         void search(const QString&, bool bForce = false);
         void openBook(int nId, bool bForce = false);
         void openChapter(int nNovel, int nChapter, bool bForce = false);
-        void download(int nId, bool bImages);
+        DownloadManager* downloads() const;
         void addToShelf(int nId);
         void cancel();
         bool hasRetryableRequest() const;
@@ -52,8 +53,6 @@ namespace Wenku8::Reader
         void chapterReady();
         void chapterImagesReady(int nNovel, int nChapter);
         void retryAvailableChanged(bool);
-        void verificationRequired();
-        void downloadReady(int);
 
       private:
         struct Impl;

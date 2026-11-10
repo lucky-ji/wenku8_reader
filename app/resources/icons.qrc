@@ -22,5 +22,6 @@
 <file alias="shelf-add.svg">assets/icons/shelf-add.svg</file>
 <file alias="fullscreen.svg">assets/icons/fullscreen.svg</file>
 <file alias="profile.svg">assets/icons/profile.svg</file>
+<file alias="folder.svg">assets/icons/folder.svg</file>
 </qresource></RCC>
 

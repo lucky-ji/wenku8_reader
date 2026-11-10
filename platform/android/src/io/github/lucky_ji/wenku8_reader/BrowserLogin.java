@@ -31,6 +31,8 @@ public final class BrowserLogin
     private final String m_strNavigationScript;
     private final LoginWindow m_oLoginWindow;
     private final WebView m_oWeb;
+    private DownloadBrowser m_oDownload;
+    private long m_nDownloadEpoch = 0;
     private final TextView m_oHint;
     private final FrameLayout m_oPageLoading;
     private final ProgressBar m_oPageProgress;
@@ -295,6 +297,7 @@ public final class BrowserLogin
                 if (same(strUrl))
                     oView.evaluateJavascript(m_strNavigationScript, null);
             }
+            @android.annotation.TargetApi(23)
             @Override
             public void onReceivedError(WebView oView, WebResourceRequest oRequest,
                                         WebResourceError oError)
@@ -384,6 +387,7 @@ public final class BrowserLogin
                 return;
             if (nAction == 0)
             {
+                oB.resetDownload();
                 oB.m_oLoginWindow.show();
                 oB.m_oWeb.requestFocus();
             }
@@ -399,6 +403,7 @@ public final class BrowserLogin
             } // Session checks keep the login surface unchanged.
             else if (nAction == 4)
             {
+                oB.resetDownload();
                 oB.abort("cancel");
                 oB.m_bLoaded = false;
                 oB.m_oWeb.stopLoading();
@@ -412,6 +417,7 @@ public final class BrowserLogin
             }
             else if (nAction == 5)
             {
+                oB.resetDownload();
                 persist();
                 oB.abort("cancel");
                 oB.m_bClosed = true;
@@ -424,6 +430,18 @@ public final class BrowserLogin
             {
                 oB.abort("cancel");
             }
+            else if (nAction == 8)
+            {
+                oB.resetDownload();
+                try
+                {
+                    oB.m_nDownloadEpoch = Long.parseLong(strValue);
+                }
+                catch (NumberFormatException oError)
+                {
+                    oB.m_nDownloadEpoch = 0;
+                }
+            }
             else if (nAction == 7 && oB.m_oActivity instanceof ReaderActivity)
             {
                 ((ReaderActivity)oB.m_oActivity).qtSurfaceReleased();
@@ -434,6 +452,7 @@ public final class BrowserLogin
     {
         if (!m_bClosed)
         {
+            resetDownload();
             loading(true);
             m_oWeb.loadUrl(m_strOrigin + "/login.php");
         }
@@ -508,6 +527,7 @@ public final class BrowserLogin
         BrowserLogin oB = m_oInstance;
         if (oB != null)
         {
+            oB.resetDownload();
             persist();
             oB.m_bClosed = true;
             oB.abort("cancel");
@@ -516,6 +536,59 @@ public final class BrowserLogin
             oB.m_oWeb.destroy();
             m_oInstance = null;
         }
+    }
+    private void resetDownload()
+    {
+        if (m_oDownload != null)
+        {
+            m_oDownload.close();
+            m_oDownload = null;
+        }
+    }
+    public static void abortDownload(long nToken, long nEpoch, long nRequest)
+    {
+        ui(() ->
+        {
+            BrowserLogin oBrowser = m_oInstance;
+            if (oBrowser != null && oBrowser.m_nToken == nToken &&
+                oBrowser.m_nDownloadEpoch == nEpoch && oBrowser.m_oDownload != null)
+            {
+                oBrowser.m_oDownload.abort(nRequest, "cancel");
+            }
+        });
+    }
+    public static void fetchDownload(long nToken, long nEpoch, long nRequest, String strScript)
+    {
+        ui(() ->
+        {
+            BrowserLogin oBrowser = m_oInstance;
+            if (oBrowser == null || oBrowser.m_bClosed || oBrowser.m_nToken != nToken ||
+                oBrowser.m_oLoginWindow.visible() || !oBrowser.m_bLoaded)
+            {
+                nativeReply(nToken, nRequest, "{\"done\":true,\"error\":\"navigation\"}");
+                return;
+            }
+            if (nEpoch == 0 || oBrowser.m_nDownloadEpoch != nEpoch)
+            {
+                nativeReply(nToken, nRequest, "{\"done\":true,\"error\":\"cancel\"}");
+                return;
+            }
+            try
+            {
+                if (oBrowser.m_oDownload == null)
+                {
+                    oBrowser.m_oDownload = new DownloadBrowser(oBrowser.m_oActivity,
+                        oBrowser.m_strOrigin, oBrowser.m_oWeb.getSettings().getUserAgentString(),
+                        (nId, strReply) -> nativeReply(nToken, nId, strReply));
+                }
+                oBrowser.m_oDownload.fetch(nRequest, strScript);
+            }
+            catch (RuntimeException oError)
+            {
+                oBrowser.resetDownload();
+                nativeReply(nToken, nRequest, "{\"done\":true,\"error\":\"network\"}");
+            }
+        });
     }
     private void abort(String strReason)
     {

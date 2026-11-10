@@ -30,6 +30,8 @@ namespace Wenku8::Reader
     class LoadingPanel;
     class PullRefreshIndicator;
     class DownloadOption;
+    class DownloadTaskPanel;
+    class Toast;
     class ClientWindow final : public QMainWindow
     {
       public:
@@ -52,17 +54,20 @@ namespace Wenku8::Reader
         std::unique_ptr<CoverStore> m_pCovers;
         QString m_strDirectory, m_strOrigin;
         Theme m_eTheme = Theme::Light;
+        bool m_bThemeApplied = false;
         bool m_bUnlocked = false, m_bRestoring = false, m_bLocalBook = false,
              m_bResumeOnOpen = false;
         quint64 m_nRestoreGeneration = 0;
         QSet<int> m_vShelfIds;
         bool m_bReaderFullscreen = false, m_bLoadingBusy = false;
+        DownloadTaskPanel* m_pDownloadTasks = nullptr;
+        Toast* m_pToast = nullptr;
         LoadingPanel* m_pLoading = nullptr;
         LoadingPanel* m_pStartupLoading = nullptr;
         QPointer<QWidget> m_pLoadingFocus;
         Qt::WindowStates m_oPreviousWindowState;
         QWidget* m_pHeading = nullptr;
-        bool m_bCompact = false, m_bReaderToolsOpen = false;
+        bool m_bCompact = false, m_bReaderToolsOpen = false, m_bAdaptingLayout = false;
         bool m_bReaderChrome = true;
         bool m_bVolumePaging = true;
         QVector<int> m_vMobileHistory;
@@ -92,7 +97,7 @@ namespace Wenku8::Reader
                *m_pReadTitle = nullptr, *m_pChapterLabel = nullptr;
         QLineEdit* m_pSearch = nullptr;
         QPushButton *m_pRefresh = nullptr, *m_pLogin = nullptr, *m_pRead = nullptr,
-                    *m_pDownload = nullptr, *m_pShelfAdd = nullptr, *m_pFullscreen = nullptr,
+                    *m_pDownload = nullptr, *m_pLocalDownload = nullptr, *m_pShelfAdd = nullptr, *m_pFullscreen = nullptr,
                     *m_pPrevious = nullptr, *m_pNext = nullptr, *m_pPreviousPage = nullptr,
                     *m_pNextPage = nullptr;
         QPushButton* m_pReaderContents = nullptr;
@@ -104,8 +109,7 @@ namespace Wenku8::Reader
         ReadingView* m_pReader = nullptr;
         QWidget* m_pOperations = nullptr;
         QWidget* m_pStatusArea = nullptr;
-        QPushButton *m_pRetryNetwork = nullptr, *m_pVerifyNetwork = nullptr;
-        bool m_bVerificationNeeded = false;
+        QPushButton* m_pRetryNetwork = nullptr;
         quint64 m_nBusinessContext = 0, m_nActiveRequestContext = 0, m_nRetryContext = 0;
         QString m_strActiveSearch;
         void build();
@@ -136,6 +140,10 @@ namespace Wenku8::Reader
         void positionPullIndicators();
         void populate(const std::vector<Novel>&);
         void downloadedBooks();
+        void cacheBook();
+        void downloadBookToLocal();
+        void chooseLocalDownloadDirectory(std::function<void(bool)> fnAfter = {});
+        void showDownloadSettings();
         void openBook(int, bool bResume = false);
         void historyBooks();
         void requestCover(int);

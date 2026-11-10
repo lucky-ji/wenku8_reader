@@ -233,6 +233,10 @@ namespace Wenku8::Reader
         {
             return m_oBrowser.transport();
         }
+        std::shared_ptr<HttpTransport> downloadTransport() const override
+        {
+            return m_oBrowser.downloadTransport();
+        }
     };
     std::unique_ptr<LoginHost> makeLoginHost(QWidget* pOwner, const QUrl& oOrigin,
                                              const QString& strStorage)

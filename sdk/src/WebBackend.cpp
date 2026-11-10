@@ -239,15 +239,17 @@ namespace Wenku8::Detail
             Html oDoc(strHtml);
             NovelPage oResult;
             std::set<int> vIds;
-            const auto pLinks =
-                oDoc.one("//*[@id='content']")
-                    ? "//*[@id='content']//a[contains(@href,'articleinfo.php') or "
-                      "contains(@href,'reader.php') or contains(@href,'readbookcase.php') or "
-                      "contains(@href,'/book/') or contains(@href,'/novel/')]"
-                    : "//a[contains(@href,'articleinfo.php') or contains(@href,'reader.php') or "
-                      "contains(@href,'readbookcase.php') or contains(@href,'/book/') or "
-                      "contains(@href,'/novel/')]";
-            for (auto pA : oDoc.select(pLinks))
+            const std::string strGrid =
+                "//table[contains(concat(' ',normalize-space(@class),' '),' grid ')]";
+            const std::string strContentGrid = "//*[@id='content']" + strGrid;
+            const std::string strScope = oDoc.one(strContentGrid.c_str()) ? strContentGrid
+                : oDoc.one(strGrid.c_str()) ? strGrid
+                : oDoc.one("//*[@id='content']") ? "//*[@id='content']" : "";
+            const std::string strLinks = strScope +
+                "//a[contains(@href,'articleinfo.php') or contains(@href,'reader.php') or "
+                "contains(@href,'readbookcase.php') or contains(@href,'/book/') or "
+                "contains(@href,'/novel/')]";
+            for (auto pA : oDoc.select(strLinks.c_str()))
             {
                 auto strHref = property(pA, "href");
                 int nId = queryId(strHref, "id");
@@ -266,6 +268,14 @@ namespace Wenku8::Detail
                         nId = numeric(oM[1].str());
                 }
                 auto strTitle = nodeText(pA);
+                // The cover and action links precede the actual title on some lists.
+                // Do not consume a book ID until a title link has been found.
+                if (strTitle == u8"我要阅读" || strTitle == u8"点击阅读" ||
+                    strTitle == u8"开始阅读" || strTitle == u8"在线阅读" ||
+                    strTitle == u8"加入书架")
+                {
+                    continue;
+                }
                 if (nId > 0 && !strTitle.empty() && vIds.insert(nId).second)
                 {
                     Novel oN;
@@ -598,7 +608,7 @@ namespace Wenku8::Detail
         if (nIndex >= sizeof(vNames) / sizeof(vNames[0]))
             throw Error(ErrorCode::InvalidArgument, "Invalid sort");
         return m_pImpl->fetch("/modules/article/toplist.php?sort=" + std::string(vNames[nIndex]) +
-                                  "&page=" + std::to_string(nPage) + "&charset=gbk",
+                                  "&page=" + std::to_string(nPage),
                               ePolicy, parsePage);
     }
     NovelPage WebBackend::search(const std::string& strQuery, SearchType eType, CachePolicy ePolicy)
