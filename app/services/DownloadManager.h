@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #pragma once
+#ifndef Q_MOC_RUN
 #include "Wenku8Sdk.h"
+#endif
 #include <QObject>
 #include <QList>
 #include <QString>
