@@ -4,7 +4,7 @@
 
 基于 C++17 与 Qt 5 的 Wenku8 阅读客户端，提供独立的纯 C++ SDK。
 
-[![Version](https://img.shields.io/badge/version-1.0.1-315b46)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.2-315b46)](docs/CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--2.0--only-blue)](LICENSE)
 [![Qt](https://img.shields.io/badge/Qt-5.15-41cd52)](https://doc.qt.io/archives/qt-5.15/)
 
@@ -16,12 +16,13 @@
 - 书架、小说发现与搜索、书籍详情、卷与章节目录、加入书架。
 - 正文与插图阅读，滚动和翻页模式，移动端音量键翻页。
 - 每本书独立保存阅读位置，支持阅读历史与书签。
-- 下载与离线阅读，封面缓存，网络失败重试与保留已有内容。
+- 后台下载缓存与离线阅读，小说导出到自选目录，任务进度、暂停与断点恢复。
+- 封面缓存、网络失败重试与保留已有内容，应用内提供开源地址与意见反馈入口。
 - 明亮、暗色、护眼三种外观，桌面与触屏分别适配。
 
-## 1.0.2 开发中的下载与阅读优化
+## 下载与阅读设置
 
-以下功能正在 `feature-reader-downloads` 分支开发，尚未发布；上方下载入口仍为正式版本。
+下载缓存与用户保存的小说文件分别管理，可按用途选择。
 
 - **下载缓存**：保存在应用数据目录，由应用管理，用于应用内离线阅读。Android 使用内部私有存储，不要求文件管理器或共享目录权限；卸载应用会清除。桌面端使用应用数据目录，设备所有者或管理员仍可访问，并非加密保险箱。
 - **下载到本地**：首次操作选择目录，之后自动记住。Android 通过系统目录选择器授予所选目录权限；如权限撤销或目录被移除，可在「下载与存储」重新选择。
@@ -72,7 +73,7 @@ git clone https://github.com/lucky-ji/wenku8_reader.git
 cd wenku8_reader
 ```
 
-默认获取 `main` 分支。若需对应正式版本的工程代码，可执行 `git switch --detach v1.0.1`；最新环境与构建说明以主仓库的 [构建指南](https://github.com/lucky-ji/wenku8_reader/blob/main/docs/BUILDING.md) 为准。
+默认获取 `main` 分支。若需对应正式版本的工程代码，可执行 `git switch --detach v1.0.2`；最新环境与构建说明以主仓库的 [构建指南](https://github.com/lucky-ji/wenku8_reader/blob/main/docs/BUILDING.md) 为准。
 
 需要 CMake 3.24+、支持 C++17 的编译器。客户端仅使用 Qt 5.15；Qt、Visual Studio、Android SDK/NDK 和 JDK 均由开发者自行安装，不包含在源码仓库中。
 

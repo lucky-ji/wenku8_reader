@@ -37,7 +37,7 @@ git clone https://github.com/lucky-ji/wenku8_reader.git
 cd wenku8_reader
 ```
 
-正式版本代码可通过 `git switch --detach v1.0.1` 取得。Qt 5、ICU、TLS 后端等第三方依赖按 [依赖来源](DEPENDENCIES.md) 中固定的版本、地址和摘要取得；Qt/VS/NDK 开发环境不包含在工程仓库中。
+正式版本代码可通过 `git switch --detach v1.0.2` 取得。Qt 5、ICU、TLS 后端等第三方依赖按 [依赖来源](DEPENDENCIES.md) 中固定的版本、地址和摘要取得；Qt/VS/NDK 开发环境不包含在工程仓库中。
 
 Actions 的 provenance artifact 仅用于记录构建身份、系统包和原始声明，不作为用户获取工程源码的入口，也不上传为 Release 附件。Release 手动附件仅保留编译好的平台发布包。
 
