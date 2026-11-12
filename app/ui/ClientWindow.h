@@ -20,8 +20,10 @@ class QCheckBox;
 class QSplitter;
 class QVBoxLayout;
 class QHBoxLayout;
+class QGridLayout;
 class QKeyEvent;
 class QMenuBar;
+class QSlider;
 namespace Wenku8::Reader
 {
     class OnlineSession;
@@ -80,6 +82,7 @@ namespace Wenku8::Reader
         QList<QPushButton*> m_vMobileNav;
         QVBoxLayout *m_pBodyLayout = nullptr, *m_pDetailLayout = nullptr;
         QHBoxLayout* m_pDetailHeaderLayout = nullptr;
+        QGridLayout* m_pDetailActions = nullptr;
         int m_nSection = 0, m_nPage = 1, m_nChapter = -1, m_nPendingChapter = -1,
             m_nRestoreOffset = -1, m_nFontSize = 18, m_nStartupNovel = 0;
         std::unique_ptr<NovelDownloader> m_pStore;
@@ -101,6 +104,8 @@ namespace Wenku8::Reader
                     *m_pPrevious = nullptr, *m_pNext = nullptr, *m_pPreviousPage = nullptr,
                     *m_pNextPage = nullptr;
         QPushButton* m_pReaderContents = nullptr;
+        QSlider* m_pReaderProgress = nullptr;
+        QLabel* m_pReaderProgressPercent = nullptr;
         QComboBox* m_pThemes = nullptr;
         DownloadOption* m_pIllustrations = nullptr;
         PullRefreshIndicator *m_pCardsRefresh = nullptr, *m_pTocRefresh = nullptr;
@@ -123,6 +128,8 @@ namespace Wenku8::Reader
         void showMobileAppearance();
         void showMobileReaderTools();
         void showReaderContents();
+        void showReaderSearch();
+        void updateReaderProgress();
         void saveReaderPreferences();
         void updateReaderFooter();
         void turnReaderPage(int nDirection);

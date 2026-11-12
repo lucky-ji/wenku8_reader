@@ -125,14 +125,15 @@ namespace Wenku8::Reader
         auto* pPage = new QWidget;
         pPage->setObjectName("downloadSettingsPage");
         auto* pOuter = new QVBoxLayout(pPage);
-        pOuter->setContentsMargins(8, 12, 8, 16);
+        pOuter->setContentsMargins(0, 0, 0, 0);
         auto* pScroll = new QScrollArea;
         pScroll->setWidgetResizable(true);
         pScroll->setFrameShape(QFrame::NoFrame);
         pScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         auto* pBody = new QWidget;
         auto* pLayout = new QVBoxLayout(pBody);
-        pLayout->setSpacing(16);
+        pLayout->setContentsMargins(16, 16, 16, 24);
+        pLayout->setSpacing(10);
         auto fnParagraph = [pLayout](const QString& strText, const char* pName)
         {
             auto* pLabel = new QLabel(strText);
@@ -142,14 +143,14 @@ namespace Wenku8::Reader
             pLayout->addWidget(pLabel);
             return pLabel;
         };
-        fnParagraph("下载缓存", "bookTitle");
+        fnParagraph("两种保存方式，分别管理", "bookTitle");
+        fnParagraph("下载缓存用于应用内离线阅读；下载到本地生成可自行使用的文件。", "muted");
+        pLayout->addSpacing(12);
+        fnParagraph("下载缓存", "sectionTitle");
         fnParagraph("保存在应用数据目录，仅供应用离线阅读，与用户选择的本地保存位置分开管理。"
                     "Android 使用应用私有存储；卸载应用会清除缓存。", "muted");
-        fnParagraph("任务与断点恢复", "bookTitle");
-        fnParagraph("两种下载都在后台排队，不影响浏览和阅读。在「下载缓存」查看进度、暂停或继续。"
-                    "已完成的章节与图片会实时保存；重新启动并验证原账号后，自动恢复未完成任务。"
-                    "手动暂停的任务需点击继续。Android 系统休眠或结束应用时下载可能暂停，重新打开后继续。", "muted");
-        fnParagraph("下载到本地", "bookTitle");
+        pLayout->addSpacing(12);
+        fnParagraph("下载到本地", "sectionTitle");
         fnParagraph("选择目录后，将小说保存为 UTF-8 文本和可离线打开的 HTML。"
                     "勾选包含插图时一并保存图片。每次新建独立书籍目录，已有文件不会被覆盖。"
                     "仅下载到本地不会加入下载缓存。", "muted");
@@ -171,6 +172,7 @@ namespace Wenku8::Reader
         fnUpdateLocation();
         auto* pChoose = new QPushButton("选择保存目录");
         pChoose->setObjectName("chooseLocalDownloadDirectory");
+        pChoose->setCursor(Qt::PointingHandCursor);
         pChoose->setMinimumHeight(48);
         setButtonIcon(pChoose, Icon::Folder);
         pLayout->addWidget(pChoose);
@@ -186,6 +188,14 @@ namespace Wenku8::Reader
         {
             fnParagraph("上次保存：" + strLast, "muted");
         }
+        pLayout->addSpacing(12);
+        fnParagraph("后台任务与断点恢复", "sectionTitle");
+        fnParagraph("两种下载都在后台排队，不影响浏览和阅读。在「下载缓存」查看进度、暂停或继续。"
+                    "已完成的章节与图片会实时保存；重新启动并验证原账号后，自动恢复未完成任务。"
+                    "手动暂停的任务需点击继续。", "muted");
+#ifdef Q_OS_ANDROID
+        fnParagraph("系统休眠或结束应用时下载可能暂停，重新打开后继续。", "muted");
+#endif
         pLayout->addStretch();
         pScroll->setWidget(pBody);
         pOuter->addWidget(pScroll);

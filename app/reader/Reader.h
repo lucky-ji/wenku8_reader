@@ -95,7 +95,10 @@ namespace Wenku8::Reader
             return m_vPages.size();
         }
         bool turnPage(int nDirection);
-        bool findInChapter(const QString&);
+        bool findInChapter(const QString&, bool bBackward = false);
+        int chapterProgress() const;
+        bool canSeekProgress() const;
+        void seekChapterProgress(int nPermille);
         void stopMotion()
         {
             cancelMotion();

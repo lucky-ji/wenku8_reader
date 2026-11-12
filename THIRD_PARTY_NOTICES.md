@@ -30,7 +30,7 @@ Windows 默认 SDK cURL 使用系统 Schannel，不为此链接 OpenSSL。Androi
 - [Hikari](https://github.com/15dd/hikari_novel_flutter)（MIT）、[niuhuan/wild](https://github.com/niuhuan/wild)（GPL-3.0）、[pywenku8api](https://github.com/WorldObservationLog/pywenku8api)（AGPL-3.0）：用于核对可观察的 URL、表单和页面约定，未复制或链接其代码、资产或二进制。
 - [LightNovelReader](https://github.com/Xempastissimo/LightNovelReader)：用于核对公开榜单 URL 与页面结构说明，未复制或链接其实现、测试、资产或二进制，不属于运行依赖。
 - [wenku8-opds-readme](https://github.com/WorldObservationLog/wenku8-opds-readme)：OPDS 服务说明参考，未复制或分发其服务实现。
-- [KOReader](https://github.com/koreader/koreader)、[Readest](https://github.com/readest/readest)、CoolReader、Lector 和 foliate-js：阅读交互和架构研究参考，未复制、链接或分发它们的代码或资源，不属于本项目运行依赖。
+- [KOReader](https://github.com/koreader/koreader)、[Readest](https://github.com/readest/readest)、[Legado](https://github.com/Jer-Chao/legado)、CoolReader、Lector 和 foliate-js：阅读交互和架构研究参考，未复制、链接或分发它们的代码或资源，不属于本项目运行依赖。
 
 ## 对应源码与再分发
 

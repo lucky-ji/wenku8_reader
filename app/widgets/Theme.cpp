@@ -2,12 +2,16 @@
 #include "Theme.h"
 #include "ThemeSelector.h"
 #include "Icons.h"
+#include "DownloadOption.h"
+#include <QCheckBox>
 #include <QComboBox>
 #include <QPalette>
 #include <QApplication>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QSlider>
+#include <QListWidget>
 #include <QLabel>
 namespace Wenku8::Reader
 {
@@ -99,6 +103,13 @@ namespace Wenku8::Reader
         QLabel { background:transparent; }
         QLabel#brand { font-size:22px; font-weight:700; letter-spacing:1px; }
         QLabel#pageTitle { font-size:28px; font-weight:600; }
+        QLabel#sectionTitle { color:%6; font-size:12px; font-weight:600; padding:6px 2px; }
+        QWidget#controlGroup, QWidget[controlGroup="true"] { background:%5; border:1px solid %4; border-radius:14px; }
+        QLabel#controlLabel { color:%1; font-size:14px; font-weight:500; }
+        QLabel#readerProgress { color:%6; font-size:11px; padding:2px 8px; }
+        QWidget#downloadTaskRow { background:%5; border:1px solid %4; border-radius:12px; }
+        QLabel#taskTitle { font-weight:600; }
+        QLabel#taskMeta { color:%6; font-size:12px; }
         QMenuBar { background:%2; color:%1; padding:3px 8px; border-bottom:1px solid %4; }
         QMenuBar::item { background:transparent; padding:5px 12px; border-radius:6px; }
         QMenuBar::item:selected { background:%7; color:%1; }
@@ -134,7 +145,8 @@ namespace Wenku8::Reader
         QListWidget:not(#cards)::item { padding:10px; border-bottom:1px solid %4; border-radius:6px; }
         QListWidget:not(#cards)::item:hover { background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 %7,stop:1 %5); }
         QListWidget:not(#cards)::item:selected { background:%10; color:%11; }
-        QCheckBox { padding:7px; spacing:8px; }
+        QCheckBox { padding:7px; spacing:10px; }
+        QCheckBox::indicator { width:18px; height:18px; }
         QCheckBox:hover { color:%11; background:%7; border-radius:6px; }
         QCheckBox:disabled { color:%12; background:transparent; }
         QTextBrowser { border:0; }
@@ -148,6 +160,17 @@ namespace Wenku8::Reader
                      oC.m_oHover.name(), oC.m_oAccent.name(), oC.m_oAccentText.name())
                 .arg(oC.m_oSelection.name(), oC.m_oSelectionText.name(), oC.m_oDisabled.name(),
                      oC.m_oSection.name());
+        const auto oCheckFill = eTheme == Theme::Dark ? oC.m_oAccent.darker(230) : oC.m_oAccent;
+        const QString strCheckStyle = QString(
+                        "QCheckBox::indicator { background:%1; border:1px solid %2; "
+                        "border-radius:5px; image:none; } QCheckBox::indicator:hover { "
+                        "border-color:%3; } QCheckBox::indicator:checked { background:%3; "
+                        "border-color:%3; image:url(:/wenku8/icons/check.svg); } "
+                        "QCheckBox::indicator:disabled { background:%4; border-color:%2; } "
+                        "QCheckBox::indicator:checked:disabled { background:%5; border-color:%5; }")
+                        .arg(oC.m_oPanel.name(), oC.m_oBorder.name(), oCheckFill.name(),
+                             oC.m_oSection.name(), oC.m_oDisabled.darker(120).name());
+        strSheet += strCheckStyle;
         if (pWidget->property("touchUi").toBool())
         {
             const auto oBar = eTheme == Theme::Dark      ? QColor("#131c28")
@@ -155,12 +178,42 @@ namespace Wenku8::Reader
                                                          : QColor("#e7eef8");
             strSheet +=
                 QString(
-                    "QWidget#mobileNavigation { background:%1; border:1px solid %2; border-top:2px "
-                    "solid %2; border-radius:18px; } QWidget#readerFooter { background:%1; "
-                    "border-top:1px solid %2; border-radius:12px; } QLabel#status { background:%3; "
+                    "QWidget#mobileNavigation { background:%1; border:1px solid %2; border-top:1px "
+                    "solid %2; border-radius:16px; } QWidget#readerFooter { background:%5; "
+                    "border-top:1px solid %2; border-radius:0; } QWidget#readerTop { background:%5; "
+                    "border-bottom:1px solid %2; } QLabel#status { background:%3; "
                     "color:%4; border-radius:8px; padding:6px 8px; font-size:11px; }")
                     .arg(oBar.name(), oC.m_oBorder.name(), oC.m_oSection.name(),
-                         oC.m_oMuted.name());
+                         oC.m_oMuted.name(), oC.m_oPanel.name());
+            strSheet += "QCheckBox::indicator { width:20px; height:20px; }";
+            // Dynamic task actions inherit this role before the next theme application.
+            strSheet += QString(
+                            "QPushButton[textAction=\"true\"] { background:transparent; "
+                            "color:%1; border:0; border-radius:10px; padding:12px 14px; "
+                            "font-size:14px; } QPushButton[textAction=\"true\"]:hover, "
+                            "QPushButton[textAction=\"true\"]:focus { background:transparent; "
+                            "border:0; } QPushButton[textAction=\"true\"]:pressed { "
+                            "background:%2; } QPushButton[textAction=\"true\"]:disabled { "
+                            "background:transparent; color:%3; }")
+                            .arg(oC.m_oText.name(), oC.m_oSelection.name(), oC.m_oDisabled.name());
+            strSheet += QString(
+                            "QPushButton[controlAction=\"true\"] { background:%1; color:%2; "
+                            "border:1px solid %3; border-radius:12px; padding:11px 13px; "
+                            "font-size:14px; } QPushButton[controlAction=\"true\"]:hover, "
+                            "QPushButton[controlAction=\"true\"]:focus { background:%1; "
+                            "border:1px solid %3; padding:11px 13px; } "
+                            "QPushButton[controlAction=\"true\"]:pressed { background:%4; } "
+                            "QPushButton[controlAction=\"true\"]:disabled { color:%5; } "
+                            "QPushButton[groupRow=\"true\"] { background:transparent; "
+                            "color:%2; border:0; border-radius:8px; text-align:left; "
+                            "padding:14px 16px; font-size:14px; } "
+                            "QPushButton[groupRow=\"true\"]:hover, "
+                            "QPushButton[groupRow=\"true\"]:focus { background:transparent; "
+                            "border:0; padding:14px 16px; } "
+                            "QPushButton[groupRow=\"true\"]:pressed { background:%4; } "
+                            "QPushButton[groupRow=\"true\"]:disabled { color:%5; }")
+                            .arg(oC.m_oSection.name(), oC.m_oText.name(), oC.m_oBorder.name(),
+                                 oC.m_oSelection.name(), oC.m_oDisabled.name());
         }
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
         strSheet += "QPushButton, QToolButton { outline:0; }";
@@ -170,6 +223,17 @@ namespace Wenku8::Reader
             if (pLabel->objectName() == "muted" || pLabel->objectName() == "subtitle" ||
                 pLabel->objectName() == "eyebrow")
                 setWidgetStyle(pLabel, "QLabel { color:" + oC.m_oMuted.name() + "; }");
+        for (auto pGroup : pWidget->findChildren<QWidget*>())
+        {
+            if (pGroup->objectName() == "controlGroup" || pGroup->property("controlGroup").toBool())
+            {
+                pGroup->setAttribute(Qt::WA_StyledBackground, true);
+                setWidgetStyle(pGroup,
+                    QString("QWidget#controlGroup, QWidget[controlGroup=\"true\"] { "
+                            "background:%1; border:1px solid %2; border-radius:14px; }")
+                        .arg(oC.m_oPanel.name(), oC.m_oBorder.name()));
+            }
+        }
         // Qt 5 caches inherited palettes on reparented/polished mobile controls.
         // Give the fixed chrome an explicit surface and text color in each theme.
         if (pWidget->property("touchUi").toBool())
@@ -180,12 +244,16 @@ namespace Wenku8::Reader
             if (auto pNavigation = pWidget->findChild<QWidget*>("mobileNavigation"))
                 setWidgetStyle(pNavigation,
                     QString("QWidget#mobileNavigation { background:%1; border:1px solid %2; "
-                            "border-top:2px solid %2; border-radius:18px; }")
+                            "border-top:1px solid %2; border-radius:16px; }")
                         .arg(oBar.name(), oC.m_oBorder.name()));
             if (auto pFooter = pWidget->findChild<QWidget*>("readerFooter"))
                 setWidgetStyle(pFooter, QString("QWidget#readerFooter { background:%1; "
-                                               "border-top:1px solid %2; border-radius:12px; }")
-                                           .arg(oBar.name(), oC.m_oBorder.name()));
+                                               "border-top:1px solid %2; border-radius:0; }")
+                                           .arg(oC.m_oPanel.name(), oC.m_oBorder.name()));
+            if (auto pReaderTop = pWidget->findChild<QWidget*>("readerTop"))
+                setWidgetStyle(pReaderTop, QString("QWidget#readerTop { background:%1; "
+                                                  "border-bottom:1px solid %2; }")
+                                              .arg(oC.m_oPanel.name(), oC.m_oBorder.name()));
             if (auto pStatus = pWidget->findChild<QLabel*>("status"))
                 setWidgetStyle(pStatus,
                     QString("QLabel { color:%1; background:%2; border-radius:8px; padding:6px 8px; "
@@ -195,8 +263,87 @@ namespace Wenku8::Reader
                 for (auto pLabel : pHeading->findChildren<QLabel*>())
                     setWidgetStyle(pLabel, "QLabel { color:" + oC.m_oText.name() + "; }");
         }
+        else
+        {
+            if (auto pStatus = pWidget->findChild<QLabel*>("status"))
+            {
+                setWidgetStyle(pStatus, QString());
+            }
+            if (auto pHeading = pWidget->findChild<QWidget*>("mobileHeader"))
+            {
+                for (auto pLabel : pHeading->findChildren<QLabel*>())
+                {
+                    setWidgetStyle(pLabel, QString());
+                }
+            }
+            for (const auto& strName : {QStringLiteral("readerTop"), QStringLiteral("readerFooter")})
+            {
+                if (auto pChrome = pWidget->findChild<QWidget*>(strName))
+                {
+                    setWidgetStyle(pChrome, QString());
+                }
+            }
+        }
+        for (auto* pCheck : pWidget->findChildren<QCheckBox*>())
+        {
+            if (dynamic_cast<DownloadOption*>(pCheck))
+            {
+                continue;
+            }
+            // Reparented secondary pages can retain Qt 5's native indicator cache.
+            setWidgetStyle(pCheck, strCheckStyle +
+                QString("QCheckBox { padding:7px; spacing:10px; color:%1; } "
+                        "QCheckBox::indicator { width:%2px; height:%2px; } "
+                        "QCheckBox:disabled { color:%3; }")
+                    .arg(oC.m_oText.name())
+                    .arg(pWidget->property("touchUi").toBool() ? 20 : 18)
+                    .arg(oC.m_oDisabled.name()));
+        }
         for (auto pBar : pWidget->findChildren<QScrollBar*>())
             setWidgetStyle(pBar, scrollBarStyle(eTheme));
+        for (auto* pList : pWidget->findChildren<QListWidget*>())
+        {
+            if (pList->objectName() != "mobileBookmarkItems" &&
+                pList->objectName() != "bookmarkItems")
+            {
+                continue;
+            }
+            setWidgetStyle(pList,
+                QString("QListWidget { background:%1; color:%2; border:1px solid %3; "
+                        "border-radius:12px; padding:6px; outline:0; } "
+                        "QListWidget::item { padding:8px; border-bottom:1px solid %3; } "
+                        "QListWidget::item:selected { background:%4; color:%5; border-radius:8px; } "
+                        "QListWidget::item:hover { background:%6; } "
+                        "QListWidget::item:selected:hover { background:%4; }")
+                    .arg(oC.m_oPanel.name(), oC.m_oText.name(), oC.m_oBorder.name(),
+                         oC.m_oSelection.name(), oC.m_oSelectionText.name(), oC.m_oHover.name()));
+        }
+        for (auto pSlider : pWidget->findChildren<QSlider*>("readerProgressSlider"))
+        {
+            // The 48px widget owns the touch target. Paint a quiet track and leave enough
+            // inset for the handle at both ends without changing its size on interaction.
+            setWidgetStyle(pSlider,
+                QString(
+                    "QSlider#readerProgressSlider { background:transparent; border:0; } "
+                    "QSlider#readerProgressSlider::groove:horizontal { background:%1; "
+                    "height:4px; border:0; border-radius:2px; margin:0 12px; } "
+                    "QSlider#readerProgressSlider::sub-page:horizontal { background:%2; "
+                    "border:0; border-radius:2px; } "
+                    "QSlider#readerProgressSlider::add-page:horizontal { background:%1; "
+                    "border:0; border-radius:2px; } "
+                    "QSlider#readerProgressSlider::handle:horizontal { background:%3; "
+                    "width:18px; border:1px solid %2; border-radius:10px; margin:-8px 0; } "
+                    "QSlider#readerProgressSlider::handle:horizontal:hover { background:%4; } "
+                    "QSlider#readerProgressSlider::handle:horizontal:focus { border-color:%5; } "
+                    "QSlider#readerProgressSlider::handle:horizontal:pressed { background:%2; "
+                    "border-color:%2; } "
+                    "QSlider#readerProgressSlider::sub-page:horizontal:disabled { background:%6; } "
+                    "QSlider#readerProgressSlider::handle:horizontal:disabled { background:%7; "
+                    "border-color:%6; }")
+                    .arg(oC.m_oBorder.name(), oC.m_oAccent.name(), oC.m_oPanel.name(),
+                         oC.m_oSelection.name(), oC.m_oSelectionText.name(),
+                         oC.m_oDisabled.name(), oC.m_oSection.name()));
+        }
         // Local control styles avoid Qt 5 palette caching when switching an already polished
         // window.
         for (auto pInput : pWidget->findChildren<QLineEdit*>())
@@ -281,29 +428,55 @@ namespace Wenku8::Reader
             if (pWidget->property("touchUi").toBool())
             {
                 const bool bRow = pButton->property("mobileRow").toBool(),
-                           bThemeChoice = strRole == "themeChoice";
-                const auto oFill = bPrimary ? oC.m_oAccent : (bRow ? oC.m_oSection : oC.m_oPanel);
+                           bThemeChoice = strRole == "themeChoice",
+                           bControlAction = pButton->property("controlAction").toBool() && !bPrimary,
+                           bGroupRow = pButton->property("groupRow").toBool() && !bPrimary,
+                           bTextAction = pButton->property("textAction").toBool() && !bPrimary &&
+                                         !bControlAction;
+                const auto oFill = bPrimary ? oC.m_oAccent : oC.m_oSection;
                 const auto oInk = bPrimary ? oC.m_oAccentText : oC.m_oText;
+                const QString strFill = bTextAction || bGroupRow ? QStringLiteral("transparent")
+                                                                : oFill.name();
+                // Touch hover often persists after release. Keep only a momentary pressed
+                // surface, and never change border widths or padding when focus moves.
                 strStyle =
-                    QString("QPushButton { background:%1; color:%2; border:0; border-radius:14px; "
+                    QString("QPushButton { background:%1; color:%2; border:0; border-radius:10px; "
                             "padding:12px 14px; font-size:14px; } QPushButton:hover { "
                             "background:%1; } QPushButton:pressed { background:%3; } "
-                            "QPushButton:disabled { background:%4; color:%5; } QPushButton:focus { "
-                            "border:1px solid %6; padding:11px 13px; }")
-                        .arg(oFill.name(), oInk.name(),
+                            "QPushButton:disabled { background:%4; color:%5; } "
+                            "QPushButton:focus { border:0; padding:12px 14px; }")
+                        .arg(strFill, oInk.name(),
                              (bPrimary ? oC.m_oAccent.darker(112) : oC.m_oSelection).name(),
-                             oC.m_oSection.name(), oC.m_oDisabled.name(), oC.m_oBorder.name());
+                             bTextAction || bGroupRow ? QStringLiteral("transparent")
+                                                    : oC.m_oSection.name(),
+                             oC.m_oDisabled.name());
                 if (bRow)
                     strStyle += "QPushButton { text-align:left; padding:14px 16px; } "
-                                "QPushButton:focus { padding:13px 15px; }";
+                                "QPushButton:focus { padding:14px 16px; }";
+                if (bControlAction)
+                    strStyle +=
+                        QString("QPushButton { border:1px solid %1; border-radius:12px; "
+                                "padding:11px 13px; } QPushButton:hover, QPushButton:focus { "
+                                "border:1px solid %1; padding:11px 13px; } "
+                                "QPushButton:pressed { background:%2; border-color:%3; } "
+                                "QPushButton:disabled { border:1px solid %1; }")
+                            .arg(oC.m_oBorder.name(), oC.m_oSelection.name(),
+                                 oC.m_oSelectionText.name());
                 if (bThemeChoice)
                     strStyle +=
                         QString(
-                            "QPushButton { text-align:left; padding:16px; } QPushButton:checked, "
-                            "QPushButton:checked:hover { background:%1; color:%2; border:2px solid "
-                            "%2; } QPushButton:focus { padding:16px; }")
+                            "QPushButton { text-align:left; padding:14px; border:2px solid "
+                            "transparent; } QPushButton:checked, QPushButton:checked:hover { "
+                            "background:%1; color:%2; border:2px solid %2; } "
+                            "QPushButton:focus { padding:14px; border:2px solid transparent; } "
+                            "QPushButton:checked:focus { border:2px solid %2; }")
                             .arg(oC.m_oSelection.name(), oC.m_oSelectionText.name());
-                pButton->setIconSize(QSize(22, 22));
+                if (pButton->property("toolbarAction").toBool())
+                {
+                    strStyle += "QPushButton, QPushButton:focus { padding:12px 4px; }";
+                }
+                pButton->setIconSize(pButton->property("toolbarAction").toBool()
+                                         ? QSize(18, 18) : QSize(22, 22));
             }
             if (strRole == "mobileNav")
             {
@@ -320,7 +493,18 @@ namespace Wenku8::Reader
                                     "background:%1; color:%2; border:1px solid %2; }")
                                 .arg(oC.m_oSelection.name(), oC.m_oSelectionText.name());
             setWidgetStyle(pButton, strStyle);
-            if (pButton->property("wenkuIcon").isValid())
+            if (pWidget->property("touchUi").toBool() &&
+                pButton->property("textAction").toBool() && !bPrimary &&
+                !pButton->property("keepIcon").toBool() &&
+                !pButton->property("controlAction").toBool())
+            {
+                // Preserve the icon identity for desktop and optional compact icon actions.
+                if (!pButton->icon().isNull())
+                {
+                    pButton->setIcon(QIcon());
+                }
+            }
+            else if (pButton->property("wenkuIcon").isValid())
             {
                 const QColor oInk(strForeground);
                 pButton->setIcon(makeIcon(Icon(pButton->property("wenkuIcon").toInt()), oInk,

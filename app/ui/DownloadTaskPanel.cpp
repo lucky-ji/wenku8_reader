@@ -20,6 +20,7 @@ namespace Wenku8::Reader
         setObjectName("downloadTaskPanel");
         auto* pOuter = new QVBoxLayout(this);
         pOuter->setContentsMargins(0, 0, 0, 0);
+        pOuter->setSpacing(12);
         auto* pTitle = new QLabel("后台任务");
         pTitle->setObjectName("eyebrow");
         pOuter->addWidget(pTitle);
@@ -33,11 +34,11 @@ namespace Wenku8::Reader
         pScroll->setWidgetResizable(true);
         pScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         pScroll->setMinimumHeight(150);
-        pScroll->setMaximumHeight(240);
+        pScroll->setMaximumHeight(280);
         auto* pBody = new QWidget;
         m_pRows = new QVBoxLayout(pBody);
-        m_pRows->setContentsMargins(0, 0, 8, 0);
-        m_pRows->setSpacing(10);
+        m_pRows->setContentsMargins(0, 0, 4, 0);
+        m_pRows->setSpacing(12);
         m_pRows->addStretch();
         pScroll->setWidget(pBody);
         pOuter->addWidget(pScroll);
@@ -82,17 +83,25 @@ namespace Wenku8::Reader
             if (!m_vRows.contains(oTask.m_strId))
             {
                 Row oRow;
-                oRow.m_pWidget = new QWidget;
+                oRow.m_pWidget = new QWidget(m_pRows->parentWidget());
                 oRow.m_pWidget->setObjectName("downloadTaskRow");
+                oRow.m_pWidget->setAttribute(Qt::WA_StyledBackground);
                 auto* pLayout = new QVBoxLayout(oRow.m_pWidget);
-                pLayout->setContentsMargins(8, 8, 8, 8);
-                pLayout->setSpacing(6);
+                pLayout->setContentsMargins(12, 12, 12, 8);
+                pLayout->setSpacing(8);
                 oRow.m_pTitle = new QLabel;
+                oRow.m_pTitle->setObjectName("taskTitle");
                 oRow.m_pTitle->setTextFormat(Qt::PlainText);
                 oRow.m_pTitle->setWordWrap(true);
                 pLayout->addWidget(oRow.m_pTitle);
+                auto* pMeta = new QLabel;
+                pMeta->setObjectName("taskMeta");
+                pMeta->setTextFormat(Qt::PlainText);
+                pMeta->setWordWrap(true);
+                pLayout->addWidget(pMeta);
                 oRow.m_pProgress = new QProgressBar;
-                oRow.m_pProgress->setFixedHeight(8);
+                oRow.m_pProgress->setFixedHeight(6);
+                oRow.m_pProgress->setAccessibleName("下载进度");
                 oRow.m_pProgress->setTextVisible(false);
                 pLayout->addWidget(oRow.m_pProgress);
                 oRow.m_pStatus = new QLabel;
@@ -101,14 +110,17 @@ namespace Wenku8::Reader
                 oRow.m_pStatus->setWordWrap(true);
                 pLayout->addWidget(oRow.m_pStatus);
                 auto* pActions = new QHBoxLayout;
+                pActions->setContentsMargins(0, 0, 0, 0);
+                pActions->setSpacing(8);
+                pActions->addStretch();
                 oRow.m_pPause = new QPushButton;
                 oRow.m_pRemove = new QPushButton("移除记录");
                 for (auto* pButton : {oRow.m_pPause, oRow.m_pRemove})
                 {
-                    pButton->setMinimumHeight(38);
+                    pButton->setProperty("textAction", true);
+                    pButton->setMinimumHeight(48);
                     pActions->addWidget(pButton);
                 }
-                pActions->addStretch();
                 pLayout->addLayout(pActions);
                 const QString strId = oTask.m_strId;
                 connect(oRow.m_pPause, &QPushButton::clicked, this, [this, strId]
@@ -135,6 +147,22 @@ namespace Wenku8::Reader
                     m_pManager->remove(strId);
                 });
                 m_pRows->insertWidget(m_pRows->count() - 1, oRow.m_pWidget);
+                // Qt 5 may retain native subcontrol painting on newly inserted task rows.
+                oRow.m_pProgress->setStyleSheet(
+                    "QProgressBar { background:palette(alternate-base); border:0; border-radius:3px; } "
+                    "QProgressBar::chunk { background:palette(button-text); border-radius:3px; }");
+                if (window()->property("touchUi").toBool())
+                {
+                    for (auto* pButton : {oRow.m_pPause, oRow.m_pRemove})
+                    {
+                        pButton->setStyleSheet(
+                            "QPushButton { background:transparent; color:palette(button-text); "
+                            "border:0; border-radius:10px; padding:12px 14px; font-size:14px; } "
+                            "QPushButton:hover, QPushButton:focus { background:transparent; border:0; } "
+                            "QPushButton:pressed { background:palette(highlight); } "
+                            "QPushButton:disabled { color:palette(mid); background:transparent; }");
+                    }
+                }
                 m_vRows.insert(strId, oRow);
             }
             auto& oRow = m_vRows[oTask.m_strId];
@@ -143,7 +171,7 @@ namespace Wenku8::Reader
                 m_pRows->insertWidget(nRowIndex, oRow.m_pWidget);
             }
             ++nRowIndex;
-            oRow.m_pTitle->setText((oTask.m_bLocal ? "下载到本地 · " : "下载缓存 · ") + oTask.m_strTitle);
+            oRow.m_pTitle->setText(oTask.m_strTitle);
             const bool bComplete = oTask.m_eState == DownloadTaskState::Complete;
             const bool bActive = oTask.m_eState == DownloadTaskState::Running ||
                                  oTask.m_eState == DownloadTaskState::Queued;
@@ -168,9 +196,19 @@ namespace Wenku8::Reader
                 oRow.m_pProgress->setRange(0, bComplete || !bActive ? 1 : 0);
                 oRow.m_pProgress->setValue(bComplete ? 1 : 0);
             }
-            QString strStatus = strState + QString(" · 章节 %1/%2 · 插图 %3/%4")
-                .arg(oTask.m_nChaptersCompleted).arg(oTask.m_nChaptersTotal)
-                .arg(oTask.m_nImagesCompleted).arg(oTask.m_nImagesTotal);
+            QString strMeta = (oTask.m_bLocal ? QString("下载到本地") : QString("下载缓存")) + " · " + strState;
+            if (nTotal > 0)
+            {
+                strMeta += QString(" · %1%").arg(qMin<qint64>(100, nDone * 100 / nTotal));
+            }
+            oRow.m_pWidget->findChild<QLabel*>("taskMeta")->setText(strMeta);
+            QString strStatus = QString("章节 %1 / %2")
+                .arg(oTask.m_nChaptersCompleted).arg(oTask.m_nChaptersTotal);
+            if (oTask.m_bImages)
+            {
+                strStatus += QString("    插图 %1 / %2")
+                    .arg(oTask.m_nImagesCompleted).arg(oTask.m_nImagesTotal);
+            }
             if (!oTask.m_strMessage.isEmpty())
             {
                 strStatus += "\n" + oTask.m_strMessage;
