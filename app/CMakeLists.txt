@@ -59,7 +59,7 @@ set_target_properties(wenku8_client_services PROPERTIES POSITION_INDEPENDENT_COD
 
 add_library(wenku8_client_ui STATIC
     ui/ClientWindow.cpp ui/ClientWindow.h
-    ui/MobilePages.cpp ui/DesktopInformation.cpp ui/ReaderContents.cpp ui/DownloadActions.cpp
+    ui/MobilePages.cpp ui/ReaderSearch.cpp ui/ReaderNavigation.cpp ui/PageControls.h ui/DesktopInformation.cpp ui/ReaderContents.cpp ui/DownloadActions.cpp
     ui/DownloadTaskPanel.cpp ui/DownloadTaskPanel.h
 )
 target_include_directories(wenku8_client_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ui")

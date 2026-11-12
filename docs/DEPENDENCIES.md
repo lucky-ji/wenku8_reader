@@ -7,7 +7,7 @@ git clone https://github.com/lucky-ji/wenku8_reader.git
 cd wenku8_reader
 ```
 
-默认使用 `main`。对应正式版本的代码可通过 `git switch --detach v1.0.2` 定位；最新环境说明见主仓库的 [构建指南](BUILDING.md)。Release 手动附件用于下载安装编译好的程序，不是自编译的工程下载入口。
+默认使用 `main`。对应正式版本的代码可通过 `git switch --detach v1.0.3` 定位；最新环境说明见主仓库的 [构建指南](BUILDING.md)。Release 手动附件用于下载安装编译好的程序，不是自编译的工程下载入口。
 
 ## 仓库中已有的源码
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "ClientWindow.h"
 #include "AppInfo.h"
+#include "PageControls.h"
 #include <QDialog>
 #include <QDesktopServices>
 #include <QUrl>
@@ -23,68 +24,9 @@
 #include <QGuiApplication>
 #include <QTextCursor>
 #include <QCheckBox>
-#include <QSlider>
-#include <QSignalBlocker>
-#include <limits>
-#include "AndroidKeys.h"
 namespace Wenku8::Reader
 {
-    namespace
-    {
-        QPushButton* action(const QString& strTitle, const char* pName, Icon eIcon)
-        {
-            auto pB = new QPushButton(strTitle);
-            pB->setObjectName(pName);
-            pB->setMinimumSize(48, 56);
-            pB->setProperty("mobileRow", true);
-            pB->setCursor(Qt::PointingHandCursor);
-            setButtonIcon(pB, eIcon);
-            return pB;
-        }
-        QLabel* paragraph(const QString& strValue, const char* pName = "muted")
-        {
-            auto pL = new QLabel(strValue);
-            pL->setObjectName(pName);
-            pL->setTextFormat(Qt::PlainText);
-            pL->setWordWrap(true);
-            return pL;
-        }
-        QVBoxLayout* controlGroup(QVBoxLayout* pParent)
-        {
-            auto* pGroup = new QWidget;
-            pGroup->setObjectName("controlGroup");
-            pGroup->setAttribute(Qt::WA_StyledBackground);
-            auto* pLayout = new QVBoxLayout(pGroup);
-            pLayout->setContentsMargins(10, 10, 10, 10);
-            pLayout->setSpacing(6);
-            pParent->addWidget(pGroup);
-            return pLayout;
-        }
-        void addGroupAction(QVBoxLayout* pLayout, QPushButton* pButton)
-        {
-            pButton->setProperty("groupRow", true);
-            pLayout->addWidget(pButton);
-        }
-        QWidget* scrollPage(QVBoxLayout*& pContent)
-        {
-            auto pPage = new QWidget;
-            pPage->setProperty("touchUi", true);
-            auto pOuter = new QVBoxLayout(pPage);
-            pOuter->setContentsMargins(0, 0, 0, 0);
-            auto pScroll = new QScrollArea;
-            pScroll->setFrameShape(QFrame::NoFrame);
-            pScroll->setWidgetResizable(true);
-            pScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-            auto pBody = new QWidget;
-            pContent = new QVBoxLayout(pBody);
-            pContent->setContentsMargins(12, 16, 12, 24);
-            pContent->setSpacing(10);
-            pScroll->setWidget(pBody);
-            pOuter->addWidget(pScroll);
-            (new TouchScroll(pScroll))->setEnabled(true);
-            return pPage;
-        }
-    } // namespace
+    using namespace PageControls;
     bool ClientWindow::mobileMode() const
     {
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
@@ -700,141 +642,6 @@ namespace Wenku8::Reader
         pLayout->addStretch();
         pushMobilePage(pPage, "阅读设置");
     }
-    void ClientWindow::showReaderSearch()
-    {
-        if (!m_bUnlocked || m_bLoadingBusy || m_nChapter < 0 || m_nChapter >= m_vFlat.size())
-        {
-            return;
-        }
-        const bool bMobile = mobileMode();
-        QVBoxLayout* pLayout = nullptr;
-        auto* pPage = scrollPage(pLayout);
-        pPage->setObjectName("readerSearchPage");
-        pPage->setProperty("touchUi", bMobile);
-        pLayout->addWidget(paragraph(QString::fromUtf8(m_vFlat[m_nChapter].m_strTitle.c_str()),
-                                     "sectionTitle"));
-        auto* pSearchGroup = controlGroup(pLayout);
-        auto* pSearch = new QLineEdit;
-        pSearch->setObjectName("readerSearchInput");
-        pSearch->setAccessibleName("章内查找关键词");
-        pSearch->setPlaceholderText("输入本章要查找的文字");
-        pSearch->setMinimumHeight(48);
-        pSearch->setClearButtonEnabled(true);
-        pSearchGroup->addWidget(pSearch);
-        auto* pActions = new QHBoxLayout;
-        auto* pPrevious = action("上一处", "readerSearchPrevious", Icon::Left);
-        auto* pNext = action("下一处", "readerSearchNext", Icon::Right);
-        for (auto* pButton : {pPrevious, pNext})
-        {
-            pButton->setProperty("mobileRow", false);
-            pButton->setProperty("controlAction", true);
-            pButton->setEnabled(false);
-            pActions->addWidget(pButton, 1);
-        }
-        pSearchGroup->addLayout(pActions);
-        auto* pStatus = paragraph("输入关键词后，点击上一处或下一处查找。搜索范围仅为当前章节。");
-        pStatus->setObjectName("readerSearchStatus");
-        pLayout->addWidget(pStatus);
-        auto* pPreviewGroup = controlGroup(pLayout);
-        auto* pPreview = paragraph("找到匹配后，将在这里显示附近的正文。", "intro");
-        pPreview->setObjectName("readerSearchPreview");
-        pPreview->setMinimumHeight(96);
-        pPreviewGroup->addWidget(pPreview);
-        auto* pRead = action("阅读此处", "readerSearchRead", Icon::Book);
-        pRead->setProperty("mobileRow", false);
-        pRead->setProperty("primary", true);
-        pRead->setEnabled(false);
-        pLayout->addWidget(pRead);
-        pLayout->addStretch();
-
-        auto fnSearch = [this, pPage, pSearch, pStatus, pPreview, pRead, bMobile](bool bBackward)
-        {
-            const QString strQuery = pSearch->text().trimmed();
-            if (strQuery.isEmpty())
-            {
-                return;
-            }
-            QGuiApplication::inputMethod()->hide();
-            if (!m_pReader->findInChapter(strQuery, bBackward))
-            {
-                pStatus->setText("本章没有找到匹配的文字，请修改关键词后重试。");
-                pPreview->setText("没有匹配结果。");
-                pRead->setEnabled(false);
-                pPage->setProperty("searchMatchOffset", QVariant());
-                return;
-            }
-            const int nOffset = m_pReader->textCursor().selectionStart();
-            pPage->setProperty("searchMatchOffset", nOffset);
-            pRead->setEnabled(true);
-            pStatus->setText("已找到匹配。可继续查找，或阅读此处；查找会在本章首尾循环。");
-            pPreview->setText(m_pReader->readingSnippet(qMax(0, nOffset - 40), 220));
-            if (bMobile)
-            {
-                // popMobilePage restores this anchor after the reader becomes visible.
-                // Keep it in sync instead of restoring the position before search.
-                m_nMobileReaderOffset = nOffset;
-            }
-        };
-        connect(pSearch, &QLineEdit::textChanged, pPage,
-                [pPage, pSearch, pPrevious, pNext, pRead, pStatus, pPreview]
-                {
-                    const bool bHasQuery = !pSearch->text().trimmed().isEmpty();
-                    pPrevious->setEnabled(bHasQuery);
-                    pNext->setEnabled(bHasQuery);
-                    pRead->setEnabled(false);
-                    pPage->setProperty("searchMatchOffset", QVariant());
-                    pStatus->setText("点击上一处或下一处查找，搜索范围仅为当前章节。");
-                    pPreview->setText("找到匹配后，将在这里显示附近的正文。");
-                });
-        connect(pPrevious, &QPushButton::clicked, pPage,
-                [fnSearch]
-                {
-                    fnSearch(true);
-                });
-        connect(pNext, &QPushButton::clicked, pPage,
-                [fnSearch]
-                {
-                    fnSearch(false);
-                });
-        connect(pSearch, &QLineEdit::returnPressed, pPage,
-                [fnSearch]
-                {
-                    fnSearch(false);
-                });
-        if (bMobile)
-        {
-            connect(pRead, &QPushButton::clicked, pPage,
-                    [this, pPage]
-                    {
-                        const QVariant oOffset = pPage->property("searchMatchOffset");
-                        if (!oOffset.isValid())
-                        {
-                            return;
-                        }
-                        m_nMobileReaderOffset = oOffset.toInt();
-                        while (!m_vMobileHistory.isEmpty() && m_pPages->currentIndex() >= 4)
-                        {
-                            popMobilePage();
-                        }
-                    });
-            pushMobilePage(pPage, "章内查找");
-            return;
-        }
-        QDialog oDialog(this);
-        oDialog.setObjectName("readerSearchDialog");
-        oDialog.setWindowTitle("章内查找");
-        auto* pDialogLayout = new QVBoxLayout(&oDialog);
-        pDialogLayout->setContentsMargins(16, 16, 16, 16);
-        pDialogLayout->addWidget(pPage);
-        auto* pClose = new QPushButton("关闭");
-        pClose->setMinimumHeight(40);
-        pDialogLayout->addWidget(pClose, 0, Qt::AlignRight);
-        connect(pClose, &QPushButton::clicked, &oDialog, &QDialog::accept);
-        connect(pRead, &QPushButton::clicked, &oDialog, &QDialog::accept);
-        applyTheme(&oDialog, m_eTheme);
-        oDialog.resize(qMin(600, width() - 40), qMin(520, height() - 40));
-        oDialog.exec();
-    }
     void ClientWindow::showMobileBookmarks()
     {
         auto pPage = new QWidget;
@@ -945,83 +752,5 @@ namespace Wenku8::Reader
                     });
         }
         pushMobilePage(pPage, "本书书签");
-    }
-    void ClientWindow::setReadingMode(ReadingMode eMode)
-    {
-        m_pReader->setReadingMode(eMode);
-        m_pReaderTouch->setPageGestures(eMode == ReadingMode::Paged,
-                                        [this](int nDirection)
-                                        {
-                                            turnReaderPage(nDirection);
-                                        });
-        for (auto pChoice : findChildren<QPushButton*>("readingModeChoice"))
-            pChoice->setChecked(pChoice->property("modeIndex").toInt() == int(eMode));
-        saveReaderPreferences();
-        updateReaderFooter();
-    }
-    void ClientWindow::saveReaderPreferences()
-    {
-#ifndef Q_OS_ANDROID
-#endif
-        m_oSettings.setValue("readingMode", int(m_pReader->readingMode()));
-        m_oSettings.setValue("volumePageKeys", m_bVolumePaging);
-    }
-    void ClientWindow::updateReaderFooter()
-    {
-        if (m_nChapter < 0)
-            return;
-        updateReaderProgress();
-        const bool bPaged = m_pReader->readingMode() == ReadingMode::Paged;
-        m_pChapterLabel->setText(
-            bPaged ? QString("章节 %1 / %2  ·  本章 %3 / %4 页")
-                         .arg(m_nChapter + 1)
-                         .arg(m_vFlat.size())
-                         .arg(m_pReader->pageNumber())
-                         .arg(m_pReader->pageCount())
-                   : QString("章节 %1 / %2").arg(m_nChapter + 1).arg(m_vFlat.size()));
-        m_pPrevious->setText(bPaged ? (mobileMode() ? "上页" : "上一页") : "上一章");
-        m_pNext->setText(bPaged ? (mobileMode() ? "下页" : "下一页") : "下一章");
-        m_pPrevious->setEnabled(m_pRead->isEnabled() &&
-                                (m_nChapter > 0 || (bPaged && m_pReader->pageNumber() > 1)));
-        m_pNext->setEnabled(m_pRead->isEnabled() &&
-                            (m_nChapter + 1 < m_vFlat.size() ||
-                             (bPaged && m_pReader->pageNumber() < m_pReader->pageCount())));
-    }
-    void ClientWindow::updateReaderProgress()
-    {
-        if (!m_pReaderProgress || m_pReaderProgress->isSliderDown())
-        {
-            return;
-        }
-        const int nProgress = m_pReader->chapterProgress();
-        const QSignalBlocker oBlocker(m_pReaderProgress);
-        m_pReaderProgress->setValue(nProgress);
-        m_pReaderProgress->setEnabled(m_nChapter >= 0 && m_pRead->isEnabled() &&
-                                      !m_bLoadingBusy && m_pReader->canSeekProgress());
-        m_pReaderProgressPercent->setText(QString("%1%").arg(nProgress / 10));
-    }
-    void ClientWindow::turnReaderPage(int nDirection)
-    {
-        if (m_bLoadingBusy)
-            return;
-        if (!m_bUnlocked || m_pPages->currentIndex() != 3 || m_nChapter < 0 || m_bRestoring ||
-            !m_pRead->isEnabled())
-            return;
-        if (m_pReader->turnPage(nDirection))
-            return;
-        int nNext = m_nChapter + (nDirection < 0 ? -1 : 1);
-        if (nNext >= 0 && nNext < m_vFlat.size())
-        {
-            m_nRestoreOffset = nDirection < 0 ? std::numeric_limits<int>::max() : 0;
-            openChapter(nNext);
-        }
-        else
-            message(nDirection < 0 ? "已到本书开头。" : "已到本书末尾。");
-    }
-    void ClientWindow::updateVolumePaging()
-    {
-        setAndroidVolumePaging(m_bVolumePaging && m_bUnlocked && !m_bLoadingBusy &&
-                               m_pPages->currentIndex() == 3 &&
-                               QGuiApplication::applicationState() == Qt::ApplicationActive);
     }
 } // namespace Wenku8::Reader
