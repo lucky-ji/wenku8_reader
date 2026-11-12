@@ -20,6 +20,7 @@ class QCheckBox;
 class QSplitter;
 class QVBoxLayout;
 class QHBoxLayout;
+class QGridLayout;
 class QKeyEvent;
 class QMenuBar;
 namespace Wenku8::Reader
@@ -80,6 +81,7 @@ namespace Wenku8::Reader
         QList<QPushButton*> m_vMobileNav;
         QVBoxLayout *m_pBodyLayout = nullptr, *m_pDetailLayout = nullptr;
         QHBoxLayout* m_pDetailHeaderLayout = nullptr;
+        QGridLayout* m_pDetailActions = nullptr;
         int m_nSection = 0, m_nPage = 1, m_nChapter = -1, m_nPendingChapter = -1,
             m_nRestoreOffset = -1, m_nFontSize = 18, m_nStartupNovel = 0;
         std::unique_ptr<NovelDownloader> m_pStore;

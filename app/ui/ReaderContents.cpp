@@ -30,9 +30,9 @@ namespace Wenku8::Reader
         pPage->setObjectName("readerContentsPage");
         pPage->setProperty("readerContents", true);
         auto* pLayout = new QVBoxLayout(pPage);
-        pLayout->setContentsMargins(bMobile ? 4 : 20, bMobile ? 8 : 16, bMobile ? 4 : 20,
-                                    bMobile ? 8 : 16);
-        pLayout->setSpacing(12);
+        pLayout->setContentsMargins(bMobile ? 12 : 24, bMobile ? 12 : 20, bMobile ? 12 : 24,
+                                    bMobile ? 12 : 20);
+        pLayout->setSpacing(10);
 
         auto* pTop = new QHBoxLayout;
         auto* pBack = new QPushButton("返回阅读");
@@ -60,6 +60,7 @@ namespace Wenku8::Reader
         pLayout->addWidget(pCurrent);
 
         auto* pSearchRow = new QHBoxLayout;
+        pSearchRow->setSpacing(8);
         auto* pSearch = new QLineEdit;
         pSearch->setObjectName("readerContentsSearch");
         pSearch->setPlaceholderText("搜索章节或卷名");
@@ -70,12 +71,22 @@ namespace Wenku8::Reader
         pLocate->setObjectName("readerContentsLocate");
         pLocate->setMinimumHeight(bMobile ? 48 : 40);
         pLocate->setCursor(Qt::PointingHandCursor);
-        setButtonIcon(pLocate, Icon::List);
+        pLocate->setProperty("textAction", true);
+        if (!bMobile)
+        {
+            setButtonIcon(pLocate, Icon::List);
+        }
         pSearchRow->addWidget(pLocate);
         pLayout->addLayout(pSearchRow);
 
+        auto* pCount = new QLabel(QString("共 %1 章 · 点击章节开始阅读").arg(m_vFlat.size()));
+        pCount->setObjectName("muted");
+        pCount->setWordWrap(true);
+        pLayout->addWidget(pCount);
+
         auto* pTree = new QTreeWidget;
         pTree->setObjectName("readerContentsTree");
+        pTree->setAccessibleName("小说章节目录");
         pTree->setHeaderHidden(true);
         pTree->setColumnCount(1);
         pTree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
@@ -187,9 +198,10 @@ namespace Wenku8::Reader
                     }
                 });
         connect(pSearch, &QLineEdit::textChanged, pPage,
-                [pTree](const QString& strText)
+                [pTree, pCount](const QString& strText)
                 {
                     const QString strQuery = strText.trimmed();
+                    int nMatches = 0;
                     for (int nVolume = 0; nVolume < pTree->topLevelItemCount(); ++nVolume)
                     {
                         auto* pVolume = pTree->topLevelItem(nVolume);
@@ -203,6 +215,10 @@ namespace Wenku8::Reader
                                 bVolumeMatches ||
                                 pChapter->text(0).contains(strQuery, Qt::CaseInsensitive);
                             pChapter->setHidden(!bMatches);
+                            if (bMatches)
+                            {
+                                ++nMatches;
+                            }
                             bAnyVisible = bAnyVisible || bMatches;
                         }
                         pVolume->setHidden(!bAnyVisible);
@@ -211,6 +227,10 @@ namespace Wenku8::Reader
                             pVolume->setExpanded(true);
                         }
                     }
+                    pCount->setText(strQuery.isEmpty()
+                                        ? QString("共 %1 章 · 点击章节开始阅读").arg(nMatches)
+                                    : nMatches == 0 ? "没有匹配的章节，试试其他关键词"
+                                                    : QString("找到 %1 个章节").arg(nMatches));
                 });
         auto fnLocate = [pTree, pSearch, pCurrentItem]
         {

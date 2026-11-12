@@ -59,8 +59,8 @@ namespace Wenku8::Reader
             pScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
             auto pBody = new QWidget;
             pContent = new QVBoxLayout(pBody);
-            pContent->setContentsMargins(8, 12, 8, 16);
-            pContent->setSpacing(14);
+            pContent->setContentsMargins(12, 16, 12, 24);
+            pContent->setSpacing(10);
             pScroll->setWidget(pBody);
             pOuter->addWidget(pScroll);
             (new TouchScroll(pScroll))->setEnabled(true);
@@ -142,6 +142,8 @@ namespace Wenku8::Reader
         pPage->setProperty("rootTab", bTab);
         pLayout->addWidget(paragraph(m_pAccount->text(), "bookTitle"));
         pLayout->addWidget(paragraph("你的文库账号与阅读偏好。"));
+        pLayout->addSpacing(8);
+        pLayout->addWidget(paragraph("阅读与存储", "sectionTitle"));
         auto pAppearance = action("外观\n明亮、暗色与护眼", "openAppearance", Icon::Sun);
         pLayout->addWidget(pAppearance);
         connect(pAppearance, &QPushButton::clicked, this,
@@ -160,6 +162,8 @@ namespace Wenku8::Reader
                     clearMobilePages();
                     navigate(3);
                 });
+        pLayout->addSpacing(8);
+        pLayout->addWidget(paragraph("账号", "sectionTitle"));
         auto pAccount = action(m_pLogin->text(), "mobileSignIn", Icon::SignIn);
         pLayout->addWidget(pAccount);
         connect(pAccount, &QPushButton::clicked, this,
@@ -168,6 +172,8 @@ namespace Wenku8::Reader
                     clearMobilePages();
                     m_pLogin->click();
                 });
+        pLayout->addSpacing(8);
+        pLayout->addWidget(paragraph("关于轻小说文库", "sectionTitle"));
         const QStringList vTitles{"版本说明", "更新日志", "开源许可"};
         const char* vNames[] = {"mobileVersion", "mobileChangelog", "mobileLicenses"};
         for (int nI = 0; nI < vTitles.size(); ++nI)
@@ -241,7 +247,7 @@ namespace Wenku8::Reader
     {
         auto pPage = new QWidget;
         auto pLayout = new QVBoxLayout(pPage);
-        pLayout->setContentsMargins(4, 8, 4, 8);
+        pLayout->setContentsMargins(12, 12, 12, 16);
         auto pBrowser = new QTextBrowser;
         pBrowser->setObjectName("mobileText");
         pBrowser->setPlainText(strText);
@@ -358,6 +364,10 @@ namespace Wenku8::Reader
             auto pLinks = new QHBoxLayout;
             auto pFeedback = action("意见反馈", "informationFeedback", Icon::Discover);
             auto pRepository = action("开源项目", "informationRepository", Icon::Book);
+            pFeedback->setProperty("textAction", true);
+            pRepository->setProperty("textAction", true);
+            pFeedback->setProperty("mobileRow", false);
+            pRepository->setProperty("mobileRow", false);
             pLinks->addWidget(pFeedback);
             pLinks->addWidget(pRepository);
             pLayout->addLayout(pLinks);
@@ -398,7 +408,7 @@ namespace Wenku8::Reader
         auto pPage = scrollPage(pLayout);
         pPage->setProperty("touchUi", bMobile);
         pPage->setObjectName("mobileReadingSettings");
-        pLayout->addWidget(paragraph("阅读偏好", "bookTitle"));
+        pLayout->addWidget(paragraph("阅读方式", "sectionTitle"));
         pLayout->addWidget(
             paragraph("滚动模式上下滑动；翻页模式左右轻点或滑动翻页，轻点中间显示工具栏。"));
         auto pModes = new QHBoxLayout;
@@ -409,6 +419,7 @@ namespace Wenku8::Reader
             auto pChoice = action(nI == 0 ? "滚动阅读" : "翻页阅读", "readingModeChoice",
                                   nI == 0 ? Icon::List : Icon::Book);
             pChoice->setCheckable(true);
+            pChoice->setProperty("mobileRow", false);
             pChoice->setProperty("modeIndex", nI);
             pChoice->setChecked(int(m_pReader->readingMode()) == nI);
             pGroup->addButton(pChoice, nI);
@@ -420,12 +431,15 @@ namespace Wenku8::Reader
                     });
         }
         pLayout->addLayout(pModes);
-        auto pVolume = new QCheckBox("音量键翻页（上键上一页，下键下一页）");
+        auto pVolume = new QCheckBox("音量键翻页");
         pVolume->setObjectName("volumePageKeys");
         pVolume->setChecked(m_bVolumePaging);
         pVolume->setMinimumHeight(48);
         pVolume->setVisible(bMobile);
         pLayout->addWidget(pVolume);
+        auto* pVolumeHint = paragraph("音量上键：上一页 · 音量下键：下一页");
+        pVolumeHint->setVisible(bMobile);
+        pLayout->addWidget(pVolumeHint);
         connect(pVolume, &QCheckBox::toggled, pPage,
                 [this](bool bEnabled)
                 {
@@ -433,15 +447,24 @@ namespace Wenku8::Reader
                     saveReaderPreferences();
                     updateVolumePaging();
                 });
+        pLayout->addSpacing(8);
+        pLayout->addWidget(paragraph("文字大小", "sectionTitle"));
         auto pSize = new QLabel(QString("字号  %1").arg(m_nFontSize));
         pSize->setObjectName("mobileFontSize");
-        pLayout->addWidget(pSize);
         auto pFonts = new QHBoxLayout;
+        pFonts->addWidget(pSize, 1);
         for (int nDelta : {-1, 1})
         {
             auto pB = action(nDelta < 0 ? "缩小文字" : "放大文字",
                              nDelta < 0 ? "mobileFontSmaller" : "mobileFontLarger",
                              nDelta < 0 ? Icon::TextSmaller : Icon::TextLarger);
+            pB->setText(nDelta < 0 ? "A−" : "A＋");
+            pB->setAccessibleName(nDelta < 0 ? "缩小文字" : "放大文字");
+            pB->setIcon(QIcon());
+            pB->setProperty("wenkuIcon", QVariant());
+            pB->setProperty("mobileRow", false);
+            pB->setProperty("textAction", true);
+            pB->setFixedWidth(64);
             pFonts->addWidget(pB);
             connect(pB, &QPushButton::clicked, pPage,
                     [this, pSize, nDelta]
@@ -453,7 +476,8 @@ namespace Wenku8::Reader
                     });
         }
         pLayout->addLayout(pFonts);
-        pLayout->addWidget(paragraph("文字排版", "bookTitle"));
+        pLayout->addSpacing(8);
+        pLayout->addWidget(paragraph("文字排版", "sectionTitle"));
         pLayout->addWidget(paragraph("调节行距、段间空行和页边留白，设置会自动保存，阅读位置保持不变。"));
         auto fnSaveTypography = [this]
         {
@@ -478,6 +502,15 @@ namespace Wenku8::Reader
             pMore->setObjectName(strName + "Increase");
             pLess->setAccessibleName(strTitle + "更紧凑");
             pMore->setAccessibleName(strTitle + "更宽松");
+            for (auto* pButton : {pLess, pMore})
+            {
+                pButton->setText(pButton == pLess ? "−" : "＋");
+                pButton->setIcon(QIcon());
+                pButton->setProperty("wenkuIcon", QVariant());
+                pButton->setProperty("mobileRow", false);
+                pButton->setProperty("textAction", true);
+                pButton->setFixedWidth(64);
+            }
             pRow->addWidget(pLess);
             pRow->addWidget(pMore);
             pLayout->addLayout(pRow);
@@ -548,6 +581,8 @@ namespace Wenku8::Reader
                                                      m_pReader->paragraphSpacing(), nValue);
                         });
         auto pResetTypography = action("恢复默认排版", "readerTypographyReset", Icon::RestoreBookmark);
+        pResetTypography->setProperty("mobileRow", false);
+        pResetTypography->setProperty("textAction", true);
         pLayout->addWidget(pResetTypography);
         connect(pResetTypography, &QPushButton::clicked, pPage,
                 [this, fnSaveTypography, vTypographyUpdates]
@@ -577,6 +612,8 @@ namespace Wenku8::Reader
             oDialog.exec();
             return;
         }
+        pLayout->addSpacing(8);
+        pLayout->addWidget(paragraph("外观与书签", "sectionTitle"));
         auto pAppearance = action("阅读外观", "readingAppearance", Icon::Sun);
         pLayout->addWidget(pAppearance);
         connect(pAppearance, &QPushButton::clicked, this,
@@ -603,14 +640,21 @@ namespace Wenku8::Reader
                                            addBookmark();
                                        });
                 });
+        pLayout->addSpacing(8);
+        pLayout->addWidget(paragraph("章内查找", "sectionTitle"));
+        auto pSearchRow = new QHBoxLayout;
         auto pSearch = new QLineEdit;
         pSearch->setObjectName("mobileChapterSearch");
         pSearch->setPlaceholderText("在当前章节查找");
         pSearch->setMinimumHeight(48);
         pSearch->setClearButtonEnabled(true);
-        pLayout->addWidget(pSearch);
+        pSearchRow->addWidget(pSearch, 1);
         auto pFind = action("查找正文", "mobileFind", Icon::Search);
-        pLayout->addWidget(pFind);
+        pFind->setText("查找");
+        pFind->setProperty("mobileRow", false);
+        pFind->setProperty("textAction", true);
+        pSearchRow->addWidget(pFind);
+        pLayout->addLayout(pSearchRow);
         auto fnPerform = [this, pSearch]
         {
             const auto strQuery = pSearch->text().trimmed();
@@ -724,12 +768,12 @@ namespace Wenku8::Reader
             return;
         const bool bPaged = m_pReader->readingMode() == ReadingMode::Paged;
         m_pChapterLabel->setText(
-            bPaged ? QString("%1/%2 章 · %3/%4 页")
+            bPaged ? QString("章节 %1 / %2  ·  本章 %3 / %4 页")
                          .arg(m_nChapter + 1)
                          .arg(m_vFlat.size())
                          .arg(m_pReader->pageNumber())
                          .arg(m_pReader->pageCount())
-                   : QString("%1 / %2 章").arg(m_nChapter + 1).arg(m_vFlat.size()));
+                   : QString("章节 %1 / %2").arg(m_nChapter + 1).arg(m_vFlat.size()));
         m_pPrevious->setText(bPaged ? (mobileMode() ? "上页" : "上一页") : "上一章");
         m_pNext->setText(bPaged ? (mobileMode() ? "下页" : "下一页") : "下一章");
         m_pPrevious->setEnabled(m_pRead->isEnabled() &&

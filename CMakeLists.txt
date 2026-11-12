@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 cmake_minimum_required(VERSION 3.24)
-project(Wenku8Reader VERSION 1.0.2 LANGUAGES C CXX)
+project(Wenku8Reader VERSION 1.0.3 LANGUAGES C CXX)
 
 option(WENKU8_BUILD_CLIENT "Build the Qt 5 reader application" OFF)
 add_subdirectory(sdk)

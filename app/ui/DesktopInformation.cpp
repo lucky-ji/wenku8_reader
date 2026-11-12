@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "ClientWindow.h"
 #include "DesktopNotices.h"
+#include "Icons.h"
 #include <QDialog>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -8,6 +9,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QTextBrowser>
+#include <QTextDocument>
 #include <QPushButton>
 #include <QSplitter>
 #include <QDesktopServices>
@@ -36,16 +38,39 @@ namespace Wenku8::Reader
         pSearch->setObjectName("desktopNoticeSearch");
         pSearch->setPlaceholderText("搜索组件或许可文件，例如 Chromium、Qt、LICENSE");
         pSearch->setClearButtonEnabled(true);
+        pSearch->setAccessibleName("搜索第三方版权声明");
         pLayout->addWidget(pSearch);
         auto pSplitter = new QSplitter;
+        pSplitter->setChildrenCollapsible(false);
+        pSplitter->setHandleWidth(8);
+        auto pFilesPanel = new QWidget;
+        auto pFilesLayout = new QVBoxLayout(pFilesPanel);
+        pFilesLayout->setContentsMargins(0, 0, 0, 0);
+        pFilesLayout->setSpacing(8);
+        auto pFilesTitle = new QLabel("组件与文件");
+        pFilesTitle->setObjectName("eyebrow");
+        pFilesLayout->addWidget(pFilesTitle);
         auto pFiles = new QListWidget;
         pFiles->setObjectName("desktopNoticeFiles");
         pFiles->setWordWrap(true);
+        pFiles->setMinimumWidth(220);
+        pFiles->setAccessibleName("第三方许可文件");
+        pFilesLayout->addWidget(pFiles, 1);
+        auto pTextPanel = new QWidget;
+        auto pTextLayout = new QVBoxLayout(pTextPanel);
+        pTextLayout->setContentsMargins(0, 0, 0, 0);
+        pTextLayout->setSpacing(8);
+        auto pTextTitle = new QLabel("许可正文");
+        pTextTitle->setObjectName("eyebrow");
+        pTextLayout->addWidget(pTextTitle);
         auto pText = new QTextBrowser;
         pText->setObjectName("desktopNoticeText");
         pText->setOpenLinks(false);
-        pSplitter->addWidget(pFiles);
-        pSplitter->addWidget(pText);
+        pText->setAccessibleName("第三方版权声明正文");
+        pText->document()->setDocumentMargin(12);
+        pTextLayout->addWidget(pText, 1);
+        pSplitter->addWidget(pFilesPanel);
+        pSplitter->addWidget(pTextPanel);
         pSplitter->setStretchFactor(0, 1);
         pSplitter->setStretchFactor(1, 2);
         pLayout->addWidget(pSplitter, 1);
@@ -84,18 +109,20 @@ namespace Wenku8::Reader
         if (vDocuments.isEmpty())
         {
             pText->setPlainText(
-                "此运行目录未附带完整的第三方版权文件。请使用完整安装包，或查看发布包中的许可证及对"
-                "应源码。应用内「开源许可」仍可查看项目与主要组件的许可正文。");
+                "此运行目录未附带完整的第三方版权文件。请使用完整安装包查看许可证，或从 GitHub 主仓"
+                "库获取源码。应用内「开源许可」仍可查看项目与主要组件的许可正文。");
             pSearch->setEnabled(false);
         }
         else
             pFiles->setCurrentRow(0);
         auto pButtons = new QHBoxLayout;
         auto pDirectoryButton = new QPushButton("打开许可文件夹");
+        setButtonIcon(pDirectoryButton, Icon::Folder);
         pDirectoryButton->setEnabled(!strDirectory.isEmpty());
         pButtons->addWidget(pDirectoryButton);
         pButtons->addStretch();
         auto pClose = new QPushButton("关闭");
+        pClose->setDefault(true);
         pButtons->addWidget(pClose);
         pLayout->addLayout(pButtons);
         connect(pDirectoryButton, &QPushButton::clicked, &oDialog,

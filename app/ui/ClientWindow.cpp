@@ -24,6 +24,7 @@
 #include <QApplication>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QGridLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QLineEdit>
@@ -315,7 +316,9 @@ namespace Wenku8::Reader
                                                      Qt::ElideRight, oR.width() - 20));
                     pP->setPen(oC.m_oAccent);
                     pP->drawText(QRect(oR.left() + 10, oCover.bottom() + 70, oR.width() - 20, 18),
-                                 Qt::AlignVCenter, oIndex.data(Qt::UserRole + 2).toString());
+                                 Qt::AlignVCenter,
+                                 pP->fontMetrics().elidedText(oIndex.data(Qt::UserRole + 2).toString(),
+                                                              Qt::ElideRight, oR.width() - 20));
                     pP->restore();
                     return;
                 }
@@ -774,6 +777,7 @@ namespace Wenku8::Reader
         pMobileTop->setContentsMargins(0, 0, 0, 0);
         auto pMobileBack = button("返回", "mobileBack");
         setButtonIcon(pMobileBack, Icon::Left);
+        pMobileBack->setProperty("textAction", true);
         pMobileTop->addWidget(pMobileBack);
         connect(pMobileBack, &QPushButton::clicked, this,
                 [this]
@@ -797,7 +801,7 @@ namespace Wenku8::Reader
         pHeading->setContentsMargins(0, 0, 0, 0);
         auto pTitles = new QVBoxLayout;
         pTitles->setSpacing(7);
-        pTitles->addWidget(label("YOUR NEXT CHAPTER", "eyebrow"));
+        pTitles->addWidget(label("轻小说文库", "eyebrow"));
         m_pTitle = label("欢迎来到文库", "pageTitle");
         m_pSubtitle = label("登录后，书架与下一段故事都在这里。", "subtitle");
         m_pTitle->setWordWrap(true);
@@ -822,7 +826,8 @@ namespace Wenku8::Reader
         m_pSearch->setObjectName("novelSearch");
         m_pSearch->setClearButtonEnabled(true);
         pSearchRow->addWidget(m_pSearch, 1);
-        auto pSearchButton = button("搜索");
+        auto pSearchButton = button("搜索", "searchNovels");
+        pSearchButton->setProperty("textAction", true);
         setButtonIcon(pSearchButton, Icon::Search);
         pSearchRow->addWidget(pSearchButton);
         pBody->addWidget(m_pOperations);
@@ -901,7 +906,9 @@ namespace Wenku8::Reader
         m_pCount->setObjectName("listCount");
         pLibraryBar->addWidget(m_pCount, 1);
         m_pPreviousPage = button("上一页", "quiet");
+        m_pPreviousPage->setProperty("textAction", true);
         m_pNextPage = button("下一页", "quiet");
+        m_pNextPage->setProperty("textAction", true);
         setButtonIcon(m_pPreviousPage, Icon::Left);
         setButtonIcon(m_pNextPage, Icon::Right);
         m_pNextPage->setLayoutDirection(Qt::RightToLeft);
@@ -981,7 +988,10 @@ namespace Wenku8::Reader
         pDetailWords->addStretch();
         pDetailHeader->addLayout(pDetailWords, 1);
         pInfo->addLayout(pDetailHeader);
-        auto pBookActions = new FlowLayout;
+        auto pBookActions = new QGridLayout;
+        m_pDetailActions = pBookActions;
+        pBookActions->setHorizontalSpacing(8);
+        pBookActions->setVerticalSpacing(4);
         m_pRead = button("开始阅读", "primary");
         m_pRead->setObjectName("readBook");
         m_pRead->setProperty("primary", true);
@@ -994,14 +1004,18 @@ namespace Wenku8::Reader
         setButtonIcon(m_pShelfAdd, Icon::ShelfAdd);
         m_pIllustrations = new DownloadOption;
         m_pIllustrations->setChecked(true);
-        pBookActions->addWidget(m_pRead);
-        pBookActions->addWidget(m_pDownload);
-        pBookActions->addWidget(m_pLocalDownload);
-        pBookActions->addWidget(m_pShelfAdd);
-        pBookActions->addWidget(m_pIllustrations);
+        pBookActions->addWidget(m_pRead, 0, 0);
+        pBookActions->addWidget(m_pDownload, 1, 0);
+        pBookActions->addWidget(m_pLocalDownload, 1, 1);
+        pBookActions->addWidget(m_pShelfAdd, 0, 1);
+        pBookActions->addWidget(m_pIllustrations, 1, 2);
         auto pSynopsis = button("查看简介", "showSynopsis");
         setButtonIcon(pSynopsis, Icon::Book);
-        pBookActions->addWidget(pSynopsis);
+        pBookActions->addWidget(pSynopsis, 0, 2);
+        for (auto pAction : {m_pDownload, m_pLocalDownload, m_pShelfAdd, pSynopsis})
+        {
+            pAction->setProperty("textAction", true);
+        }
         connect(pSynopsis, &QPushButton::clicked, this,
                 [this]
                 {
@@ -1101,10 +1115,12 @@ namespace Wenku8::Reader
         pReadingLayout->setSpacing(12);
         auto pReaderTopHost = new QWidget;
         pReaderTopHost->setObjectName("readerTop");
+        pReaderTopHost->setAttribute(Qt::WA_StyledBackground);
         auto pReaderTopLayout = new QHBoxLayout(pReaderTopHost);
         pReaderTopLayout->setContentsMargins(0, 0, 0, 0);
         auto pReaderBack = button("返回", "readerBack");
         setButtonIcon(pReaderBack, Icon::Left);
+        pReaderBack->setProperty("textAction", true);
         pReaderTopLayout->addWidget(pReaderBack);
         connect(pReaderBack, &QPushButton::clicked, this,
                 [this]
@@ -1119,6 +1135,7 @@ namespace Wenku8::Reader
                     m_pPages->setCurrentIndex(2);
                 });
         m_pReadTitle = label("", "muted");
+        m_pReadTitle->setAccessibleName("当前阅读章节");
         m_pReadTitle->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
         pReaderTopLayout->addWidget(m_pReadTitle, 1);
         m_pFullscreen = button("全屏阅读", "readerFullscreen");
@@ -1126,6 +1143,7 @@ namespace Wenku8::Reader
         m_pFullscreen->setToolTip("全屏阅读（F11），按 Esc 退出");
         m_pReaderToolsToggle = button("工具", "readerToolsToggle");
         setButtonIcon(m_pReaderToolsToggle, Icon::List);
+        m_pReaderToolsToggle->setProperty("textAction", true);
         pReaderTopLayout->addWidget(m_pReaderToolsToggle);
         connect(m_pReaderToolsToggle, &QPushButton::clicked, this,
                 [this]
@@ -1250,20 +1268,20 @@ namespace Wenku8::Reader
         auto pFooterHost = new QWidget;
         pFooterHost->setObjectName("readerFooter");
         pFooterHost->setAttribute(Qt::WA_StyledBackground);
-        auto pFooterLayout = new QHBoxLayout(pFooterHost);
-        pFooterLayout->setContentsMargins(0, 0, 0, 0);
-        pFooterLayout->setSpacing(8);
-        m_pPrevious = button("上一章");
-        m_pNext = button("下一章");
+        auto pFooterLayout = new QVBoxLayout(pFooterHost);
+        pFooterLayout->setContentsMargins(8, 6, 8, 8);
+        pFooterLayout->setSpacing(2);
+        auto pFooterActions = new QHBoxLayout;
+        pFooterActions->setSpacing(8);
+        m_pPrevious = button("上一章", "readerPrevious");
+        m_pNext = button("下一章", "readerNext");
         setButtonIcon(m_pPrevious, Icon::Left);
         setButtonIcon(m_pNext, Icon::Right);
         m_pNext->setLayoutDirection(Qt::RightToLeft);
-        m_pChapterLabel = label("", "muted");
+        m_pChapterLabel = label("", "readerProgress");
+        m_pChapterLabel->setMinimumHeight(24);
+        m_pChapterLabel->setAccessibleName("阅读进度");
         m_pChapterLabel->setAlignment(Qt::AlignCenter);
-        auto pChapterSection = new QWidget;
-        auto pChapterSectionLayout = new QVBoxLayout(pChapterSection);
-        pChapterSectionLayout->setContentsMargins(0, 2, 0, 2);
-        pChapterSectionLayout->setSpacing(2);
         m_pReaderContents = button("目录", "readerContents");
         setButtonIcon(m_pReaderContents, Icon::List);
         connect(m_pReaderContents, &QPushButton::clicked, this,
@@ -1271,11 +1289,14 @@ namespace Wenku8::Reader
                 {
                     showReaderContents();
                 });
-        pChapterSectionLayout->addWidget(m_pReaderContents, 0, Qt::AlignHCenter);
-        pChapterSectionLayout->addWidget(m_pChapterLabel);
-        pFooterLayout->addWidget(m_pPrevious);
-        pFooterLayout->addWidget(pChapterSection, 1);
-        pFooterLayout->addWidget(m_pNext);
+        for (auto pAction : {m_pPrevious, m_pReaderContents, m_pNext})
+        {
+            pAction->setProperty("textAction", true);
+            pAction->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+            pFooterActions->addWidget(pAction, 1);
+        }
+        pFooterLayout->addLayout(pFooterActions);
+        pFooterLayout->addWidget(m_pChapterLabel);
         pReadingLayout->addWidget(pFooterHost);
         m_pPages->addWidget(pReading);
         connect(m_pPrevious, &QPushButton::clicked, this,
@@ -2353,6 +2374,27 @@ namespace Wenku8::Reader
         }
         m_pDetailIntro->setVisible(!bMobile);
         findChild<QPushButton*>("showSynopsis")->setVisible(bMobile);
+        auto* pDetail = m_pDetailTitle->parentWidget();
+        if (!pDetail->property("mobileDetailActions").isValid() ||
+            pDetail->property("mobileDetailActions").toBool() != bMobile)
+        {
+            pDetail->setProperty("mobileDetailActions", bMobile);
+            while (auto* pItem = m_pDetailActions->takeAt(0))
+            {
+                delete pItem;
+            }
+            auto* pSynopsis = findChild<QPushButton*>("showSynopsis");
+            m_pDetailActions->addWidget(m_pRead, 0, 0);
+            m_pDetailActions->addWidget(m_pShelfAdd, 0, 1);
+            m_pDetailActions->addWidget(m_pDownload, 1, 0);
+            m_pDetailActions->addWidget(m_pLocalDownload, 1, 1);
+            m_pDetailActions->addWidget(m_pIllustrations, bMobile ? 2 : 1, bMobile ? 0 : 2);
+            m_pDetailActions->addWidget(pSynopsis, bMobile ? 2 : 0, bMobile ? 1 : 2);
+            for (int nColumn = 0; nColumn < 3; ++nColumn)
+            {
+                m_pDetailActions->setColumnStretch(nColumn, nColumn < (bMobile ? 2 : 3) ? 1 : 0);
+            }
+        }
         const auto oColors = colors(m_eTheme);
         const QString strDetailStyle = QString("font-size:%1px;font-weight:600;color:%2;")
             .arg(bMobile ? 18 : 25).arg(oColors.m_oText.name());
@@ -2372,6 +2414,12 @@ namespace Wenku8::Reader
                                                      : Qt::ScrollBarAsNeeded);
         m_pReaderToolsToggle->setVisible(bMobile);
         m_pReaderToolsToggle->setText("设置");
+        m_pReadTitle->setAlignment(bMobile ? Qt::AlignCenter : Qt::AlignLeft | Qt::AlignVCenter);
+        for (auto pAction : {findChild<QPushButton*>("readerBack"), m_pReaderToolsToggle})
+        {
+            pAction->setMinimumWidth(bMobile ? 64 : 0);
+            pAction->setMaximumWidth(bMobile ? 64 : QWIDGETSIZE_MAX);
+        }
         m_pReaderTools->setVisible(!bMobile);
         m_pFullscreen->setVisible(!bMobile);
         m_pFullscreen->setText(m_bReaderFullscreen ? "退出全屏" : "全屏阅读");
