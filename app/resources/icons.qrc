@@ -24,5 +24,6 @@
 <file alias="profile.svg">assets/icons/profile.svg</file>
 <file alias="folder.svg">assets/icons/folder.svg</file>
 <file alias="check.svg">assets/icons/check.svg</file>
+<file alias="settings.svg">assets/icons/settings.svg</file>
 </qresource></RCC>
 

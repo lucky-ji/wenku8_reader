@@ -102,6 +102,8 @@ namespace Wenku8::Reader
         QLabel#brand { font-size:22px; font-weight:700; letter-spacing:1px; }
         QLabel#pageTitle { font-size:28px; font-weight:600; }
         QLabel#sectionTitle { color:%6; font-size:12px; font-weight:600; padding:6px 2px; }
+        QWidget#controlGroup, QWidget[controlGroup="true"] { background:%5; border:1px solid %4; border-radius:14px; }
+        QLabel#controlLabel { color:%1; font-size:14px; font-weight:500; }
         QLabel#readerProgress { color:%6; font-size:11px; padding:2px 8px; }
         QWidget#downloadTaskRow { background:%5; border:1px solid %4; border-radius:12px; }
         QLabel#taskTitle { font-weight:600; }
@@ -192,6 +194,24 @@ namespace Wenku8::Reader
                             "background:%2; } QPushButton[textAction=\"true\"]:disabled { "
                             "background:transparent; color:%3; }")
                             .arg(oC.m_oText.name(), oC.m_oSelection.name(), oC.m_oDisabled.name());
+            strSheet += QString(
+                            "QPushButton[controlAction=\"true\"] { background:%1; color:%2; "
+                            "border:1px solid %3; border-radius:12px; padding:11px 13px; "
+                            "font-size:14px; } QPushButton[controlAction=\"true\"]:hover, "
+                            "QPushButton[controlAction=\"true\"]:focus { background:%1; "
+                            "border:1px solid %3; padding:11px 13px; } "
+                            "QPushButton[controlAction=\"true\"]:pressed { background:%4; } "
+                            "QPushButton[controlAction=\"true\"]:disabled { color:%5; } "
+                            "QPushButton[groupRow=\"true\"] { background:transparent; "
+                            "color:%2; border:0; border-radius:8px; text-align:left; "
+                            "padding:14px 16px; font-size:14px; } "
+                            "QPushButton[groupRow=\"true\"]:hover, "
+                            "QPushButton[groupRow=\"true\"]:focus { background:transparent; "
+                            "border:0; padding:14px 16px; } "
+                            "QPushButton[groupRow=\"true\"]:pressed { background:%4; } "
+                            "QPushButton[groupRow=\"true\"]:disabled { color:%5; }")
+                            .arg(oC.m_oSection.name(), oC.m_oText.name(), oC.m_oBorder.name(),
+                                 oC.m_oSelection.name(), oC.m_oDisabled.name());
         }
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
         strSheet += "QPushButton, QToolButton { outline:0; }";
@@ -201,6 +221,17 @@ namespace Wenku8::Reader
             if (pLabel->objectName() == "muted" || pLabel->objectName() == "subtitle" ||
                 pLabel->objectName() == "eyebrow")
                 setWidgetStyle(pLabel, "QLabel { color:" + oC.m_oMuted.name() + "; }");
+        for (auto pGroup : pWidget->findChildren<QWidget*>())
+        {
+            if (pGroup->objectName() == "controlGroup" || pGroup->property("controlGroup").toBool())
+            {
+                pGroup->setAttribute(Qt::WA_StyledBackground, true);
+                setWidgetStyle(pGroup,
+                    QString("QWidget#controlGroup, QWidget[controlGroup=\"true\"] { "
+                            "background:%1; border:1px solid %2; border-radius:14px; }")
+                        .arg(oC.m_oPanel.name(), oC.m_oBorder.name()));
+            }
+        }
         // Qt 5 caches inherited palettes on reparented/polished mobile controls.
         // Give the fixed chrome an explicit surface and text color in each theme.
         if (pWidget->property("touchUi").toBool())
@@ -353,10 +384,14 @@ namespace Wenku8::Reader
             {
                 const bool bRow = pButton->property("mobileRow").toBool(),
                            bThemeChoice = strRole == "themeChoice",
-                           bTextAction = pButton->property("textAction").toBool() && !bPrimary;
+                           bControlAction = pButton->property("controlAction").toBool() && !bPrimary,
+                           bGroupRow = pButton->property("groupRow").toBool() && !bPrimary,
+                           bTextAction = pButton->property("textAction").toBool() && !bPrimary &&
+                                         !bControlAction;
                 const auto oFill = bPrimary ? oC.m_oAccent : oC.m_oSection;
                 const auto oInk = bPrimary ? oC.m_oAccentText : oC.m_oText;
-                const QString strFill = bTextAction ? QStringLiteral("transparent") : oFill.name();
+                const QString strFill = bTextAction || bGroupRow ? QStringLiteral("transparent")
+                                                                : oFill.name();
                 // Touch hover often persists after release. Keep only a momentary pressed
                 // surface, and never change border widths or padding when focus moves.
                 strStyle =
@@ -367,11 +402,21 @@ namespace Wenku8::Reader
                             "QPushButton:focus { border:0; padding:12px 14px; }")
                         .arg(strFill, oInk.name(),
                              (bPrimary ? oC.m_oAccent.darker(112) : oC.m_oSelection).name(),
-                             bTextAction ? QStringLiteral("transparent") : oC.m_oSection.name(),
+                             bTextAction || bGroupRow ? QStringLiteral("transparent")
+                                                    : oC.m_oSection.name(),
                              oC.m_oDisabled.name());
                 if (bRow)
                     strStyle += "QPushButton { text-align:left; padding:14px 16px; } "
                                 "QPushButton:focus { padding:14px 16px; }";
+                if (bControlAction)
+                    strStyle +=
+                        QString("QPushButton { border:1px solid %1; border-radius:12px; "
+                                "padding:11px 13px; } QPushButton:hover, QPushButton:focus { "
+                                "border:1px solid %1; padding:11px 13px; } "
+                                "QPushButton:pressed { background:%2; border-color:%3; } "
+                                "QPushButton:disabled { border:1px solid %1; }")
+                            .arg(oC.m_oBorder.name(), oC.m_oSelection.name(),
+                                 oC.m_oSelectionText.name());
                 if (bThemeChoice)
                     strStyle +=
                         QString(
@@ -381,7 +426,12 @@ namespace Wenku8::Reader
                             "QPushButton:focus { padding:14px; border:2px solid transparent; } "
                             "QPushButton:checked:focus { border:2px solid %2; }")
                             .arg(oC.m_oSelection.name(), oC.m_oSelectionText.name());
-                pButton->setIconSize(QSize(22, 22));
+                if (pButton->property("toolbarAction").toBool())
+                {
+                    strStyle += "QPushButton, QPushButton:focus { padding:12px 4px; }";
+                }
+                pButton->setIconSize(pButton->property("toolbarAction").toBool()
+                                         ? QSize(18, 18) : QSize(22, 22));
             }
             if (strRole == "mobileNav")
             {
@@ -399,9 +449,11 @@ namespace Wenku8::Reader
                                 .arg(oC.m_oSelection.name(), oC.m_oSelectionText.name());
             setWidgetStyle(pButton, strStyle);
             if (pWidget->property("touchUi").toBool() &&
-                pButton->property("textAction").toBool() && !bPrimary)
+                pButton->property("textAction").toBool() && !bPrimary &&
+                !pButton->property("keepIcon").toBool() &&
+                !pButton->property("controlAction").toBool())
             {
-                // Keep the icon identity for desktop resizing; mobile chrome uses text only.
+                // Preserve the icon identity for desktop and optional compact icon actions.
                 if (!pButton->icon().isNull())
                 {
                     pButton->setIcon(QIcon());
