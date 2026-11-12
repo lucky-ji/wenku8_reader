@@ -46,6 +46,8 @@
 #include <QPainterPath>
 #include <QTextCursor>
 #include <QScrollBar>
+#include <QSlider>
+#include <QSignalBlocker>
 #include <algorithm>
 #include <QShortcut>
 #include <QDialog>
@@ -610,7 +612,10 @@ namespace Wenku8::Reader
                 [this, pScrollSave]
                 {
                     if (!m_bRestoring && m_pPages->currentIndex() == 3)
+                    {
+                        updateReaderProgress();
                         pScrollSave->start();
+                    }
                 });
         connect(pScrollSave, &QTimer::timeout, this,
                 [this, pScrollSave]
@@ -1245,21 +1250,26 @@ namespace Wenku8::Reader
                 {
                     showBookmarks();
                 });
-        auto pFindText = new SearchInput("在本章查找");
-        pFindText->setClearButtonEnabled(true);
-        pFindText->setObjectName("chapterSearch");
-        pFindText->setMinimumWidth(180);
-        pReaderTools->addWidget(pFindText);
-        auto pFindButton = button("查找");
+        auto* pFindButton = button("章内查找", "readerSearch");
         setButtonIcon(pFindButton, Icon::Search);
         pReaderTools->addWidget(pFindButton);
-        auto fnFind = [this, pFindText]
+        connect(pFindButton, &QPushButton::clicked, this, &ClientWindow::showReaderSearch);
+        auto* pFindShortcut = new QShortcut(QKeySequence::Find, this);
+        connect(pFindShortcut, &QShortcut::activated, this, [this]
         {
-            if (!m_pReader->findInChapter(pFindText->text()))
-                message("本章没有找到这段文字。");
-        };
-        connect(pFindText, &QLineEdit::returnPressed, this, fnFind);
-        connect(pFindButton, &QPushButton::clicked, this, fnFind);
+            if (m_pPages->currentIndex() == 3)
+            {
+                showReaderSearch();
+            }
+        });
+        auto* pBookmarkShortcut = new QShortcut(QKeySequence("Ctrl+D"), this);
+        connect(pBookmarkShortcut, &QShortcut::activated, this, [this]
+        {
+            if (m_pPages->currentIndex() == 3)
+            {
+                addBookmark();
+            }
+        });
         for (int nI = 0; nI < 2; ++nI)
         {
             auto pMode = button(nI == 0 ? "滚动阅读" : "翻页阅读", "readingModeChoice");
@@ -1288,6 +1298,44 @@ namespace Wenku8::Reader
         auto pFooterLayout = new QVBoxLayout(pFooterHost);
         pFooterLayout->setContentsMargins(8, 6, 8, 8);
         pFooterLayout->setSpacing(2);
+        auto* pSeekRow = new QHBoxLayout;
+        pSeekRow->setSpacing(8);
+        pSeekRow->addWidget(label("本章", "muted"));
+        m_pReaderProgress = new QSlider(Qt::Horizontal);
+        m_pReaderProgress->setObjectName("readerProgressSlider");
+        m_pReaderProgress->setAccessibleName("本章阅读进度，拖动后松开跳转");
+        m_pReaderProgress->setRange(0, 1000);
+        m_pReaderProgress->setSingleStep(10);
+        m_pReaderProgress->setPageStep(100);
+        m_pReaderProgress->setMinimumHeight(48);
+        m_pReaderProgress->setLayoutDirection(Qt::LeftToRight);
+        pSeekRow->addWidget(m_pReaderProgress, 1);
+        m_pReaderProgressPercent = label("0%", "readerProgress");
+        m_pReaderProgressPercent->setMinimumWidth(70);
+        m_pReaderProgressPercent->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        pSeekRow->addWidget(m_pReaderProgressPercent);
+        pFooterLayout->addLayout(pSeekRow);
+        auto fnSeekProgress = [this]
+        {
+            if (!m_bUnlocked || m_bLoadingBusy || m_bRestoring ||
+                m_pPages->currentIndex() != 3 || m_nChapter < 0)
+            {
+                return;
+            }
+            m_pReader->seekChapterProgress(m_pReaderProgress->value());
+            updateReaderProgress();
+            saveProgress();
+        };
+        connect(m_pReaderProgress, &QSlider::sliderPressed, m_pReader, &ReadingView::stopMotion);
+        connect(m_pReaderProgress, &QSlider::sliderReleased, this, fnSeekProgress);
+        connect(m_pReaderProgress, &QSlider::valueChanged, this, [this, fnSeekProgress](int nValue)
+        {
+            m_pReaderProgressPercent->setText(QString("%1%").arg(nValue / 10));
+            if (!m_pReaderProgress->isSliderDown())
+            {
+                fnSeekProgress();
+            }
+        });
         auto* pFooterGroup = new QWidget;
         pFooterGroup->setObjectName("controlGroup");
         auto pFooterActions = new QHBoxLayout(pFooterGroup);
@@ -1319,6 +1367,28 @@ namespace Wenku8::Reader
         }
         pFooterLayout->addWidget(pFooterGroup);
         pFooterLayout->addWidget(m_pChapterLabel);
+        auto* pQuickTools = new QWidget;
+        pQuickTools->setObjectName("readerQuickTools");
+        auto* pQuickLayout = new QHBoxLayout(pQuickTools);
+        pQuickLayout->setContentsMargins(0, 2, 0, 0);
+        pQuickLayout->setSpacing(8);
+        auto* pQuickSearch = button("查找", "readerQuickSearch");
+        auto* pQuickBookmarks = button("书签", "readerQuickBookmarks");
+        auto* pQuickAppearance = button("外观", "readerQuickAppearance");
+        setButtonIcon(pQuickSearch, Icon::Search);
+        setButtonIcon(pQuickBookmarks, Icon::Bookmark);
+        setButtonIcon(pQuickAppearance, Icon::Sun);
+        for (auto* pAction : {pQuickSearch, pQuickBookmarks, pQuickAppearance})
+        {
+            pAction->setProperty("controlAction", true);
+            pAction->setProperty("toolbarAction", true);
+            pAction->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+            pQuickLayout->addWidget(pAction, 1);
+        }
+        connect(pQuickSearch, &QPushButton::clicked, this, &ClientWindow::showReaderSearch);
+        connect(pQuickBookmarks, &QPushButton::clicked, this, &ClientWindow::showBookmarks);
+        connect(pQuickAppearance, &QPushButton::clicked, this, &ClientWindow::showMobileAppearance);
+        pFooterLayout->addWidget(pQuickTools);
         pReadingLayout->addWidget(pFooterHost);
         m_pPages->addWidget(pReading);
         connect(m_pPrevious, &QPushButton::clicked, this,
@@ -2007,7 +2077,8 @@ namespace Wenku8::Reader
                                        return QByteArray();
                                    }
                                });
-        m_pReadTitle->setText(text(m_oBook.m_strTitle));
+        m_pReadTitle->setText(text(m_vFlat[m_nChapter].m_strTitle));
+        m_pReadTitle->setToolTip(text(m_oBook.m_strTitle));
         updateReaderFooter();
         auto oSaved = m_pReadingState->position(m_oBook.m_nId);
         int nOffset = m_nRestoreOffset >= 0 ? m_nRestoreOffset
@@ -2268,6 +2339,7 @@ namespace Wenku8::Reader
                                        (m_pReader->readingMode() == ReadingMode::Paged &&
                                         m_pReader->pageNumber() < m_pReader->pageCount())));
         m_pCards->setEnabled(!bBusy);
+        updateReaderProgress();
         updateVolumePaging();
         updateNetworkActions();
         if (!bBusy && m_pPages->currentIndex() == 1 && m_pCount->text().contains("正在"))
@@ -2447,6 +2519,7 @@ namespace Wenku8::Reader
         m_pFullscreen->setText(m_bReaderFullscreen ? "退出全屏" : "全屏阅读");
         findChild<QWidget*>("readerTop")->setVisible(!bMobile || m_bReaderChrome);
         findChild<QWidget*>("readerFooter")->setVisible(!bMobile || m_bReaderChrome);
+        findChild<QWidget*>("readerQuickTools")->setVisible(bMobile && !bLandscape);
         if (bMobile)
             m_pOperations->setVisible(m_bUnlocked && m_pPages->currentIndex() == 1 &&
                                       m_nSection < 2);

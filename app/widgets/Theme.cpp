@@ -10,6 +10,8 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QSlider>
+#include <QListWidget>
 #include <QLabel>
 namespace Wenku8::Reader
 {
@@ -299,6 +301,49 @@ namespace Wenku8::Reader
         }
         for (auto pBar : pWidget->findChildren<QScrollBar*>())
             setWidgetStyle(pBar, scrollBarStyle(eTheme));
+        for (auto* pList : pWidget->findChildren<QListWidget*>())
+        {
+            if (pList->objectName() != "mobileBookmarkItems" &&
+                pList->objectName() != "bookmarkItems")
+            {
+                continue;
+            }
+            setWidgetStyle(pList,
+                QString("QListWidget { background:%1; color:%2; border:1px solid %3; "
+                        "border-radius:12px; padding:6px; outline:0; } "
+                        "QListWidget::item { padding:8px; border-bottom:1px solid %3; } "
+                        "QListWidget::item:selected { background:%4; color:%5; border-radius:8px; } "
+                        "QListWidget::item:hover { background:%6; } "
+                        "QListWidget::item:selected:hover { background:%4; }")
+                    .arg(oC.m_oPanel.name(), oC.m_oText.name(), oC.m_oBorder.name(),
+                         oC.m_oSelection.name(), oC.m_oSelectionText.name(), oC.m_oHover.name()));
+        }
+        for (auto pSlider : pWidget->findChildren<QSlider*>("readerProgressSlider"))
+        {
+            // The 48px widget owns the touch target. Paint a quiet track and leave enough
+            // inset for the handle at both ends without changing its size on interaction.
+            setWidgetStyle(pSlider,
+                QString(
+                    "QSlider#readerProgressSlider { background:transparent; border:0; } "
+                    "QSlider#readerProgressSlider::groove:horizontal { background:%1; "
+                    "height:4px; border:0; border-radius:2px; margin:0 12px; } "
+                    "QSlider#readerProgressSlider::sub-page:horizontal { background:%2; "
+                    "border:0; border-radius:2px; } "
+                    "QSlider#readerProgressSlider::add-page:horizontal { background:%1; "
+                    "border:0; border-radius:2px; } "
+                    "QSlider#readerProgressSlider::handle:horizontal { background:%3; "
+                    "width:18px; border:1px solid %2; border-radius:10px; margin:-8px 0; } "
+                    "QSlider#readerProgressSlider::handle:horizontal:hover { background:%4; } "
+                    "QSlider#readerProgressSlider::handle:horizontal:focus { border-color:%5; } "
+                    "QSlider#readerProgressSlider::handle:horizontal:pressed { background:%2; "
+                    "border-color:%2; } "
+                    "QSlider#readerProgressSlider::sub-page:horizontal:disabled { background:%6; } "
+                    "QSlider#readerProgressSlider::handle:horizontal:disabled { background:%7; "
+                    "border-color:%6; }")
+                    .arg(oC.m_oBorder.name(), oC.m_oAccent.name(), oC.m_oPanel.name(),
+                         oC.m_oSelection.name(), oC.m_oSelectionText.name(),
+                         oC.m_oDisabled.name(), oC.m_oSection.name()));
+        }
         // Local control styles avoid Qt 5 palette caching when switching an already polished
         // window.
         for (auto pInput : pWidget->findChildren<QLineEdit*>())

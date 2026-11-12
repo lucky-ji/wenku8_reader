@@ -23,6 +23,7 @@ class QHBoxLayout;
 class QGridLayout;
 class QKeyEvent;
 class QMenuBar;
+class QSlider;
 namespace Wenku8::Reader
 {
     class OnlineSession;
@@ -103,6 +104,8 @@ namespace Wenku8::Reader
                     *m_pPrevious = nullptr, *m_pNext = nullptr, *m_pPreviousPage = nullptr,
                     *m_pNextPage = nullptr;
         QPushButton* m_pReaderContents = nullptr;
+        QSlider* m_pReaderProgress = nullptr;
+        QLabel* m_pReaderProgressPercent = nullptr;
         QComboBox* m_pThemes = nullptr;
         DownloadOption* m_pIllustrations = nullptr;
         PullRefreshIndicator *m_pCardsRefresh = nullptr, *m_pTocRefresh = nullptr;
@@ -125,6 +128,8 @@ namespace Wenku8::Reader
         void showMobileAppearance();
         void showMobileReaderTools();
         void showReaderContents();
+        void showReaderSearch();
+        void updateReaderProgress();
         void saveReaderPreferences();
         void updateReaderFooter();
         void turnReaderPage(int nDirection);

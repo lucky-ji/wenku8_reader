@@ -668,26 +668,65 @@ namespace Wenku8::Reader
         m_pScrollAnimation->start();
         return true;
     }
-    bool ReadingView::findInChapter(const QString& strQuery)
+    int ReadingView::chapterProgress() const
     {
-        if (strQuery.isEmpty())
-            return false;
-        cancelMotion();
-        bool bFound = QTextBrowser::find(strQuery);
-        if (!bFound)
-        {
-            moveCursor(QTextCursor::Start);
-            bFound = QTextBrowser::find(strQuery);
-        }
-        if (!bFound)
-            return false;
         if (m_eMode == ReadingMode::Paged)
         {
-            auto oSelection = textCursor();
-            restorePosition(oSelection.selectionStart());
-            setTextCursor(oSelection);
+            return m_vPages.size() > 1 ? int(qint64(m_nPage) * 1000 / (m_vPages.size() - 1)) : 0;
+        }
+        const auto* pBar = verticalScrollBar();
+        return pBar->maximum() > 0 ? int(qint64(pBar->value()) * 1000 / pBar->maximum()) : 0;
+    }
+    bool ReadingView::canSeekProgress() const
+    {
+        return !m_bLayoutPending && (m_eMode == ReadingMode::Paged
+                                         ? m_vPages.size() > 1 : verticalScrollBar()->maximum() > 0);
+    }
+    void ReadingView::seekChapterProgress(int nPermille)
+    {
+        if (!canSeekProgress())
+        {
+            return;
+        }
+        nPermille = qBound(0, nPermille, 1000);
+        cancelMotion();
+        if (m_eMode == ReadingMode::Paged)
+        {
+            const int nPage = int((qint64(nPermille) * (m_vPages.size() - 1) + 500) / 1000);
+            restorePosition(m_vPages[nPage].m_nOffset);
+        }
+        else
+        {
+            verticalScrollBar()->setValue(int(qint64(nPermille) * verticalScrollBar()->maximum() / 1000));
+        }
+        emit pageStateChanged();
+    }
+    bool ReadingView::findInChapter(const QString& strQuery, bool bBackward)
+    {
+        if (strQuery.isEmpty())
+        {
+            return false;
+        }
+        const auto oFlags = bBackward ? QTextDocument::FindBackward : QTextDocument::FindFlags{};
+        auto oFound = m_pDocument->find(strQuery, textCursor(), oFlags);
+        if (oFound.isNull())
+        {
+            QTextCursor oStart(m_pDocument);
+            oStart.movePosition(bBackward ? QTextCursor::End : QTextCursor::Start);
+            oFound = m_pDocument->find(strQuery, oStart, oFlags);
+        }
+        if (oFound.isNull())
+        {
+            return false;
+        }
+        cancelMotion();
+        restorePosition(oFound.selectionStart());
+        setTextCursor(oFound);
+        if (m_eMode == ReadingMode::Paged && !m_vPages.isEmpty())
+        {
             verticalScrollBar()->setValue(m_vPages[m_nPage].m_nY);
         }
+        emit pageStateChanged();
         return true;
     }
     bool ReadingView::moving() const
