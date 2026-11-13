@@ -218,6 +218,7 @@ namespace Wenku8::Reader
         : QTextBrowser(pParent), m_pDocument(new LocalDocument(this))
     {
         setDocument(m_pDocument);
+        m_strDefaultFontFamily = font().family();
         setOpenLinks(false);
         setOpenExternalLinks(false);
         setReadOnly(true);
@@ -301,6 +302,7 @@ namespace Wenku8::Reader
         m_oImageRefreshTimer.stop();
         m_bImagesPending = false;
         QScopedValueRollback<bool> oGuard(m_bRebuilding, true);
+        updateComfortMargins();
         // A fresh document also guarantees no cached image survives chapter changes.
         QPointer<LocalDocument> pPrevious = m_pDocument;
         m_pDocument = new LocalDocument(this);
@@ -342,6 +344,7 @@ namespace Wenku8::Reader
         cancelMotion();
         clearRasterCache();
         QScopedValueRollback<bool> oGuard(m_bRebuilding, true);
+        updateComfortMargins();
         const int nPreferredMargin =
             m_nSideMargin > 0 ? m_nSideMargin : viewport()->width() < 600 ? 16 : 24;
         const int nMargin = qMin(nPreferredMargin, qMax(0, (viewport()->width() - 80) / 2));
@@ -425,6 +428,71 @@ namespace Wenku8::Reader
             rebuild(nPosition);
         }
     }
+    void ReadingView::setReadingFont(const QString& strFamily, bool bBold)
+    {
+        const QString strNormalizedFamily = strFamily.trimmed();
+        if (m_strReadingFontFamily == strNormalizedFamily && m_bReadingBold == bBold)
+        {
+            return;
+        }
+        const int nPosition = readingPosition();
+        m_strReadingFontFamily = strNormalizedFamily;
+        m_bReadingBold = bBold;
+        cancelMotion();
+        clearRasterCache();
+        {
+            QScopedValueRollback<bool> oGuard(m_bRebuilding, true);
+            QFont oFont = font();
+            oFont.setFamily(strNormalizedFamily.isEmpty() ? m_strDefaultFontFamily
+                                                        : strNormalizedFamily);
+            oFont.setBold(bBold);
+            setFont(oFont);
+        }
+        if (!m_oChapter.m_strHtml.isEmpty())
+        {
+            rebuild(nPosition);
+        }
+    }
+    void ReadingView::setComfortWidth(int nMaxWidth)
+    {
+        nMaxWidth = nMaxWidth <= 0 ? 0 : std::clamp(nMaxWidth, 320, 2560);
+        if (m_nComfortWidth == nMaxWidth)
+        {
+            return;
+        }
+        const int nPosition = readingPosition();
+        m_nComfortWidth = nMaxWidth;
+        if (!m_oChapter.m_strHtml.isEmpty())
+        {
+            rebuild(nPosition);
+        }
+        else
+        {
+            updateComfortMargins();
+        }
+    }
+    void ReadingView::updateComfortMargins()
+    {
+        if (m_bUpdatingComfortMargins)
+        {
+            return;
+        }
+        // Reconstruct the available inner width from the actual viewport. This
+        // already excludes the frame and any reserved scrollbar, including themed
+        // or overlay scrollbars, and cannot compound previously applied margins.
+        const QMargins oMargins = viewportMargins();
+        const int nAvailableWidth = qMax(0, viewport()->width() + oMargins.left() + oMargins.right());
+        const int nExtra = m_nComfortWidth > 0 ? qMax(0, nAvailableWidth - m_nComfortWidth) : 0;
+        const int nLeft = nExtra / 2;
+        const int nRight = nExtra - nLeft;
+        if (oMargins.left() == nLeft && oMargins.right() == nRight)
+        {
+            return;
+        }
+        QScopedValueRollback<bool> oMarginGuard(m_bUpdatingComfortMargins, true);
+        QScopedValueRollback<bool> oLayoutGuard(m_bRebuilding, true);
+        setViewportMargins(nLeft, oMargins.top(), nRight, oMargins.bottom());
+    }
     void ReadingView::appearance(int nSize, Theme eTheme)
     {
         nSize = std::clamp(nSize, 10, 36);
@@ -471,6 +539,7 @@ namespace Wenku8::Reader
     {
         int nPosition = readingPosition();
         QTextBrowser::resizeEvent(pEvent);
+        updateComfortMargins();
         if (m_bRebuilding || m_oChapter.m_strHtml.isEmpty())
         {
             return;
@@ -1034,6 +1103,7 @@ namespace Wenku8::Reader
     void ReadingView::showEvent(QShowEvent* pEvent)
     {
         QTextBrowser::showEvent(pEvent);
+        updateComfortMargins();
         if (m_bLayoutPending)
         {
             rebuild(m_nPendingPosition);

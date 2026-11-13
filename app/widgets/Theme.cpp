@@ -100,6 +100,10 @@ namespace Wenku8::Reader
         QMainWindow, QDialog, QWidget#shell { background:%2; }
         QFrame#sidebar { background:%3; border-right:1px solid %4; }
         QFrame#surface { background:%5; border:1px solid %4; border-radius:16px; }
+        QDockWidget { color:%1; }
+        QDockWidget::title { background:%3; padding:9px; border-bottom:1px solid %4; }
+        QMainWindow::separator { background:%4; width:5px; height:5px; }
+        QMainWindow::separator:hover { background:%8; }
         QLabel { background:transparent; }
         QLabel#brand { font-size:22px; font-weight:700; letter-spacing:1px; }
         QLabel#pageTitle { font-size:28px; font-weight:600; }
@@ -487,6 +491,12 @@ namespace Wenku8::Reader
                 pButton->setProperty("navDisabled", oC.m_oDisabled);
                 strStyle = "QPushButton, QPushButton:hover, QPushButton:checked, "
                            "QPushButton:pressed { background:transparent; border:0; padding:0; }";
+            }
+            if (strRole.startsWith("readerPanelTab"))
+            {
+                strStyle += QString("QPushButton:checked, QPushButton:checked:hover { "
+                                    "background:%1; color:%2; border:1px solid %2; font-weight:600; }")
+                                .arg(oC.m_oSelection.name(), oC.m_oSelectionText.name());
             }
             if (strRole == "readingModeChoice")
                 strStyle += QString("QPushButton:checked, QPushButton:checked:hover { "

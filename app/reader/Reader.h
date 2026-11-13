@@ -66,6 +66,20 @@ namespace Wenku8::Reader
             appearance(nPointSize, bDark ? Theme::Dark : Theme::Light);
         }
         void setTypography(int nLineHeightPercent, int nParagraphSpacing, int nSideMargin);
+        void setReadingFont(const QString& strFamily, bool bBold);
+        QString fontFamily() const
+        {
+            return m_strReadingFontFamily;
+        }
+        bool bold() const
+        {
+            return m_bReadingBold;
+        }
+        void setComfortWidth(int nMaxWidth);
+        int comfortWidth() const
+        {
+            return m_nComfortWidth;
+        }
         int lineHeightPercent() const
         {
             return m_nLineHeightPercent;
@@ -134,6 +148,10 @@ namespace Wenku8::Reader
         QSize m_oLayoutViewport;
         Theme m_eAppearanceTheme = Theme::Light;
         int m_nLineHeightPercent = 145, m_nParagraphSpacing = 8, m_nSideMargin = 0;
+        QString m_strReadingFontFamily, m_strDefaultFontFamily;
+        bool m_bReadingBold = false, m_bUpdatingComfortMargins = false;
+        int m_nComfortWidth = 0;
+        void updateComfortMargins();
         ChapterText m_oChapter;
         LocalDocument::ImageLoader m_fnLoader;
         void rebuild(int nPosition);

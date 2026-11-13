@@ -24,6 +24,13 @@
 #include <QGuiApplication>
 #include <QTextCursor>
 #include <QCheckBox>
+#include <QFontComboBox>
+#include <QApplication>
+#include <QSignalBlocker>
+#include <QTextBlock>
+#include <QTextBlockFormat>
+#include <QTextCharFormat>
+#include <memory>
 namespace Wenku8::Reader
 {
     using namespace PageControls;
@@ -429,6 +436,88 @@ namespace Wenku8::Reader
         pLayout->addSpacing(8);
         pLayout->addWidget(paragraph("文字大小", "sectionTitle"));
         auto* pFontLayout = controlGroup(pLayout);
+        auto* pFamily = new QFontComboBox;
+        pFamily->setEditable(false);
+        pFamily->setObjectName("readerFontFamily");
+        pFamily->setAccessibleName("正文字体");
+        pFamily->setMinimumHeight(48);
+        pFamily->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+        pFamily->setCurrentFont(m_pReader->fontFamily().isEmpty()
+                                   ? QApplication::font() : QFont(m_pReader->fontFamily()));
+        pFontLayout->addWidget(paragraph("正文字体", "controlLabel"));
+        pFontLayout->addWidget(pFamily);
+        auto* pFontOptions = new QHBoxLayout;
+        auto* pBold = new QCheckBox("正文粗体");
+        pBold->setObjectName("readerBold");
+        pBold->setMinimumHeight(48);
+        pBold->setChecked(m_pReader->bold());
+        pFontOptions->addWidget(pBold, 1);
+        auto* pDefaultFont = action("系统默认", "readerDefaultFont", Icon::RestoreBookmark);
+        pDefaultFont->setProperty("mobileRow", false);
+        pDefaultFont->setProperty("textAction", true);
+        pFontOptions->addWidget(pDefaultFont);
+        pFontLayout->addLayout(pFontOptions);
+        auto* pPreview = new QTextBrowser;
+        pPreview->setObjectName("readerTypographyPreview");
+        pPreview->setAccessibleName("即时排版预览");
+        pPreview->setFrameShape(QFrame::NoFrame);
+        pPreview->setFixedHeight(180);
+        pPreview->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        pPreview->setTextInteractionFlags(Qt::NoTextInteraction);
+        pPreview->setFocusPolicy(Qt::NoFocus);
+        auto fnPreview = [this, pPreview]
+        {
+            QFont oFont = m_pReader->fontFamily().isEmpty()
+                              ? QApplication::font() : QFont(m_pReader->fontFamily());
+            oFont.setPointSize(m_nFontSize);
+            oFont.setBold(m_pReader->bold());
+            pPreview->document()->setDefaultFont(oFont);
+            pPreview->setPlainText("雨停之后，窗沿的水珠悄然落下。翻开书页，下一段故事就在这里。\n"
+                                   "在这里预览字号、字体和排版，设置会自动保存。");
+            pPreview->document()->setDocumentMargin(m_pReader->sideMargin() > 0
+                                                        ? m_pReader->sideMargin() : 12);
+            QTextCursor oTextCursor(pPreview->document());
+            oTextCursor.select(QTextCursor::Document);
+            QTextCharFormat oTextFormat;
+            oTextFormat.setFont(oFont);
+            oTextCursor.mergeCharFormat(oTextFormat);
+            for (auto oBlock = pPreview->document()->begin(); oBlock.isValid(); oBlock = oBlock.next())
+            {
+                QTextCursor oCursor(oBlock);
+                QTextBlockFormat oFormat = oCursor.blockFormat();
+                oFormat.setLineHeight(m_pReader->lineHeightPercent(),
+                                      QTextBlockFormat::ProportionalHeight);
+                oFormat.setBottomMargin(m_pReader->paragraphSpacing());
+                oCursor.setBlockFormat(oFormat);
+            }
+            pPreview->moveCursor(QTextCursor::Start);
+        };
+        auto fnSaveFont = [this, fnPreview]
+        {
+            m_oSettings.setValue("readerFontFamily", m_pReader->fontFamily());
+            m_oSettings.setValue("readerBold", m_pReader->bold());
+            fnPreview();
+        };
+        connect(pFamily, &QFontComboBox::currentFontChanged, pPage,
+                [this, fnSaveFont](const QFont& oFont)
+                {
+                    m_pReader->setReadingFont(oFont.family(), m_pReader->bold());
+                    fnSaveFont();
+                });
+        connect(pBold, &QCheckBox::toggled, pPage,
+                [this, fnSaveFont](bool bBold)
+                {
+                    m_pReader->setReadingFont(m_pReader->fontFamily(), bBold);
+                    fnSaveFont();
+                });
+        connect(pDefaultFont, &QPushButton::clicked, pPage,
+                [this, pFamily, fnSaveFont]
+                {
+                    m_pReader->setReadingFont({}, m_pReader->bold());
+                    const QSignalBlocker oBlocker(pFamily);
+                    pFamily->setCurrentFont(QApplication::font());
+                    fnSaveFont();
+                });
         auto pSize = new QLabel(QString::number(m_nFontSize));
         pSize->setObjectName("mobileFontSize");
         pSize->setAlignment(Qt::AlignCenter);
@@ -454,23 +543,29 @@ namespace Wenku8::Reader
                 pFonts->addWidget(pSize);
             }
             connect(pB, &QPushButton::clicked, pPage,
-                    [this, pSize, nDelta]
+                    [this, pSize, nDelta, fnPreview]
                     {
                         m_nFontSize = qBound(10, m_nFontSize + nDelta, 36);
                         m_pReader->appearance(m_nFontSize, m_eTheme);
                         pSize->setText(QString::number(m_nFontSize));
                         m_oSettings.setValue("fontSize", m_nFontSize);
+                        fnPreview();
                     });
         }
         pFontLayout->addLayout(pFonts);
+        pFontLayout->addWidget(paragraph("即时预览", "sectionTitle"));
+        pFontLayout->addWidget(pPreview);
+        (new TouchScroll(pPreview))->setEnabled(bMobile);
+        fnPreview();
         pLayout->addSpacing(8);
         pLayout->addWidget(paragraph("文字排版", "sectionTitle"));
         auto* pTypographyLayout = controlGroup(pLayout);
-        auto fnSaveTypography = [this]
+        auto fnSaveTypography = [this, fnPreview]
         {
             m_oSettings.setValue("readerLineHeight", m_pReader->lineHeightPercent());
             m_oSettings.setValue("readerParagraphSpacing", m_pReader->paragraphSpacing());
             m_oSettings.setValue("readerSideMargin", m_pReader->sideMargin());
+            fnPreview();
         };
         QVector<std::function<void()>> vTypographyUpdates;
         auto fnAddTypography = [this, pPage, pTypographyLayout, fnSaveTypography, &vTypographyUpdates](
@@ -571,6 +666,28 @@ namespace Wenku8::Reader
                             m_pReader->setTypography(m_pReader->lineHeightPercent(),
                                                      m_pReader->paragraphSpacing(), nValue);
                         });
+        if (!bMobile)
+        {
+            auto* pWidth = new QComboBox;
+            pWidth->setObjectName("readerComfortWidth");
+            pWidth->setAccessibleName("桌面舒适阅读宽度");
+            pWidth->addItem("全宽", 0);
+            for (int nWidth : {720, 880, 1040})
+            {
+                pWidth->addItem(QString("%1 像素").arg(nWidth), nWidth);
+            }
+            pWidth->setCurrentIndex(qMax(0, pWidth->findData(m_pReader->comfortWidth())));
+            auto* pWidthRow = new QHBoxLayout;
+            pWidthRow->addWidget(paragraph("舒适宽度", "controlLabel"), 1);
+            pWidthRow->addWidget(pWidth);
+            pTypographyLayout->addLayout(pWidthRow);
+            connect(pWidth, QOverload<int>::of(&QComboBox::currentIndexChanged), pPage,
+                    [this, pWidth](int)
+                    {
+                        m_pReader->setComfortWidth(pWidth->currentData().toInt());
+                        m_oSettings.setValue("readerComfortWidth", m_pReader->comfortWidth());
+                    });
+        }
         auto pResetTypography = action("恢复默认排版", "readerTypographyReset", Icon::RestoreBookmark);
         pResetTypography->setProperty("mobileRow", false);
         pResetTypography->setProperty("controlAction", true);
@@ -609,6 +726,18 @@ namespace Wenku8::Reader
             pLayout->addStretch();
             QDialog oDialog(this);
             oDialog.setObjectName("readerPreferencesDialog");
+            for (auto* pControl : pPage->findChildren<QPushButton*>())
+            {
+                pControl->setMinimumHeight(36);
+            }
+            for (auto* pControl : pPage->findChildren<QComboBox*>())
+            {
+                pControl->setMinimumHeight(36);
+            }
+            for (auto* pControl : pPage->findChildren<QCheckBox*>())
+            {
+                pControl->setMinimumHeight(36);
+            }
             oDialog.setWindowTitle("阅读设置");
             auto pDialogLayout = new QVBoxLayout(&oDialog);
             pDialogLayout->setContentsMargins(16, 16, 16, 16);
@@ -703,66 +832,168 @@ namespace Wenku8::Reader
                                            showMobileBookmarks();
                                        });
                 });
-        auto vEntries = m_pReadingState->bookmarks(m_oBook.m_nId);
-        if (vEntries.isEmpty())
+        const int nBook = m_oBook.m_nId;
+        auto* pManage = action("管理", "mobileBookmarkManage", Icon::Settings);
+        pManage->setProperty("mobileRow", false);
+        pManage->setProperty("controlAction", true);
+        pManage->setCheckable(true);
+        pLayout->addWidget(pManage, 0, Qt::AlignRight);
+        auto* pHint = paragraph("轻点书签继续阅读；管理模式中可以选择和删除。");
+        pHint->setObjectName("mobileBookmarkHint");
+        pLayout->addWidget(pHint);
+        auto* pEmpty = paragraph("还没有书签，点击上方「添加当前位置」保存当前阅读位置。");
+        pEmpty->setObjectName("mobileBookmarkEmpty");
+        pLayout->addWidget(pEmpty);
+        auto* pList = new QListWidget;
+        pList->setObjectName("mobileBookmarkItems");
+        pList->setWordWrap(true);
+        pList->setSelectionMode(QAbstractItemView::NoSelection);
+        pList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+        pList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        pList->setAccessibleName("轻点继续阅读的书签列表");
+        pLayout->addWidget(pList, 1);
+        auto* pRemove = action("删除选中书签", "mobileRemoveBookmark", Icon::Cancel);
+        pRemove->setProperty("mobileRow", false);
+        pRemove->setProperty("controlAction", true);
+        pRemove->setEnabled(false);
+        pRemove->hide();
+        pLayout->addWidget(pRemove);
+        auto* pUndo = action("已删除书签 · 撤销删除", "mobileUndoBookmark", Icon::RestoreBookmark);
+        pUndo->setProperty("mobileRow", false);
+        pUndo->setProperty("controlAction", true);
+        pUndo->hide();
+        pLayout->addWidget(pUndo);
+        auto* pUndoTimer = new QTimer(pPage);
+        pUndoTimer->setSingleShot(true);
+        pUndoTimer->setInterval(5000);
+        auto pEntries = std::make_shared<QVector<BookmarkEntry>>();
+        auto pDeleted = std::make_shared<std::optional<BookmarkEntry>>();
+        auto fnReload = [this, nBook, pEntries, pList, pEmpty, pManage, pRemove]
         {
-            pLayout->addWidget(paragraph("还没有书签，点击上方「添加当前位置」保存当前阅读位置。"));
-            pLayout->addStretch();
-        }
-        else
-        {
-            auto pList = new QListWidget;
-            pList->setObjectName("mobileBookmarkItems");
-            pList->setWordWrap(true);
-            pList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-            pList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-            pLayout->addWidget(pList, 1);
-            for (const auto& oEntry : vEntries)
+            *pEntries = m_pReadingState->bookmarks(nBook);
+            pList->clear();
+            for (const auto& oEntry : *pEntries)
             {
-                auto pItem =
-                    new QListWidgetItem(oEntry.m_strTitle + "\n" + oEntry.m_strSnippet, pList);
+                auto* pItem = new QListWidgetItem(oEntry.m_strTitle + "\n" + oEntry.m_strSnippet,
+                                                 pList);
                 pItem->setSizeHint(QSize(200, 96));
+                pItem->setToolTip(oEntry.m_strTitle);
             }
-            auto pJump = action("跳转到书签", "mobileJumpBookmark", Icon::Book);
-            pLayout->addWidget(pJump);
-            connect(pJump, &QPushButton::clicked, pPage,
-                    [this, pList, vEntries]
+            pList->setCurrentRow(-1);
+            pRemove->setEnabled(false);
+            pEmpty->setVisible(pEntries->isEmpty());
+            pManage->setEnabled(!pEntries->isEmpty());
+            if (pEntries->isEmpty())
+            {
+                pManage->setChecked(false);
+            }
+        };
+        connect(pManage, &QPushButton::toggled, pPage,
+                [pList, pHint, pManage, pRemove](bool bManaging)
+                {
+                    pManage->setText(bManaging ? "完成" : "管理");
+                    pList->setSelectionMode(bManaging ? QAbstractItemView::SingleSelection
+                                                      : QAbstractItemView::NoSelection);
+                    pList->setCurrentRow(-1);
+                    pList->clearSelection();
+                    pRemove->setEnabled(false);
+                    pRemove->setVisible(bManaging);
+                    pHint->setText(bManaging ? "选择要删除的书签。删除后 5 秒内可撤销。"
+                                             : "轻点书签继续阅读；管理模式中可以选择和删除。");
+                });
+        connect(pList, &QListWidget::itemSelectionChanged, pPage,
+                [pList, pManage, pRemove]
+                {
+                    pRemove->setEnabled(pManage->isChecked() && !pList->selectedItems().isEmpty());
+                });
+        auto fnActivate = [this, pPage, nBook, pEntries, pManage, pList, pHint](QListWidgetItem* pItem)
+        {
+            if (!pItem || m_pPages->currentWidget() != pPage || m_oBook.m_nId != nBook ||
+                m_bLoadingBusy)
+            {
+                return;
+            }
+            if (pManage->isChecked())
+            {
+                pList->setCurrentItem(pItem);
+                pItem->setSelected(true);
+                return;
+            }
+            const int nRow = pList->row(pItem);
+            if (nRow < 0 || nRow >= pEntries->size())
+            {
+                return;
+            }
+            const BookmarkEntry oEntry = pEntries->at(nRow);
+            int nTarget = -1;
+            for (int nIndex = 0; nIndex < m_vFlat.size(); ++nIndex)
+            {
+                if (m_vFlat[nIndex].m_nId == oEntry.m_nChapter)
+                {
+                    nTarget = nIndex;
+                    break;
+                }
+            }
+            if (nTarget < 0)
+            {
+                pHint->setText("这条书签的章节已不在当前目录中。");
+                return;
+            }
+            const bool bSameChapter = nTarget == m_nChapter;
+            m_nMobileReaderOffset = oEntry.m_nOffset;
+            while (!m_vMobileHistory.isEmpty() && m_pPages->currentIndex() >= 4)
+            {
+                popMobilePage();
+            }
+            if (!bSameChapter)
+            {
+                m_nRestoreOffset = oEntry.m_nOffset;
+                openChapter(nTarget);
+            }
+        };
+        connect(pList, &QListWidget::itemClicked, pPage, fnActivate);
+        connect(pList, &QListWidget::itemActivated, pPage, fnActivate);
+        (new TouchScroll(pList,
+                         [pList, fnActivate](QPoint oPoint)
+                         {
+                             fnActivate(pList->itemAt(oPoint));
+                         }))
+            ->setEnabled(true);
+        connect(pRemove, &QPushButton::clicked, pPage,
+                [this, nBook, pEntries, pDeleted, pList, pManage, pUndo, pUndoTimer, fnReload]
+                {
+                    const int nRow = pList->currentRow();
+                    if (!pManage->isChecked() || pList->selectedItems().isEmpty() || nRow < 0 ||
+                        nRow >= pEntries->size() || m_oBook.m_nId != nBook)
                     {
-                        int nRow = pList->currentRow();
-                        if (nRow < 0 || nRow >= vEntries.size())
-                            return;
-                        const auto oEntry = vEntries[nRow];
-                        while (m_pPages->currentIndex() >= 4)
-                            popMobilePage();
-                        for (int nI = 0; nI < m_vFlat.size(); ++nI)
-                            if (m_vFlat[nI].m_nId == oEntry.m_nChapter)
-                            {
-                                m_nRestoreOffset = oEntry.m_nOffset;
-                                openChapter(nI);
-                                return;
-                            }
-                    });
-            (new TouchScroll(pList,
-                             [pList](QPoint oPoint)
-                             {
-                                 if (auto pItem = pList->itemAt(oPoint))
-                                     pList->setCurrentItem(pItem);
-                             }))
-                ->setEnabled(true);
-            auto pRemove = action("删除选中书签", "mobileRemoveBookmark", Icon::Cancel);
-            pLayout->addWidget(pRemove);
-            connect(pRemove, &QPushButton::clicked, pPage,
-                    [this, pList, vEntries]
+                        return;
+                    }
+                    *pDeleted = pEntries->at(nRow);
+                    m_pReadingState->removeBookmark(nBook, pDeleted->value().m_strId);
+                    fnReload();
+                    pUndo->show();
+                    pUndoTimer->start();
+                });
+        connect(pUndo, &QPushButton::clicked, pPage,
+                [this, nBook, pDeleted, pUndo, pUndoTimer, fnReload]
+                {
+                    if (!pDeleted->has_value() || m_oBook.m_nId != nBook)
                     {
-                        int nRow = pList->currentRow();
-                        if (nRow >= 0 && nRow < vEntries.size())
-                        {
-                            m_pReadingState->removeBookmark(m_oBook.m_nId, vEntries[nRow].m_strId);
-                            popMobilePage();
-                            showMobileBookmarks();
-                        }
-                    });
-        }
+                        return;
+                    }
+                    m_pReadingState->addBookmark(nBook, pDeleted->value());
+                    pDeleted->reset();
+                    pUndoTimer->stop();
+                    pUndo->hide();
+                    fnReload();
+                });
+        connect(pUndoTimer, &QTimer::timeout, pPage,
+                [pDeleted, pUndo]
+                {
+                    pDeleted->reset();
+                    pUndo->hide();
+                });
+        fnReload();
         pushMobilePage(pPage, "本书书签");
     }
 } // namespace Wenku8::Reader

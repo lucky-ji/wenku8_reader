@@ -51,6 +51,7 @@
 #include <algorithm>
 #include <QShortcut>
 #include <QDialog>
+#include <QDockWidget>
 #include <QDialogButtonBox>
 #include <QTextBlock>
 #include <QHeaderView>
@@ -465,6 +466,9 @@ namespace Wenku8::Reader
         resize(1280, 860);
         setMinimumSize(320, 360);
         build();
+        m_pReader->setReadingFont(m_oSettings.value("readerFontFamily").toString(),
+                                  m_oSettings.value("readerBold", false).toBool());
+        m_pReader->setComfortWidth(m_oSettings.value("readerComfortWidth", 0).toInt());
         m_pReader->setTypography(m_oSettings.value("readerLineHeight", 145).toInt(),
                                 m_oSettings.value("readerParagraphSpacing", 8).toInt(),
                                 m_oSettings.value("readerSideMargin", 0).toInt());
@@ -678,6 +682,14 @@ namespace Wenku8::Reader
         m_pDesktopMenuBar->setObjectName("desktopMenuBar");
         setMenuBar(m_pDesktopMenuBar);
         auto pHelp = m_pDesktopMenuBar->addMenu("帮助");
+        auto* pKeys = pHelp->addAction("阅读快捷键");
+        connect(pKeys, &QAction::triggered, this, [this]
+        {
+            showInformationDocument("阅读快捷键",
+                "Ctrl+F：章内查找\nF3 / Shift+F3：下一处 / 上一处\n"
+                "Ctrl+D：添加当前位置书签\nAlt+← / Alt+→：上一章 / 下一章\n"
+                "PageUp / PageDown、← / →：正文聚焦时翻页\nF11：切换全屏\nEsc：关闭侧栏或退出全屏");
+        });
         const QStringList vInfoTitles{"版本说明", "更新日志", "开源许可"};
         const char* vActionNames[] = {"aboutVersion", "aboutChangelog", "aboutLicenses"};
         for (int nI = 0; nI < vInfoTitles.size(); ++nI)
@@ -1207,6 +1219,11 @@ namespace Wenku8::Reader
         connect(pEscapeShortcut, &QShortcut::activated, this,
                 [this]
                 {
+                    if (!mobileMode() && !m_bReaderFullscreen && m_pReaderDock && m_pReaderDock->isVisible())
+                    {
+                        closeReaderPanel();
+                        return;
+                    }
                     if (!m_vMobileHistory.isEmpty() || m_bCompact)
                     {
                         goBack();
@@ -1274,6 +1291,30 @@ namespace Wenku8::Reader
                 showReaderSearch();
             }
         });
+        for (bool bBackward : {false, true})
+        {
+            auto* pRepeat = new QShortcut(QKeySequence(bBackward ? "Shift+F3" : "F3"), this);
+            connect(pRepeat, &QShortcut::activated, this, [this, bBackward]
+            {
+                if (m_pPages->currentIndex() != 3 || !m_pReaderDock || !m_pReaderDock->isVisible())
+                {
+                    return;
+                }
+                if (auto* pAction = m_pReaderDock->findChild<QPushButton*>(
+                        bBackward ? "readerSearchPrevious" : "readerSearchNext"))
+                {
+                    pAction->click();
+                }
+            });
+            auto* pChapterKey = new QShortcut(QKeySequence(bBackward ? "Alt+Left" : "Alt+Right"), this);
+            connect(pChapterKey, &QShortcut::activated, this, [this, bBackward]
+            {
+                if (m_pPages->currentIndex() == 3 && !m_bLoadingBusy && !m_bRestoring)
+                {
+                    openChapter(m_nChapter + (bBackward ? -1 : 1));
+                }
+            });
+        }
         auto* pBookmarkShortcut = new QShortcut(QKeySequence("Ctrl+D"), this);
         connect(pBookmarkShortcut, &QShortcut::activated, this, [this]
         {
@@ -2114,6 +2155,30 @@ namespace Wenku8::Reader
                                highlightChapter();
                            });
         message(m_bLocalBook ? "缓存阅读 · 阅读位置自动保存" : "在线阅读 · 阅读位置自动保存");
+        if (!mobileMode() && m_pReaderDock && m_bReaderDockRequested)
+        {
+            const QString strPanel = m_pReaderDock->property("panelTitle").toString();
+            QTimer::singleShot(0, this, [this, strPanel, nGeneration]
+            {
+                if (nGeneration != m_nRestoreGeneration || m_pPages->currentIndex() != 3 ||
+                    !m_bReaderDockRequested || mobileMode())
+                {
+                    return;
+                }
+                if (strPanel == "目录")
+                {
+                    showReaderContents();
+                }
+                else if (strPanel == "章内查找")
+                {
+                    showReaderSearch();
+                }
+                else
+                {
+                    showDesktopBookmarks();
+                }
+            });
+        }
     }
     QString ClientWindow::progressKey() const
     {
@@ -2150,109 +2215,33 @@ namespace Wenku8::Reader
         oEntry.m_strSnippet = m_pReader->readingSnippet(oEntry.m_nOffset);
         m_pReadingState->addBookmark(m_oBook.m_nId, oEntry);
         message("书签已保存，可在「书签列表」管理和跳转。");
+        if (!mobileMode() && m_pReaderDock && m_pReaderDock->isVisible() &&
+            m_pReaderDock->property("panelTitle").toString() == "书签")
+        {
+            const int nBook = m_oBook.m_nId;
+            QTimer::singleShot(0, this, [this, nBook]
+            {
+                if (m_oBook.m_nId == nBook && m_pReaderDock && m_pReaderDock->isVisible() &&
+                    m_pReaderDock->property("panelTitle").toString() == "书签")
+                {
+                    showDesktopBookmarks();
+                }
+            });
+        }
     }
     void ClientWindow::showBookmarks()
     {
-#ifdef WENKU8_CLIENT_ONLINE
-        if (m_pSession && m_pSession->busy())
+        if (!m_bUnlocked || m_bLoadingBusy || m_oBook.m_nId <= 0)
+        {
             return;
-#endif
-        if (!m_bUnlocked || m_oBook.m_nId <= 0)
-            return;
-        saveProgress();
+        }
         if (mobileMode())
         {
             showMobileBookmarks();
-            return;
         }
-        QDialog oDialog(this);
-        oDialog.setObjectName("bookmarksDialog");
-        oDialog.setWindowTitle("书签 · " + text(m_oBook.m_strTitle));
-        oDialog.resize(qMin(620, width() - 24), qMin(460, height() - 40));
-        auto pLayout = new QVBoxLayout(&oDialog);
-        pLayout->setContentsMargins(24, 24, 24, 24);
-        pLayout->setSpacing(14);
-        pLayout->addWidget(label("这本书的书签", "bookTitle"));
-        auto pList = new QListWidget;
-        pList->setObjectName("bookmarkItems");
-        pList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        QScroller::grabGesture(pList->viewport(), QScroller::TouchGesture);
-        pList->setWordWrap(true);
-        pLayout->addWidget(pList, 1);
-        auto pFooter = new QHBoxLayout;
-        auto pRemove = button("删除书签", "removeBookmark"),
-             pJump = button("跳转阅读", "jumpBookmark"), pClose = button("关闭");
-        pJump->setProperty("primary", true);
-        pFooter->addWidget(pRemove);
-        pFooter->addStretch();
-        pFooter->addWidget(pClose);
-        pFooter->addWidget(pJump);
-        pLayout->addLayout(pFooter);
-        QVector<BookmarkEntry> vEntries;
-        auto fnReload = [&]
+        else
         {
-            pList->clear();
-            vEntries = m_pReadingState->bookmarks(m_oBook.m_nId);
-            for (const auto& oEntry : vEntries)
-            {
-                auto pItem = new QListWidgetItem(
-                    oEntry.m_strTitle + "\n" + oEntry.m_strSnippet + "\n" +
-                        oEntry.m_oCreated.toLocalTime().toString("yyyy-MM-dd HH:mm"),
-                    pList);
-                pItem->setSizeHint(QSize(240, 100));
-                pItem->setData(Qt::UserRole, oEntry.m_strId);
-                pItem->setData(Qt::UserRole + 1, oEntry.m_nOffset);
-            }
-            if (!vEntries.isEmpty())
-                pList->setCurrentRow(0);
-            pRemove->setEnabled(!vEntries.isEmpty());
-            pJump->setEnabled(!vEntries.isEmpty());
-            if (vEntries.isEmpty())
-            {
-                auto pItem = new QListWidgetItem(
-                    "还没有书签。在阅读页点击「添加书签」记录当前位置。", pList);
-                pItem->setFlags(Qt::NoItemFlags);
-            }
-        };
-        int nTargetChapter = 0, nTargetOffset = 0;
-        auto fnSelect = [&]
-        {
-            int nRow = pList->currentRow();
-            if (nRow < 0 || nRow >= vEntries.size())
-                return;
-            nTargetChapter = vEntries[nRow].m_nChapter;
-            nTargetOffset = vEntries[nRow].m_nOffset;
-            oDialog.accept();
-        };
-        connect(pJump, &QPushButton::clicked, &oDialog, fnSelect);
-        connect(pList, &QListWidget::itemDoubleClicked, &oDialog,
-                [&](QListWidgetItem*)
-                {
-                    fnSelect();
-                });
-        connect(pClose, &QPushButton::clicked, &oDialog, &QDialog::reject);
-        connect(pRemove, &QPushButton::clicked, &oDialog,
-                [&]
-                {
-                    int nRow = pList->currentRow();
-                    if (nRow >= 0 && nRow < vEntries.size())
-                    {
-                        m_pReadingState->removeBookmark(m_oBook.m_nId, vEntries[nRow].m_strId);
-                        fnReload();
-                    }
-                });
-        fnReload();
-        applyTheme(&oDialog, m_eTheme);
-        if (oDialog.exec() == QDialog::Accepted)
-        {
-            for (int nI = 0; nI < m_vFlat.size(); ++nI)
-                if (m_vFlat[nI].m_nId == nTargetChapter)
-                {
-                    m_nRestoreOffset = nTargetOffset;
-                    openChapter(nI);
-                    return;
-                }
-            message("这个书签的章节已不在当前目录中。");
+            showDesktopBookmarks();
         }
     }
     void ClientWindow::updateShelfAction()
@@ -2433,6 +2422,14 @@ namespace Wenku8::Reader
         if (m_pDesktopMenuBar)
             m_pDesktopMenuBar->setVisible(!bMobile && !m_bReaderFullscreen &&
                                           m_pStartupPages->currentIndex() == 1);
+        if (m_pReaderDock)
+        {
+            if (m_pReaderDock->property("bookId").toInt() != m_oBook.m_nId)
+            {
+                m_bReaderDockRequested = false;
+            }
+            m_pReaderDock->setVisible(!bMobile && bReading && m_bReaderDockRequested);
+        }
         const bool bTab = bExtra && m_pPages->currentWidget()->property("rootTab").toBool();
         const bool bLandscape = bMobile && height() < 520;
         if (property("touchUi").toBool() != bMobile)

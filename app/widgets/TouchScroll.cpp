@@ -6,6 +6,7 @@
 #include <QTouchEvent>
 #include <QAbstractButton>
 #include <QLineEdit>
+#include <QComboBox>
 #include <QGuiApplication>
 #include <QInputMethod>
 #include <QScrollBar>
@@ -332,6 +333,15 @@ namespace Wenku8::Reader
                         {
                             if (pButton->isEnabled())
                                 pButton->click();
+                            break;
+                        }
+                        if (auto* pChoice = qobject_cast<QComboBox*>(pWidget))
+                        {
+                            if (pChoice->isEnabled())
+                            {
+                                pChoice->setFocus(Qt::MouseFocusReason);
+                                pChoice->showPopup();
+                            }
                             break;
                         }
                         if (auto pInput = qobject_cast<QLineEdit*>(pWidget))

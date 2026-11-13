@@ -16,7 +16,7 @@ namespace Wenku8::Reader
     }
     QString applicationVersion()
     {
-        return "1.0.4";
+        return "1.0.5";
     }
     QUrl applicationRepositoryUrl()
     {

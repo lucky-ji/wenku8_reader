@@ -23,6 +23,7 @@ class QHBoxLayout;
 class QGridLayout;
 class QKeyEvent;
 class QMenuBar;
+class QDockWidget;
 class QSlider;
 namespace Wenku8::Reader
 {
@@ -92,6 +93,8 @@ namespace Wenku8::Reader
         QVector<Chapter> m_vFlat;
         QList<QPushButton*> m_vNav;
         QWidget* m_pSidebar = nullptr;
+        QDockWidget* m_pReaderDock = nullptr;
+        bool m_bReaderDockRequested = false;
         QMenuBar* m_pDesktopMenuBar = nullptr;
         AnimatedStack* m_pPages = nullptr;
         QStackedWidget* m_pStartupPages = nullptr;
@@ -130,6 +133,9 @@ namespace Wenku8::Reader
         void showMobileReaderTools();
         void showReaderContents();
         void showReaderSearch();
+        void showReaderPanel(QWidget*, const QString&);
+        void closeReaderPanel();
+        void showDesktopBookmarks();
         void updateReaderProgress();
         void saveReaderPreferences();
         void updateReaderFooter();

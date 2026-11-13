@@ -146,7 +146,8 @@ namespace Wenku8::Reader
         m_oSettings.setValue(strBase + "/offset", oE.m_nOffset);
         m_oSettings.setValue(strBase + "/title", oE.m_strTitle.left(200));
         m_oSettings.setValue(strBase + "/snippet", oE.m_strSnippet.left(140));
-        m_oSettings.setValue(strBase + "/created", QDateTime::currentDateTimeUtc());
+        m_oSettings.setValue(strBase + "/created", oE.m_oCreated.isValid()
+                                                        ? oE.m_oCreated : QDateTime::currentDateTimeUtc());
         m_oSettings.sync();
         return oE.m_strId;
     }
