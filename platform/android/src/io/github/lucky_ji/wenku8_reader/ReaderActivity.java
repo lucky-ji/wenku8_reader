@@ -11,8 +11,11 @@ import android.os.Looper;
 public class ReaderActivity extends QtActivity
 {
     private static volatile boolean m_bVolumePagingEnabled = false;
+    private static volatile boolean m_bReadingActive = false;
+    private static volatile boolean m_bReadingKeepAwake = false;
     private final SparseBooleanArray m_oCaptured = new SparseBooleanArray();
     private final Handler m_oMainHandler = new Handler(Looper.getMainLooper());
+    private final ReadingWindow m_oReadingWindow = new ReadingWindow(this);
     private final SurfaceRecovery m_oSurfaceRecovery = new SurfaceRecovery(
         () -> QtNative.setApplicationState(QtActivityDelegate.ApplicationHidden),
         () ->
@@ -34,13 +37,57 @@ public class ReaderActivity extends QtActivity
     @Override public void onResume()
     {
         super.onResume();
+        m_oReadingWindow.attach();
+        m_oReadingWindow.setPreferences(m_bReadingActive, m_bReadingKeepAwake);
+        m_oReadingWindow.setFocused(hasWindowFocus());
+        m_oReadingWindow.setForeground(true);
         m_oSurfaceRecovery.setForeground(true);
+    }
+    @Override public void onWindowFocusChanged(boolean bHasFocus)
+    {
+        super.onWindowFocusChanged(bHasFocus);
+        m_oReadingWindow.setFocused(bHasFocus);
+    }
+    public static void setReadingPreferences(boolean bActive, boolean bKeepAwake)
+    {
+        m_bReadingActive = bActive;
+        m_bReadingKeepAwake = bKeepAwake;
+        final android.app.Activity oActivity = QtNative.activity();
+        if (oActivity instanceof ReaderActivity)
+        {
+            final ReaderActivity oReader = (ReaderActivity) oActivity;
+            oReader.runOnUiThread(() -> oReader.m_oReadingWindow.setPreferences(
+                m_bReadingActive, m_bReadingKeepAwake));
+        }
+    }
+    public static int[] getReadingSafeInsets()
+    {
+        final android.app.Activity oActivity = QtNative.activity();
+        if (oActivity instanceof ReaderActivity)
+        {
+            return ((ReaderActivity) oActivity).m_oReadingWindow.safeInsets();
+        }
+        return new int[] {0, 0, 0, 0};
+    }
+    static boolean notifyReadingInsetsChanged()
+    {
+        try
+        {
+            nativeReadingInsetsChanged();
+            return true;
+        }
+        catch (UnsatisfiedLinkError oIgnored)
+        {
+            // Layout can precede Qt's native library initialization. Retry on the next layout/resume.
+            return false;
+        }
     }
     public static void setVolumePagingEnabled(boolean bEnabled)
     {
         m_bVolumePagingEnabled = bEnabled;
     }
     private static native void nativeVolumePage(int nDirection);
+    private static native void nativeReadingInsetsChanged();
 
     @Override public boolean dispatchKeyEvent(KeyEvent oEvent)
     {
@@ -76,12 +123,14 @@ public class ReaderActivity extends QtActivity
     }
     @Override public void onDestroy()
     {
+        m_oReadingWindow.close();
         m_oSurfaceRecovery.close();
         BrowserLogin.destroy();
         super.onDestroy();
     }
     @Override public void onPause()
     {
+        m_oReadingWindow.setForeground(false);
         m_oSurfaceRecovery.setForeground(false);
         BrowserLogin.persist();
         m_bVolumePagingEnabled = false;

@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    project(Wenku8Sdk VERSION 1.0.3 LANGUAGES C CXX)
+    project(Wenku8Sdk VERSION 1.0.4 LANGUAGES C CXX)
 endif()
 
 include(GNUInstallDirs)
@@ -66,7 +66,7 @@ target_sources(Wenku8Sdk PRIVATE
 target_compile_features(Wenku8Sdk PUBLIC cxx_std_17)
 target_compile_definitions(Wenku8Sdk PRIVATE WENKU8SDK_EXPORTS)
 set_target_properties(Wenku8Sdk PROPERTIES
-    VERSION 1.0.3
+    VERSION 1.0.4
     SOVERSION 1
     POSITION_INDEPENDENT_CODE ON
 )

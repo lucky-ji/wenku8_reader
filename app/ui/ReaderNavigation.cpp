@@ -28,6 +28,7 @@ namespace Wenku8::Reader
     {
         m_oSettings.setValue("readingMode", int(m_pReader->readingMode()));
         m_oSettings.setValue("volumePageKeys", m_bVolumePaging);
+        m_oSettings.setValue("readerKeepAwake", m_bKeepAwake);
     }
     void ClientWindow::updateReaderFooter()
     {
@@ -83,6 +84,9 @@ namespace Wenku8::Reader
     }
     void ClientWindow::updateVolumePaging()
     {
+        setAndroidReadingActive(m_bUnlocked && m_pPages->currentIndex() == 3 &&
+                                QGuiApplication::applicationState() == Qt::ApplicationActive,
+                                m_bKeepAwake);
         setAndroidVolumePaging(m_bVolumePaging && m_bUnlocked && !m_bLoadingBusy &&
                                m_pPages->currentIndex() == 3 &&
                                QGuiApplication::applicationState() == Qt::ApplicationActive);

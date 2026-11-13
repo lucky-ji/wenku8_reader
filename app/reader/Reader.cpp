@@ -542,6 +542,7 @@ namespace Wenku8::Reader
         if (m_eMode == eMode)
             return;
         const int nPosition = readingPosition();
+        resetWheelInput();
         m_eMode = eMode;
         setVerticalScrollBarPolicy(eMode == ReadingMode::Paged ? Qt::ScrollBarAlwaysOff
                                                                : Qt::ScrollBarAsNeeded);
@@ -919,17 +920,88 @@ namespace Wenku8::Reader
             qBound(nInset, m_vPages[m_nPage].m_nEnd - m_vPages[m_nPage].m_nY, viewport()->height());
         oP.fillRect(QRect(0, nEnd, viewport()->width(), viewport()->height() - nEnd), m_oPaper);
     }
+    void ReadingView::resetWheelInput(bool bResetCooldown)
+    {
+        m_nWheelDelta = 0;
+        m_nWheelDirection = 0;
+        m_bWheelGestureActive = false;
+        m_bWheelGestureTurned = false;
+        m_bWheelPixelInput = false;
+        m_oWheelEventTimer.invalidate();
+        if (bResetCooldown)
+        {
+            m_oWheelTurnTimer.invalidate();
+        }
+    }
     void ReadingView::wheelEvent(QWheelEvent* pEvent)
     {
-        if (m_eMode == ReadingMode::Paged)
+        if (m_eMode != ReadingMode::Paged)
         {
-            int nDelta = pEvent->angleDelta().y();
-            if (nDelta && !turnPage(nDelta < 0 ? 1 : -1))
-                emit chapterBoundaryRequested(nDelta < 0 ? 1 : -1);
-            pEvent->accept();
+            QTextBrowser::wheelEvent(pEvent);
             return;
         }
-        QTextBrowser::wheelEvent(pEvent);
+        pEvent->accept();
+        const auto ePhase = pEvent->phase();
+        if (ePhase == Qt::ScrollMomentum)
+        {
+            // Inertia belongs to the gesture that already selected a page.
+            return;
+        }
+        if (ePhase == Qt::ScrollEnd)
+        {
+            resetWheelInput();
+            return;
+        }
+        const bool bPhased = ePhase != Qt::NoScrollPhase;
+        if (ePhase == Qt::ScrollBegin || (bPhased && !m_bWheelGestureActive))
+        {
+            resetWheelInput(false);
+            m_bWheelGestureActive = true;
+        }
+        else if (!bPhased &&
+                 (m_bWheelGestureActive ||
+                  (m_oWheelEventTimer.isValid() && m_oWheelEventTimer.elapsed() > 400)))
+        {
+            resetWheelInput(false);
+        }
+        const bool bPixelInput = pEvent->pixelDelta().y() != 0;
+        const int nDelta = bPixelInput ? pEvent->pixelDelta().y() : pEvent->angleDelta().y();
+        if (nDelta == 0 || (bPhased && m_bWheelGestureTurned))
+        {
+            return;
+        }
+        m_oWheelEventTimer.start();
+        const int nDirection = nDelta < 0 ? 1 : -1;
+        if (nDirection != m_nWheelDirection || bPixelInput != m_bWheelPixelInput)
+        {
+            // Do not let a small reverse motion reuse a previous forward remainder.
+            m_nWheelDelta = 0;
+        }
+        m_nWheelDirection = nDirection;
+        m_bWheelPixelInput = bPixelInput;
+        const int nThreshold = bPixelInput ? 80 : 120;
+        m_nWheelDelta = qBound(-nThreshold,
+                              m_nWheelDelta + qBound(-nThreshold, nDelta, nThreshold),
+                              nThreshold);
+        if (qAbs(m_nWheelDelta) < nThreshold)
+        {
+            return;
+        }
+        // Never queue unused notches or touchpad momentum across page/chapter boundaries.
+        m_nWheelDelta = 0;
+        if (!bPhased && m_oWheelTurnTimer.isValid() && m_oWheelTurnTimer.elapsed() < 160)
+        {
+            return;
+        }
+        m_oWheelTurnTimer.start();
+        if (bPhased)
+        {
+            m_bWheelGestureTurned = true;
+        }
+        if (!turnPage(nDirection))
+        {
+            emit chapterBoundaryRequested(nDirection);
+        }
     }
     void ReadingView::keyPressEvent(QKeyEvent* pEvent)
     {
@@ -948,6 +1020,7 @@ namespace Wenku8::Reader
     }
     void ReadingView::hideEvent(QHideEvent* pEvent)
     {
+        resetWheelInput();
         cancelMotion();
         m_oWarmTimer.stop();
         m_vWarmBands.clear();

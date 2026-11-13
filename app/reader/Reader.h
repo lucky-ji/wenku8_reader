@@ -10,6 +10,7 @@
 #include <QCache>
 #include <QPixmap>
 #include <QTimer>
+#include <QElapsedTimer>
 class QPropertyAnimation;
 class QVariantAnimation;
 class QPainter;
@@ -144,6 +145,11 @@ namespace Wenku8::Reader
         QVector<Page> m_vPages;
         int m_nPage = 0;
         ReadingMode m_eMode = ReadingMode::Scroll;
+        int m_nWheelDelta = 0, m_nWheelDirection = 0;
+        bool m_bWheelGestureActive = false, m_bWheelGestureTurned = false,
+             m_bWheelPixelInput = false;
+        QElapsedTimer m_oWheelEventTimer, m_oWheelTurnTimer;
+        void resetWheelInput(bool bResetCooldown = true);
         QColor m_oPaper = Qt::white;
         QPropertyAnimation* m_pScrollAnimation = nullptr;
         QVariantAnimation* m_pTurnAnimation = nullptr;

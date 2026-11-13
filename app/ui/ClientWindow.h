@@ -72,6 +72,7 @@ namespace Wenku8::Reader
         bool m_bCompact = false, m_bReaderToolsOpen = false, m_bAdaptingLayout = false;
         bool m_bReaderChrome = true;
         bool m_bVolumePaging = true;
+        bool m_bKeepAwake = false;
         QVector<int> m_vMobileHistory;
         int m_nMobileReaderOffset = 0;
         TouchScroll *m_pCardsTouch = nullptr, *m_pTocTouch = nullptr, *m_pReaderTouch = nullptr;

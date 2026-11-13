@@ -59,6 +59,7 @@
 #include <QScroller>
 #include <QKeyEvent>
 #include <QScreen>
+#include <QtMath>
 #include <QWindow>
 #include <QFile>
 namespace Wenku8::Reader
@@ -468,6 +469,15 @@ namespace Wenku8::Reader
                                 m_oSettings.value("readerParagraphSpacing", 8).toInt(),
                                 m_oSettings.value("readerSideMargin", 0).toInt());
         m_bVolumePaging = m_oSettings.value("volumePageKeys", true).toBool();
+        m_bKeepAwake = m_oSettings.value("readerKeepAwake", false).toBool();
+        const QPointer<ClientWindow> pThis(this);
+        setAndroidSafeInsetsChangedHandler([pThis]
+        {
+            if (pThis)
+            {
+                pThis->adaptLayout();
+            }
+        });
         setReadingMode(ReadingMode(qBound(0, m_oSettings.value("readingMode", 0).toInt(), 1)));
         setTheme(m_eTheme);
         adaptLayout();
@@ -653,6 +663,8 @@ namespace Wenku8::Reader
     ClientWindow::~ClientWindow()
     {
         setAndroidVolumePaging(false);
+        setAndroidReadingActive(false, false);
+        setAndroidSafeInsetsChangedHandler({});
         saveProgress();
         m_oSettings.sync();
 #ifdef WENKU8_CLIENT_ONLINE
@@ -2050,7 +2062,10 @@ namespace Wenku8::Reader
             return;
         m_bRestoring = true;
         const auto nGeneration = ++m_nRestoreGeneration;
-        m_bReaderChrome = true;
+        if (m_nChapter < 0)
+        {
+            m_bReaderChrome = true;
+        }
         if (mobileMode())
             QGuiApplication::inputMethod()->hide();
         m_pTitle->setText("阅读时间");
@@ -2396,17 +2411,21 @@ namespace Wenku8::Reader
             setProperty("compact", m_bCompact);
         }
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
-        // A maximized window already respects the platform's available area. When
-        // fullscreen extends under system UI, inset only the part outside that area.
         if (windowHandle() && screen())
         {
-            QRect oGlobal(mapToGlobal(QPoint(0, 0)), size());
-            QRect oSafe = oGlobal.intersected(screen()->availableGeometry());
-            if (!oSafe.isEmpty())
-                centralWidget()->layout()->setContentsMargins(
-                    qMax(0, oSafe.left() - oGlobal.left()), qMax(0, oSafe.top() - oGlobal.top()),
-                    qMax(0, oGlobal.right() - oSafe.right()),
-                    qMax(0, oGlobal.bottom() - oSafe.bottom()));
+            const QRect oGlobal(mapToGlobal(QPoint(0, 0)), size());
+            const QRect oSafe = oGlobal.intersected(screen()->availableGeometry());
+            const auto oAndroidInsets = getAndroidSafeInsets();
+            const qreal fDpr = qMax(qreal(1), devicePixelRatioF());
+            const QMargins oMargins(
+                qMax(oSafe.isEmpty() ? 0 : qMax(0, oSafe.left() - oGlobal.left()), qCeil(oAndroidInsets.left() / fDpr)),
+                qMax(oSafe.isEmpty() ? 0 : qMax(0, oSafe.top() - oGlobal.top()), qCeil(oAndroidInsets.top() / fDpr)),
+                qMax(oSafe.isEmpty() ? 0 : qMax(0, oGlobal.right() - oSafe.right()), qCeil(oAndroidInsets.right() / fDpr)),
+                qMax(oSafe.isEmpty() ? 0 : qMax(0, oGlobal.bottom() - oSafe.bottom()), qCeil(oAndroidInsets.bottom() / fDpr)));
+            if (centralWidget()->layout()->contentsMargins() != oMargins)
+            {
+                centralWidget()->layout()->setContentsMargins(oMargins);
+            }
         }
 #endif
         const bool bMobile = mobileMode(), bReading = m_pPages->currentIndex() == 3,

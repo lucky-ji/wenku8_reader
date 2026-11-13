@@ -407,6 +407,18 @@ namespace Wenku8::Reader
         auto* pVolumeHint = paragraph("音量上键：上一页 · 音量下键：下一页");
         pVolumeHint->setVisible(bMobile);
         pModeLayout->addWidget(pVolumeHint);
+        auto* pKeepAwake = new QCheckBox("阅读时保持屏幕常亮");
+        pKeepAwake->setObjectName("readerKeepAwake");
+        pKeepAwake->setMinimumHeight(48);
+        pKeepAwake->setChecked(m_bKeepAwake);
+        pKeepAwake->setVisible(bMobile);
+        pModeLayout->addWidget(pKeepAwake);
+        connect(pKeepAwake, &QCheckBox::toggled, pPage, [this](bool bEnabled)
+        {
+            m_bKeepAwake = bEnabled;
+            saveReaderPreferences();
+            updateVolumePaging();
+        });
         connect(pVolume, &QCheckBox::toggled, pPage,
                 [this](bool bEnabled)
                 {
