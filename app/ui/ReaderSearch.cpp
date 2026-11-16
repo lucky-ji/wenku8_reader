@@ -2,7 +2,10 @@
 #include "ClientWindow.h"
 #include "PageControls.h"
 #include "AnimatedStack.h"
-#include <QDialog>
+#include <QTextDocument>
+#include <QRegularExpression>
+#include <memory>
+#include <algorithm>
 #include <QLineEdit>
 #include <QHBoxLayout>
 #include <QInputMethod>
@@ -50,6 +53,7 @@ namespace Wenku8::Reader
         auto* pPreview = paragraph("找到匹配后，将在这里显示附近的正文。", "intro");
         pPreview->setObjectName("readerSearchPreview");
         pPreview->setMinimumHeight(96);
+        pPreview->setTextFormat(Qt::RichText);
         pPreviewGroup->addWidget(pPreview);
         auto* pRead = action("阅读此处", "readerSearchRead", Icon::Book);
         pRead->setProperty("mobileRow", false);
@@ -58,7 +62,8 @@ namespace Wenku8::Reader
         pLayout->addWidget(pRead);
         pLayout->addStretch();
 
-        auto fnSearch = [this, pPage, pSearch, pStatus, pPreview, pRead, bMobile](bool bBackward)
+        auto pMatches = std::make_shared<QVector<int>>();
+        auto fnSearch = [this, pPage, pSearch, pStatus, pPreview, pRead, bMobile, pMatches](bool bBackward)
         {
             const QString strQuery = pSearch->text().trimmed();
             if (strQuery.isEmpty())
@@ -74,11 +79,47 @@ namespace Wenku8::Reader
                 pPage->setProperty("searchMatchOffset", QVariant());
                 return;
             }
+            if (pPage->property("countedQuery").toString() != strQuery)
+            {
+                pMatches->clear();
+                QTextCursor oCursor(m_pReader->document());
+                while (pMatches->size() < 10000)
+                {
+                    oCursor = m_pReader->document()->find(strQuery, oCursor);
+                    if (oCursor.isNull())
+                    {
+                        break;
+                    }
+                    pMatches->append(oCursor.selectionStart());
+                }
+                pPage->setProperty("countedQuery", strQuery);
+            }
             const int nOffset = m_pReader->textCursor().selectionStart();
             pPage->setProperty("searchMatchOffset", nOffset);
             pRead->setEnabled(true);
-            pStatus->setText("已找到匹配。可继续查找，或阅读此处；查找会在本章首尾循环。");
-            pPreview->setText(m_pReader->readingSnippet(qMax(0, nOffset - 40), 220));
+            const auto oFound = std::lower_bound(pMatches->cbegin(), pMatches->cend(), nOffset);
+            const int nOrdinal = int(oFound - pMatches->cbegin()) + 1;
+            const bool bLimited = pMatches->size() >= 10000;
+            pStatus->setText(bLimited ? "当前匹配 · 至少 10000 处，支持首尾循环"
+                                     : QString("第 %1 / %2 处 · 支持首尾循环").arg(nOrdinal).arg(pMatches->size()));
+            const QString strSnippet = m_pReader->readingSnippet(qMax(0, nOffset - 40), 220);
+            const QRegularExpression oPattern(QRegularExpression::escape(strQuery),
+                                              QRegularExpression::CaseInsensitiveOption);
+            auto oMatches = oPattern.globalMatch(strSnippet);
+            QString strHtml;
+            int nPrevious = 0;
+            const auto oColors = colors(m_eTheme);
+            while (oMatches.hasNext())
+            {
+                const auto oMatch = oMatches.next();
+                strHtml += strSnippet.mid(nPrevious, oMatch.capturedStart() - nPrevious).toHtmlEscaped();
+                strHtml += QString("<span style='background-color:%1;color:%2;font-weight:600'>%3</span>")
+                               .arg(oColors.m_oSelection.name(), oColors.m_oSelectionText.name(),
+                                    oMatch.captured().toHtmlEscaped());
+                nPrevious = oMatch.capturedEnd();
+            }
+            strHtml += strSnippet.mid(nPrevious).toHtmlEscaped();
+            pPreview->setText(strHtml);
             if (bMobile)
             {
                 // popMobilePage restores this anchor after the reader becomes visible.
@@ -94,6 +135,7 @@ namespace Wenku8::Reader
                     pNext->setEnabled(bHasQuery);
                     pRead->setEnabled(false);
                     pPage->setProperty("searchMatchOffset", QVariant());
+                    pPage->setProperty("countedQuery", QVariant());
                     pStatus->setText("点击上一处或下一处查找，搜索范围仅为当前章节。");
                     pPreview->setText("找到匹配后，将在这里显示附近的正文。");
                 });
@@ -131,19 +173,12 @@ namespace Wenku8::Reader
             pushMobilePage(pPage, "章内查找");
             return;
         }
-        QDialog oDialog(this);
-        oDialog.setObjectName("readerSearchDialog");
-        oDialog.setWindowTitle("章内查找");
-        auto* pDialogLayout = new QVBoxLayout(&oDialog);
-        pDialogLayout->setContentsMargins(16, 16, 16, 16);
-        pDialogLayout->addWidget(pPage);
-        auto* pClose = new QPushButton("关闭");
-        pClose->setMinimumHeight(40);
-        pDialogLayout->addWidget(pClose, 0, Qt::AlignRight);
-        connect(pClose, &QPushButton::clicked, &oDialog, &QDialog::accept);
-        connect(pRead, &QPushButton::clicked, &oDialog, &QDialog::accept);
-        applyTheme(&oDialog, m_eTheme);
-        oDialog.resize(qMin(600, width() - 40), qMin(520, height() - 40));
-        oDialog.exec();
+        pRead->setText("定位到正文");
+        connect(pRead, &QPushButton::clicked, this, [this]
+        {
+            m_pReader->setFocus();
+        });
+        showReaderPanel(pPage, "章内查找");
+        pSearch->setFocus();
     }
 }

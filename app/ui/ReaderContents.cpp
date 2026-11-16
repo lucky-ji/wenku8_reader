@@ -137,11 +137,12 @@ namespace Wenku8::Reader
             pVolume->setExpanded(true);
         }
 
-        auto fnActivate = [this, pPage, nBook](QTreeWidgetItem* pItem)
+        auto fnActivate = [this, pPage, nBook, bMobile](QTreeWidgetItem* pItem)
         {
             // A mouse double click or an accessibility activation may follow the
             // first click. Once the page has been popped, it cannot switch twice.
-            if (!pItem || m_pPages->currentWidget() != pPage || m_bLoadingBusy ||
+            if (!pItem || (bMobile ? m_pPages->currentWidget() != pPage
+                         : m_pPages->currentIndex() != 3 || !pPage->isVisible()) || m_bLoadingBusy ||
                 m_oBook.m_nId != nBook)
             {
                 return;
@@ -158,7 +159,10 @@ namespace Wenku8::Reader
                 return;
             }
             const bool bSameChapter = nIndex == m_nChapter;
-            popMobilePage();
+            if (bMobile)
+            {
+                popMobilePage();
+            }
             if (!bSameChapter)
             {
                 m_nRestoreOffset = -1;
@@ -249,7 +253,15 @@ namespace Wenku8::Reader
         pLocate->setEnabled(pCurrentItem != nullptr);
         connect(pLocate, &QPushButton::clicked, pPage, fnLocate);
 
-        pushMobilePage(pPage, "目录");
+        if (bMobile)
+        {
+            pushMobilePage(pPage, "目录");
+        }
+        else
+        {
+            pBack->hide();
+            showReaderPanel(pPage, "目录");
+        }
         QTimer::singleShot(0, pPage, fnLocate);
     }
 } // namespace Wenku8::Reader

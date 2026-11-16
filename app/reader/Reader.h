@@ -10,6 +10,7 @@
 #include <QCache>
 #include <QPixmap>
 #include <QTimer>
+#include <QElapsedTimer>
 class QPropertyAnimation;
 class QVariantAnimation;
 class QPainter;
@@ -65,6 +66,20 @@ namespace Wenku8::Reader
             appearance(nPointSize, bDark ? Theme::Dark : Theme::Light);
         }
         void setTypography(int nLineHeightPercent, int nParagraphSpacing, int nSideMargin);
+        void setReadingFont(const QString& strFamily, bool bBold);
+        QString fontFamily() const
+        {
+            return m_strReadingFontFamily;
+        }
+        bool bold() const
+        {
+            return m_bReadingBold;
+        }
+        void setComfortWidth(int nMaxWidth);
+        int comfortWidth() const
+        {
+            return m_nComfortWidth;
+        }
         int lineHeightPercent() const
         {
             return m_nLineHeightPercent;
@@ -133,6 +148,10 @@ namespace Wenku8::Reader
         QSize m_oLayoutViewport;
         Theme m_eAppearanceTheme = Theme::Light;
         int m_nLineHeightPercent = 145, m_nParagraphSpacing = 8, m_nSideMargin = 0;
+        QString m_strReadingFontFamily, m_strDefaultFontFamily;
+        bool m_bReadingBold = false, m_bUpdatingComfortMargins = false;
+        int m_nComfortWidth = 0;
+        void updateComfortMargins();
         ChapterText m_oChapter;
         LocalDocument::ImageLoader m_fnLoader;
         void rebuild(int nPosition);
@@ -144,6 +163,11 @@ namespace Wenku8::Reader
         QVector<Page> m_vPages;
         int m_nPage = 0;
         ReadingMode m_eMode = ReadingMode::Scroll;
+        int m_nWheelDelta = 0, m_nWheelDirection = 0;
+        bool m_bWheelGestureActive = false, m_bWheelGestureTurned = false,
+             m_bWheelPixelInput = false;
+        QElapsedTimer m_oWheelEventTimer, m_oWheelTurnTimer;
+        void resetWheelInput(bool bResetCooldown = true);
         QColor m_oPaper = Qt::white;
         QPropertyAnimation* m_pScrollAnimation = nullptr;
         QVariantAnimation* m_pTurnAnimation = nullptr;
