@@ -52,7 +52,9 @@ def main():
             raise RuntimeError("Real Qt 5 WebEngine helper is missing")
         shutil.copy2(pHelper, pBundle / "libexec/QtWebEngineProcess")
         vPending.append(pHelper)
-        for strGroup in ("platforms", "imageformats", "iconengines", "xcbglintegrations"):
+        if not any((pQt / "plugins/texttospeech").glob("*.so")):
+            raise RuntimeError("Qt 5 TextToSpeech system plugin is missing; install the qtspeech module")
+        for strGroup in ("platforms", "imageformats", "iconengines", "xcbglintegrations", "texttospeech"):
             for pPlugin in (pQt / "plugins" / strGroup).glob("*.so"):
                 pDestination = pBundle / "plugins" / strGroup / pPlugin.name
                 pDestination.parent.mkdir(parents=True, exist_ok=True)

@@ -9,11 +9,14 @@
 • libxml2 2.15.4：MIT 及源文件内的补充声明，见 libxml2-2.15.4.txt。
 • TinyXML-2 10.0.0：zlib license，见对应源码 third_party/tinyxml2/LICENSE.txt。
 • 桌面版 Qt 5.15.2 WebEngine、WebChannel、QML 等模块及其传递依赖：沿用相应 Qt 许可选项；Chromium 及其内置第三方声明见 Qt-5.15.2-Chromium.txt 与 Qt 组件许可目录。
+• 桌面 Qt Speech：采用 GPL-2.0 许可选项，原始正文见 Qt-Speech-5.15.2-GPL-2.0.txt；平台语音插件与对应源码一同保留。
 • Android 版本另使用 Qt AndroidExtras、GNU libiconv / libcharset、Mbed TLS 和 LLVM libc++ filesystem；各自原始许可证见发布包许可目录。
 
 平台组件
 
 Android 系统 WebView 由操作系统提供。Windows 版使用系统 Schannel 进行 TLS；Microsoft 运行库遵守随附的再分发条款。
+
+听书使用系统提供的语音服务与音色，不随本应用分发语音数据或在线语音 SDK。系统引擎及音色的许可、下载和联网隐私规则由其提供方维护。
 
 完整法律文本与版权声明
 

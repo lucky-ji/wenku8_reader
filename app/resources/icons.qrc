@@ -25,5 +25,9 @@
 <file alias="folder.svg">assets/icons/folder.svg</file>
 <file alias="check.svg">assets/icons/check.svg</file>
 <file alias="settings.svg">assets/icons/settings.svg</file>
+<file alias="headphones.svg">assets/icons/headphones.svg</file>
+<file alias="play.svg">assets/icons/play.svg</file>
+<file alias="pause.svg">assets/icons/pause.svg</file>
+<file alias="stop.svg">assets/icons/stop.svg</file>
 </qresource></RCC>
 

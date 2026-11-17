@@ -32,7 +32,11 @@ namespace Wenku8::Reader
         Fullscreen,
         Profile,
         Folder,
-        Settings
+        Settings,
+        Headphones,
+        Play,
+        Pause,
+        Stop
     };
     QIcon makeIcon(Icon, const QColor& oNormal, const QColor& oDisabled, const QColor& oActive);
     void setButtonIcon(QAbstractButton*, Icon);

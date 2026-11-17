@@ -6,6 +6,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QScrollArea>
+#include <QVariant>
 namespace Wenku8::Reader::PageControls
 {
     inline QPushButton* action(const QString& strTitle, const char* pName, Icon eIcon)

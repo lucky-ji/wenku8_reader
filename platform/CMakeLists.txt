@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 set(strAppResources "${CMAKE_CURRENT_SOURCE_DIR}/../app/resources")
-add_library(reader_platform STATIC LoginHost.h ExportDestination.h "${strAppResources}/mobile_browser.qrc")
+add_library(reader_platform STATIC LoginHost.h ExportDestination.h SpeechEngine.h "${strAppResources}/mobile_browser.qrc")
 target_include_directories(reader_platform PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/android/nativebridge"
@@ -13,6 +13,7 @@ if(ANDROID)
         android/nativebridge/AndroidLoginHost.cpp
         android/nativebridge/AndroidExportDestination.cpp
         android/nativebridge/AndroidKeys.cpp android/nativebridge/AndroidKeys.h
+        android/nativebridge/AndroidSpeechEngine.cpp
         android/nativebridge/MobileBrowserProtocol.cpp android/nativebridge/MobileBrowserProtocol.h
     )
     target_link_libraries(reader_platform PUBLIC Qt5::AndroidExtras)
@@ -22,7 +23,7 @@ if(ANDROID)
 elseif(IOS)
     message(FATAL_ERROR "iOS WKWebView session host is not implemented yet; the iOS files currently document UI groundwork only.")
 else()
-    find_package(Qt5 5.15 REQUIRED COMPONENTS WebEngineWidgets)
+    find_package(Qt5 5.15 REQUIRED COMPONENTS WebEngineWidgets TextToSpeech)
     add_library(Wenku8WebView STATIC desktop/qtwebview/Wenku8WebView.cpp desktop/qtwebview/Wenku8WebView.h)
     add_library(Wenku8::WebView ALIAS Wenku8WebView)
     target_include_directories(Wenku8WebView PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/desktop/qtwebview")
@@ -32,6 +33,6 @@ else()
     if(MSVC)
         target_compile_options(Wenku8WebView PRIVATE /W4 /utf-8)
     endif()
-    target_sources(reader_platform PRIVATE desktop/DesktopLoginHost.cpp desktop/ExportDestination.cpp)
-    target_link_libraries(reader_platform PUBLIC Wenku8::WebView)
+    target_sources(reader_platform PRIVATE desktop/DesktopLoginHost.cpp desktop/ExportDestination.cpp desktop/QtSpeechEngine.cpp)
+    target_link_libraries(reader_platform PUBLIC Wenku8::WebView Qt5::TextToSpeech)
 endif()

@@ -26,6 +26,10 @@ namespace Wenku8::Reader
         {
             m_fnPress = std::move(fnAction);
         }
+        void setDragAction(std::function<void()> fnAction)
+        {
+            m_fnDrag = std::move(fnAction);
+        }
         // Optional edge gesture. Progress is damped distance / 72 logical px;
         // a raw 96px pull reaches the release threshold. The header owns its return
         // animation; this controller always reports zero before invoking refresh.
@@ -50,6 +54,8 @@ namespace Wenku8::Reader
         bool m_bPaged = false;
         std::function<void(int)> m_fnTurn;
         std::function<void()> m_fnPress;
+        std::function<void()> m_fnDrag;
+        bool m_bDragNotified = false;
         void releaseFeedback();
         void moveScroll(const QPointF&, qint64 nTimestamp);
         qint64 inputTimestamp(const QTouchEvent*);

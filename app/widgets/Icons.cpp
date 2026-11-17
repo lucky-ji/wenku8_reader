@@ -35,7 +35,10 @@ namespace Wenku8::Reader
                                 "moon",         "leaf",
                                 "shield",       "history",
                                 "shelf-add",    "fullscreen",
-                                "profile", "folder", "settings"};
+                                "profile",      "folder",
+                                "settings",     "headphones",
+                                "play",         "pause",
+                                "stop"};
         QSvgRenderer* renderer(Icon eIcon, const QColor& oColor)
         {
             initializeWenkuIcons();

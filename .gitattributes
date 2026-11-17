@@ -1,7 +1,7 @@
 * text=auto eol=lf
 third_party/** -text
-licenses/** -text
-platform/android/assets/licenses/** -text
+licenses/** -text whitespace=cr-at-eol
+platform/android/assets/licenses/** -text whitespace=cr-at-eol
 *.png binary
 *.ico binary
 *.zip binary

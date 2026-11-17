@@ -10,6 +10,7 @@
 | [TinyXML-2](https://github.com/leethomason/tinyxml2/tree/10.0.0) | 10.0.0；XML 与存储清单 | zlib license；[原始 LICENSE](third_party/tinyxml2/LICENSE.txt) 与源文件头 |
 | [libxml2](https://gitlab.gnome.org/GNOME/libxml2) | 2.15.4；HTML/XPath 解析 | MIT 及部分源文件补充声明；[完整文本](licenses/libxml2-2.15.4.txt) |
 | [Qt](https://www.qt.io/) | 5.15.2；Core、Gui、Widgets、Svg、Concurrent、平台与图片插件 | 本项目采用相应模块提供的 GPL-2.0 许可选项；[GPL 正文](licenses/Qt-5.15.2-GPL-2.0.txt)。Qt 内置组件声明随对应源码和发行包保留 |
+| [Qt Speech](https://code.qt.io/cgit/qt/qtspeech.git/tree/?h=v5.15.2) | 桌面系统文字转语音适配及平台插件；Android 使用自有 JNI 适配，不链接该模块 | 模块源码提供 GPL-2.0-or-later 选项，本项目选择 GPL-2.0；[未经修改的 LICENSE.GPLv2](licenses/Qt-Speech-5.15.2-GPL-2.0.txt) |
 | [Qt WebEngine / Chromium](https://doc.qt.io/archives/qt-5.15/qtwebengine-licensing.html) | 桌面登录与会话；包括 WebChannel 等传递依赖 | Qt 模块许可及 Chromium 多种第三方许可证；[保留声明](licenses/Qt-5.15.2-Chromium.txt)，完整组件归属随实际 Qt 源码和发行包提供 |
 | [GNU libiconv / libcharset](https://www.gnu.org/software/libiconv/) | 1.17；Android 编码转换 | LGPL-2.1-or-later；[完整文本](licenses/libiconv-1.17.txt) |
 | [Mbed TLS](https://github.com/Mbed-TLS/mbedtls/tree/mbedtls-3.6.5) | 3.6.5；Android 原生网络依赖 | 采用 GPL-2.0-or-later 许可选项；[完整文本](licenses/mbedtls-3.6.5.txt)，内置第三方声明以原源码为准 |
@@ -19,6 +20,8 @@
 | [ICU](https://github.com/unicode-org/icu/releases/tag/release-56-1) | 56.1；官方 Linux Qt kit 的 Unicode 运行依赖 | ICU、Unicode 数据及原始附加条款；[完整原始许可](licenses/icu-56.1.txt)，未经修改的源码地址和摘要见 [依赖来源](docs/DEPENDENCIES.md) |
 
 Windows 默认 SDK cURL 使用系统 Schannel，不为此链接 OpenSSL。Android 系统 WebView 由操作系统提供，不随 APK 分发 Chromium。Qt AndroidExtras 的许可随 Qt 5 相应模块保留。上表描述本项目使用的版本；改用系统 cURL 或其他 Qt 构建时，必须按实际依赖更新发行材料。
+
+听书通过 Windows SAPI、macOS 系统语音、Linux Speech Dispatcher 或 Android TextToSpeech 调用用户设备上的语音引擎与音色。本项目不分发这些系统语音数据，也不附带云端语音 SDK、API 密钥或自建语音服务。系统音色可能需要联网；应用默认不允许联网音色合成，用户明确允许后由所选系统引擎按其服务规则处理文字。语音引擎与音色的许可和隐私规则由对应提供方维护。
 
 原生桌面构建补充：Linux x86_64 与 macOS Intel 使用官方 Qt 5.15.2，macOS SDK cURL 使用系统 SecureTransport；Linux SDK cURL 使用发行版 Mbed TLS，采用 GPL-2.0-or-later 许可选项。Ubuntu 24.04 ARM64 使用系统 Qt 5.15.13、Qt WebEngine 5.15.16 及系统 Mbed TLS，不随应用复制这些系统库。Linux 包内的 `BUILD-METADATA.json`、`RUNTIME-DEPENDENCIES.txt` 与对应源码材料记录实际系统包及源码版本，不能将其视为使用了表中全部同版本的私有库。QtMacExtras、QtX11Extras 等实际分发模块的原始源码与声明随桌面对应源码保留。
 
@@ -31,6 +34,7 @@ Windows 默认 SDK cURL 使用系统 Schannel，不为此链接 OpenSSL。Androi
 - [LightNovelReader](https://github.com/Xempastissimo/LightNovelReader)：用于核对公开榜单 URL 与页面结构说明，未复制或链接其实现、测试、资产或二进制，不属于运行依赖。
 - [wenku8-opds-readme](https://github.com/WorldObservationLog/wenku8-opds-readme)：OPDS 服务说明参考，未复制或分发其服务实现。
 - [KOReader](https://github.com/koreader/koreader)、[Readest](https://github.com/readest/readest)、[Legado](https://github.com/Jer-Chao/legado)、CoolReader、Lector 和 foliate-js：阅读交互和架构研究参考，未复制、链接或分发它们的代码或资源，不属于本项目运行依赖。
+- 听书的播放状态、逐段定位和控制布局参考 Legado 与 Readest 的公开功能组织；分段、状态控制与各平台系统语音适配均为本项目自行实现，未复制上游代码或资源。
 
 ## 对应源码与再分发
 

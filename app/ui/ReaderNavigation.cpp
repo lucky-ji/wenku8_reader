@@ -3,6 +3,7 @@
 #include "AnimatedStack.h"
 #include "TouchScroll.h"
 #include "AndroidKeys.h"
+#include "ReadAloudController.h"
 #include <QPushButton>
 #include <QLabel>
 #include <QSlider>
@@ -60,8 +61,8 @@ namespace Wenku8::Reader
         const int nProgress = m_pReader->chapterProgress();
         const QSignalBlocker oBlocker(m_pReaderProgress);
         m_pReaderProgress->setValue(nProgress);
-        m_pReaderProgress->setEnabled(m_nChapter >= 0 && m_pRead->isEnabled() &&
-                                      !m_bLoadingBusy && m_pReader->canSeekProgress());
+        m_pReaderProgress->setEnabled(m_nChapter >= 0 && m_pRead->isEnabled() && !m_bLoadingBusy &&
+                                      m_pReader->canSeekProgress());
         m_pReaderProgressPercent->setText(QString("%1%").arg(nProgress / 10));
     }
     void ClientWindow::turnReaderPage(int nDirection)
@@ -71,6 +72,10 @@ namespace Wenku8::Reader
         if (!m_bUnlocked || m_pPages->currentIndex() != 3 || m_nChapter < 0 || m_bRestoring ||
             !m_pRead->isEnabled())
             return;
+        if (m_pReadAloud)
+        {
+            m_pReadAloud->setFollow(false);
+        }
         if (m_pReader->turnPage(nDirection))
             return;
         int nNext = m_nChapter + (nDirection < 0 ? -1 : 1);
@@ -84,11 +89,13 @@ namespace Wenku8::Reader
     }
     void ClientWindow::updateVolumePaging()
     {
-        setAndroidReadingActive(m_bUnlocked && m_pPages->currentIndex() == 3 &&
-                                QGuiApplication::applicationState() == Qt::ApplicationActive,
-                                m_bKeepAwake);
-        setAndroidVolumePaging(m_bVolumePaging && m_bUnlocked && !m_bLoadingBusy &&
+        const bool bListening = m_pReadAloud && speechPageActive() &&
+                                m_pReadAloud->state() == ReadAloudController::State::Playing;
+        setAndroidReadingActive(m_bUnlocked && (m_pPages->currentIndex() == 3 || bListening) &&
+                                    QGuiApplication::applicationState() == Qt::ApplicationActive,
+                                m_bKeepAwake || bListening);
+        setAndroidVolumePaging(m_bVolumePaging && m_bUnlocked && !m_bLoadingBusy && !bListening &&
                                m_pPages->currentIndex() == 3 &&
                                QGuiApplication::applicationState() == Qt::ApplicationActive);
     }
-}
+} // namespace Wenku8::Reader

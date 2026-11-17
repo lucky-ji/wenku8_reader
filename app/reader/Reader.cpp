@@ -6,6 +6,7 @@
 #include <QImageReader>
 #include <QScroller>
 #include <QScopedValueRollback>
+#include <QSignalBlocker>
 #include <QTextCursor>
 #include <QScrollBar>
 #include <QResizeEvent>
@@ -278,6 +279,7 @@ namespace Wenku8::Reader
     void ReadingView::showChapter(const QString& strTitle, const QString& strText,
                                   LocalDocument::ImageLoader fnLoader)
     {
+        clearSpeechRange();
         m_oChapter = formatChapter(strTitle, strText);
         m_fnLoader = std::move(fnLoader);
         rebuild(0);
@@ -332,6 +334,7 @@ namespace Wenku8::Reader
         paginate();
         m_oLayoutViewport = viewport()->size();
         restorePosition(nPosition);
+        updateSpeechSelection();
         queueWarmBands();
     }
     void ReadingView::reflow(int nPosition)
@@ -408,6 +411,124 @@ namespace Wenku8::Reader
         }
         verticalScrollBar()->setValue(verticalScrollBar()->value() + cursorRect(oCursor).top());
         emit pageStateChanged();
+    }
+    QTextCharFormat ReadingView::speechFormat() const
+    {
+        QTextCharFormat oFormat;
+        if (m_eAppearanceTheme == Theme::Dark)
+        {
+            oFormat.setBackground(QColor("#335445"));
+            oFormat.setForeground(QColor("#eff9ef"));
+        }
+        else if (m_eAppearanceTheme == Theme::EyeCare)
+        {
+            oFormat.setBackground(QColor("#d7e3bd"));
+            oFormat.setForeground(QColor("#30442b"));
+        }
+        else
+        {
+            oFormat.setBackground(QColor("#e2efdc"));
+            oFormat.setForeground(QColor("#24462b"));
+        }
+        oFormat.setProperty(m_nSpeechSelectionProperty, true);
+        return oFormat;
+    }
+    void ReadingView::updateSpeechSelection()
+    {
+        m_oSpeechCursor = QTextCursor();
+        const int nMaximum = qMax(0, m_pDocument->characterCount() - 1);
+        int nStart = qBound(0, m_nSpeechStart, nMaximum);
+        int nEnd = qBound(0, m_nSpeechEnd, nMaximum);
+        if (nStart < nEnd && m_nSpeechStart >= 0)
+        {
+            // Public offsets are UTF-16, just like QTextCursor. Expand an accidental
+            // surrogate split so a spoken emoji is never highlighted as half a glyph.
+            if (nStart > 0 && m_pDocument->characterAt(nStart).isLowSurrogate() &&
+                m_pDocument->characterAt(nStart - 1).isHighSurrogate())
+            {
+                --nStart;
+            }
+            if (nEnd < nMaximum && m_pDocument->characterAt(nEnd).isLowSurrogate() &&
+                m_pDocument->characterAt(nEnd - 1).isHighSurrogate())
+            {
+                ++nEnd;
+            }
+            m_oSpeechCursor = QTextCursor(m_pDocument);
+            m_oSpeechCursor.setPosition(nStart);
+            m_oSpeechCursor.setPosition(nEnd, QTextCursor::KeepAnchor);
+        }
+        auto vSelections = extraSelections();
+        for (int nIndex = vSelections.size() - 1; nIndex >= 0; --nIndex)
+        {
+            if (vSelections[nIndex].format.property(m_nSpeechSelectionProperty).toBool())
+            {
+                vSelections.removeAt(nIndex);
+            }
+        }
+        if (m_oSpeechCursor.hasSelection())
+        {
+            QTextEdit::ExtraSelection oSelection;
+            oSelection.cursor = m_oSpeechCursor;
+            oSelection.format = speechFormat();
+            vSelections.append(oSelection);
+        }
+        setExtraSelections(vSelections);
+    }
+    void ReadingView::setSpeechRange(int nStart, int nEnd, bool bFollow)
+    {
+        nStart = qMax(0, nStart);
+        nEnd = qMax(0, nEnd);
+        if (nEnd <= nStart)
+        {
+            clearSpeechRange();
+            return;
+        }
+        const bool bChanged = m_nSpeechStart != nStart || m_nSpeechEnd != nEnd;
+        m_nSpeechStart = nStart;
+        m_nSpeechEnd = nEnd;
+        if (bChanged)
+        {
+            cancelMotion();
+            updateSpeechSelection();
+            clearRasterCache();
+        }
+        if (bFollow)
+        {
+            const QTextCursor oPreviousCursor = textCursor();
+            const auto* pPreviousDocument = m_pDocument;
+            restorePosition(nStart);
+            if (pPreviousDocument == m_pDocument && oPreviousCursor.document() == m_pDocument)
+            {
+                // setTextCursor may scroll to the user's selection. Keep that selection,
+                // then restore the speech-follow scroll position without transient events.
+                const int nVertical = verticalScrollBar()->value();
+                const int nHorizontal = horizontalScrollBar()->value();
+                const QSignalBlocker oVerticalBlocker(verticalScrollBar());
+                const QSignalBlocker oHorizontalBlocker(horizontalScrollBar());
+                setTextCursor(oPreviousCursor);
+                verticalScrollBar()->setValue(nVertical);
+                horizontalScrollBar()->setValue(nHorizontal);
+            }
+        }
+        if (bChanged || bFollow)
+        {
+            viewport()->update();
+            queueWarmBands();
+        }
+    }
+    void ReadingView::clearSpeechRange()
+    {
+        if (m_nSpeechStart < 0 && m_nSpeechEnd < 0)
+        {
+            return;
+        }
+        m_nSpeechStart = -1;
+        m_nSpeechEnd = -1;
+        cancelMotion();
+        updateSpeechSelection();
+        clearRasterCache();
+        viewport()->update();
+        queueWarmBands();
     }
     void ReadingView::setTypography(int nLineHeightPercent, int nParagraphSpacing, int nSideMargin)
     {
@@ -533,6 +654,7 @@ namespace Wenku8::Reader
         {
             reflow(nPosition);
         }
+        updateSpeechSelection();
         viewport()->update();
     }
     void ReadingView::resizeEvent(QResizeEvent* pEvent)
@@ -789,6 +911,7 @@ namespace Wenku8::Reader
         {
             return false;
         }
+        emit userNavigation();
         cancelMotion();
         restorePosition(oFound.selectionStart());
         setTextCursor(oFound);
@@ -872,6 +995,13 @@ namespace Wenku8::Reader
             QAbstractTextDocumentLayout::PaintContext oContext;
             oContext.palette = palette();
             oContext.clip = QRectF(0, nTop, nWidth, m_nBandHeight);
+            if (m_oSpeechCursor.hasSelection() && m_oSpeechCursor.document() == m_pDocument)
+            {
+                QAbstractTextDocumentLayout::Selection oSelection;
+                oSelection.cursor = m_oSpeechCursor;
+                oSelection.format = speechFormat();
+                oContext.selections.append(oSelection);
+            }
             if (textCursor().hasSelection())
             {
                 QAbstractTextDocumentLayout::Selection oSelection;
@@ -1004,6 +1134,11 @@ namespace Wenku8::Reader
     }
     void ReadingView::wheelEvent(QWheelEvent* pEvent)
     {
+        if (pEvent->phase() != Qt::ScrollMomentum &&
+            (pEvent->angleDelta().y() != 0 || pEvent->pixelDelta().y() != 0))
+        {
+            emit userNavigation();
+        }
         if (m_eMode != ReadingMode::Paged)
         {
             QTextBrowser::wheelEvent(pEvent);
@@ -1074,6 +1209,22 @@ namespace Wenku8::Reader
     }
     void ReadingView::keyPressEvent(QKeyEvent* pEvent)
     {
+        switch (pEvent->key())
+        {
+        case Qt::Key_Left:
+        case Qt::Key_Right:
+        case Qt::Key_Up:
+        case Qt::Key_Down:
+        case Qt::Key_PageUp:
+        case Qt::Key_PageDown:
+        case Qt::Key_Home:
+        case Qt::Key_End:
+        case Qt::Key_Space:
+            emit userNavigation();
+            break;
+        default:
+            break;
+        }
         if (m_eMode == ReadingMode::Paged &&
             (pEvent->key() == Qt::Key_PageDown || pEvent->key() == Qt::Key_Right ||
              pEvent->key() == Qt::Key_PageUp || pEvent->key() == Qt::Key_Left))

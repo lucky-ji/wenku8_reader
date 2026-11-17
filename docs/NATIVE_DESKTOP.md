@@ -10,6 +10,10 @@
 
 这些是构建目标，最终是否可以分发以各原生任务的构建、部署与校验结果为准。Qt 5.15.2 没有官方 macOS ARM64 WebEngine kit，本工作流不生成虚构的 ARM64 Mac 客户端。iOS 不在本工作流范围内。
 
+桌面听书使用 Qt 5 `TextToSpeech` 与对应的系统引擎。官方 Qt 安装需同时选择 `qtspeech` 模块；Ubuntu ARM64 安装 `libqt5texttospeech5-dev`、`qtspeech5-speechd-plugin`，Linux 运行时需 Speech Dispatcher 及语音数据。打包会检查并复制官方 Qt 的 `texttospeech` 插件，macOS 检查 QtTextToSpeech framework 与系统语音插件；OS 服务和音色仍由系统安装，不随程序包分发。CI 的无声启动检查不能替代中文朗读、音频焦点或耳机拔出验收。
+
+aqtinstall 的 Qt 5.15.2 桌面包中，`qtspeech` 属于默认基础归档，不是 `--modules` 的可选扩展名；工作流安装基础 kit 后检查 `Qt5TextToSpeechConfig.cmake`，避免传入不存在的可选模块名称。
+
 ## 运行
 
 在 GitHub Actions 中选择该工作流，使用 `Run workflow` 指定源码 ref；或使用：

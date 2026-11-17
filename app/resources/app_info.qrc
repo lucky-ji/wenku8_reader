@@ -2,6 +2,7 @@
 <file alias="notice.txt">../../licenses/NOTICE.txt</file>
 <file alias="android-notice.txt">../../platform/android/assets/licenses/NOTICE.txt</file>
 <file alias="release_notes.json">release_notes.json</file>
+<file alias="Qt-Speech-5.15.2-GPL-2.0.txt">../../licenses/Qt-Speech-5.15.2-GPL-2.0.txt</file>
 <file alias="REFERENCE-GPL-2.0.txt">../../platform/android/assets/licenses/REFERENCE-GPL-2.0.txt</file>
 <file alias="Qt-5.15.2-GPL-2.0.txt">../../platform/android/assets/licenses/Qt-5.15.2-GPL-2.0.txt</file>
 <file alias="Qt-bundled-notices.txt">../../platform/android/assets/licenses/Qt-bundled-notices.txt</file>

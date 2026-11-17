@@ -14,7 +14,7 @@ cd wenku8_reader
 ## 通用要求
 
 - CMake 3.24 或更高版本、Ninja、支持 C++17 的编译器。
-- 客户端使用 Qt 5，工具链基线为 5.15.2，包含 Widgets、Svg、Concurrent；桌面另需 Network、WebEngineWidgets 及其传递依赖，Android 另需 AndroidExtras。Linux ARM64 使用 Ubuntu 的 Qt 5 包，实际版本记录在发行材料中。
+- 客户端使用 Qt 5，工具链基线为 5.15.2，包含 Widgets、Svg、Concurrent；桌面另需 Network、WebEngineWidgets、TextToSpeech（`qtspeech` 模块）及其传递依赖，Android 另需 AndroidExtras，使用系统 TextToSpeech JNI 适配而不链接 Qt Speech。Linux ARM64 使用 Ubuntu 的 Qt 5 包，实际版本记录在发行材料中。
 - SDK 依赖 cURL 7.85+、TinyXML-2、libxml2，非 Windows 平台另需 Iconv。仓库保留 TinyXML-2 源码与 libxml2/cURL 原始归档；`WENKU8_BUNDLED_CURL=ON` 使用仓库的 cURL 源码，`OFF` 使用目标环境提供的 cURL。
 - Qt、Visual Studio、Android SDK/NDK、JDK、签名工具等开发环境不随仓库提供。第三方源码与许可证保持原样。
 
@@ -39,10 +39,12 @@ cmake --install build/windows --prefix out/windows
 
 部署时还需包含 SDK 动态库、实际依赖运行库、`licenses/` 和对应源码材料。检查 `windeployqt` 的实际结果，不能只复制主程序 exe。Qt 某些二进制构建的 WebEngine/网络依赖 OpenSSL，即使 SDK 使用 Schannel，也应按实际 Qt 运行组件部署并保留来源。
 
+桌面听书另需 `Qt5TextToSpeech.dll` 与 `texttospeech/qtexttospeech_sapi.dll`；MSI 构建会检查它们是否已部署。中文朗读需要用户在 Windows 系统中安装可用的中文语音，不能用 Qt DLL 代替系统语音数据。macOS/Linux 的系统语音要求见 [原生桌面构建](NATIVE_DESKTOP.md)。Android 需在系统文字转语音设置中安装并启用引擎及中文音色；构建成功不能证明测试设备已装好音色。
+
 MSI 脚本使用 Python 3 与 WiX Toolset 3。先准备完整的部署目录：
 
 ```powershell
-python platform/windows/build_msi.py --stage out/windows/bin --wix C:/Tools/WiX/bin --output out/installer --version 1.0.4
+python platform/windows/build_msi.py --stage out/windows/bin --wix C:/Tools/WiX/bin --output out/installer --version 1.0.5
 ```
 
 `--stage` 指向经过检查的应用根目录；将许可证、图标及其他分发文件与程序一起放在该目录。发布附件仅包含编译好的程序；源码入口为主仓库及 [匹配依赖来源](DEPENDENCIES.md)。保留完整许可证、实际依赖版本及必要构建信息，不把开发机的 Qt 或 VS 安装目录加入 Git。
@@ -110,9 +112,10 @@ iOS 仅保留启动界面与基础配置，WKWebView 会话适配尚未实现。
 
 ## 发布核对
 
-1. 在干净构建目录生成程序，核对版本为 1.0.4、名称为轻小说文库。
+1. 在干净构建目录生成程序，核对版本为 1.0.5、名称为轻小说文库。
 2. 检查首次登录、重启会话恢复、书架、搜索、正文、目录、下载与离线阅读。
 3. 检查明暗护眼主题、历史位置、书签，以及 Android 触控和音量键。
+   听书需另查中文语音是否可用、暂停／继续／逐段跳转、切章、跟读定位、睡眠定时、网络音色默认关闭及后台自动暂停。构建机无音频设备或中文音色时应显示真实不可用原因，不宣称已完成发声验收。
 4. 打包完整运行依赖、原始许可证与组件声明，核对主仓库中的版本源码、依赖来源及必要构建信息。
 5. 检查包内不含账号、Cookie、正文缓存、历史、密钥或开发工具；更新 SHA-256 摘要并发布正式资产。
 

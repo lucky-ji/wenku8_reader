@@ -5,6 +5,7 @@
 #endif
 #include "Theme.h"
 #include <QTextBrowser>
+#include <QTextCursor>
 #include <QStringList>
 #include <functional>
 #include <QCache>
@@ -114,6 +115,8 @@ namespace Wenku8::Reader
         int chapterProgress() const;
         bool canSeekProgress() const;
         void seekChapterProgress(int nPermille);
+        void setSpeechRange(int nStart, int nEnd, bool bFollow);
+        void clearSpeechRange();
         void stopMotion()
         {
             cancelMotion();
@@ -129,6 +132,7 @@ namespace Wenku8::Reader
       signals:
         void pageStateChanged();
         void chapterBoundaryRequested(int nDirection);
+        void userNavigation();
 
       protected:
         bool viewportEvent(QEvent*) override;
@@ -142,6 +146,11 @@ namespace Wenku8::Reader
 
       private:
         LocalDocument* m_pDocument;
+        QTextCursor m_oSpeechCursor;
+        int m_nSpeechStart = -1, m_nSpeechEnd = -1;
+        static constexpr int m_nSpeechSelectionProperty = QTextFormat::UserProperty + 28;
+        QTextCharFormat speechFormat() const;
+        void updateSpeechSelection();
         bool m_bRebuilding = false;
         bool m_bLayoutPending = false, m_bAppearanceSet = false;
         int m_nPendingPosition = 0;

@@ -11,6 +11,7 @@
 #include <QPushButton>
 #include <QScrollBar>
 #include <QSlider>
+#include <QProgressBar>
 #include <QListWidget>
 #include <QLabel>
 namespace Wenku8::Reader
@@ -322,27 +323,40 @@ namespace Wenku8::Reader
                     .arg(oC.m_oPanel.name(), oC.m_oText.name(), oC.m_oBorder.name(),
                          oC.m_oSelection.name(), oC.m_oSelectionText.name(), oC.m_oHover.name()));
         }
-        for (auto pSlider : pWidget->findChildren<QSlider*>("readerProgressSlider"))
+        for (auto* pProgress : pWidget->findChildren<QProgressBar*>("readAloudProgress"))
         {
+            setWidgetStyle(pProgress,
+                QString("QProgressBar { background:%1; border:0; border-radius:2px; "
+                        "padding:0; color:transparent; } QProgressBar::chunk { "
+                        "background:%2; border:0; border-radius:2px; }")
+                    .arg(oC.m_oBorder.name(), oC.m_oAccent.name()));
+        }
+        for (auto pSlider : pWidget->findChildren<QSlider*>())
+        {
+            if (pSlider->objectName() != "readerProgressSlider" &&
+                !pSlider->property("speechControlSlider").toBool())
+            {
+                continue;
+            }
             // The 48px widget owns the touch target. Paint a quiet track and leave enough
             // inset for the handle at both ends without changing its size on interaction.
             setWidgetStyle(pSlider,
                 QString(
-                    "QSlider#readerProgressSlider { background:transparent; border:0; } "
-                    "QSlider#readerProgressSlider::groove:horizontal { background:%1; "
+                    "QSlider { background:transparent; border:0; } "
+                    "QSlider::groove:horizontal { background:%1; "
                     "height:4px; border:0; border-radius:2px; margin:0 12px; } "
-                    "QSlider#readerProgressSlider::sub-page:horizontal { background:%2; "
+                    "QSlider::sub-page:horizontal { background:%2; "
                     "border:0; border-radius:2px; } "
-                    "QSlider#readerProgressSlider::add-page:horizontal { background:%1; "
+                    "QSlider::add-page:horizontal { background:%1; "
                     "border:0; border-radius:2px; } "
-                    "QSlider#readerProgressSlider::handle:horizontal { background:%3; "
+                    "QSlider::handle:horizontal { background:%3; "
                     "width:18px; border:1px solid %2; border-radius:10px; margin:-8px 0; } "
-                    "QSlider#readerProgressSlider::handle:horizontal:hover { background:%4; } "
-                    "QSlider#readerProgressSlider::handle:horizontal:focus { border-color:%5; } "
-                    "QSlider#readerProgressSlider::handle:horizontal:pressed { background:%2; "
+                    "QSlider::handle:horizontal:hover { background:%4; } "
+                    "QSlider::handle:horizontal:focus { border-color:%5; } "
+                    "QSlider::handle:horizontal:pressed { background:%2; "
                     "border-color:%2; } "
-                    "QSlider#readerProgressSlider::sub-page:horizontal:disabled { background:%6; } "
-                    "QSlider#readerProgressSlider::handle:horizontal:disabled { background:%7; "
+                    "QSlider::sub-page:horizontal:disabled { background:%6; } "
+                    "QSlider::handle:horizontal:disabled { background:%7; "
                     "border-color:%6; }")
                     .arg(oC.m_oBorder.name(), oC.m_oAccent.name(), oC.m_oPanel.name(),
                          oC.m_oSelection.name(), oC.m_oSelectionText.name(),

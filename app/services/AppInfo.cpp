@@ -16,7 +16,7 @@ namespace Wenku8::Reader
     }
     QString applicationVersion()
     {
-        return "1.0.4";
+        return "1.0.5";
     }
     QUrl applicationRepositoryUrl()
     {
@@ -52,6 +52,7 @@ namespace Wenku8::Reader
                        "<p>"
                        "用于浏览和阅读轻小说，提供书架、小说发现、阅读历史、书签、下载缓存与下载到本地，支持明"
                        "亮、暗色和护眼外观。</p>"
+                       "<p>前台听书使用设备系统语音与音色，进入后台自动暂停；联网音色需单独允许。</p>"
                        "<p><b>开源项目</b><br/><a href=\"%2\">"
                        "github.com/lucky-ji/wenku8_reader</a></p>"
                        "<p><a href=\"%3\">意见反馈 · GitHub Issues</a></p>"
@@ -105,6 +106,7 @@ namespace Wenku8::Reader
         vItems.append(
             {"LLVM libc++ filesystem", "Apache-2.0 WITH LLVM-exception", "llvm-libcxx.txt"});
 #else
+        vItems.append({"Qt Speech（桌面听书）", "GPL-2.0-or-later 许可选项", "Qt-Speech-5.15.2-GPL-2.0.txt"});
         vItems.append({"Qt WebEngine / Chromium", "原始版权与许可证", "Qt-5.15.2-Chromium.txt"});
         vItems.append({"OpenSSL（Qt 组件依赖）", "OpenSSL / SSLeay license", "OpenSSL-1.1.1t.txt"});
         vItems.append({"zlib（Qt 组件依赖）", "zlib license", "zlib-1.2.13.txt"});

@@ -46,6 +46,8 @@ if not oMinimum or tuple((list(map(int,oMinimum.group(1).split(".")))+[0,0])[:3]
     raise RuntimeError("Unexpected minimum macOS deployment target")
 vMetadata["minimumMacOs"]=oMinimum.group(1)
 vMetadata["bundledQtFrameworks"]=sorted(pPath.name for pPath in (pApp/"Contents/Frameworks").glob("*.framework"))
+if "QtTextToSpeech.framework" not in vMetadata["bundledQtFrameworks"] or not list((pApp/"Contents/PlugIns/texttospeech").glob("*.dylib")):
+    raise RuntimeError("Qt 5 TextToSpeech framework or system speech plugin missing from deployed app")
 vHelpers=[pPath for pPath in pApp.rglob("QtWebEngineProcess") if pPath.is_file()]
 if not vHelpers:
     raise RuntimeError("Real Qt WebEngine helper missing from deployed app")

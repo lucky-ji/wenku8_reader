@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "ClientWindow.h"
 #include "AppInfo.h"
+#include "ReadAloudController.h"
 #include "PageControls.h"
 #include <QDialog>
 #include <QDesktopServices>
@@ -940,6 +941,10 @@ namespace Wenku8::Reader
                 return;
             }
             const bool bSameChapter = nTarget == m_nChapter;
+            if (m_pReadAloud)
+            {
+                m_pReadAloud->setFollow(false);
+            }
             m_nMobileReaderOffset = oEntry.m_nOffset;
             while (!m_vMobileHistory.isEmpty() && m_pPages->currentIndex() >= 4)
             {

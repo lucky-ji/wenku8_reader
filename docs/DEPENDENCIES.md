@@ -25,6 +25,7 @@ Qt、VS、NDK 等开发环境不包含在主仓库中。编译客户端先安装
 | 组件 | 版本和用途 | 固定版本源码 |
 | --- | --- | --- |
 | Qt | 5.15.2；官方 Windows、Android、macOS Intel 与 Linux x86_64 kit | [完整源码 tar.xz](https://download.qt.io/archive/qt/5.15/5.15.2/single/qt-everywhere-src-5.15.2.tar.xz)，包含 WebEngine/Chromium 和各模块原始声明 |
+| Qt Speech | 5.15.2；桌面 `TextToSpeech` 库与 `texttospeech` 平台插件 | 包含在上项完整 Qt 源码的 `qtspeech/`，GPL-2.0 许可选项；Android 不链接该模块 |
 | Mbed TLS | 3.6.5；Android 网络依赖 | [完整发布源码 tar.bz2](https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.5/mbedtls-3.6.5.tar.bz2)，需包含 framework 等发布子目录 |
 | GNU libiconv | 1.17；Android 编码转换 | [原始 tar.gz](https://ftp.gnu.org/gnu/libiconv/libiconv-1.17.tar.gz) |
 | OpenSSL | 1.1.1t；部分 Windows Qt 组件依赖 | [官方历史源码](https://www.openssl.org/source/old/1.1.1/openssl-1.1.1t.tar.gz) · [对应 GitHub 发布](https://github.com/openssl/openssl/releases/tag/OpenSSL_1_1_1t) |
@@ -49,6 +50,8 @@ Windows 可使用 `Get-FileHash -Algorithm SHA256 <文件>`，Linux/macOS 可使
 Ubuntu 24.04 ARM64 使用系统 Qt 5.15.13、Qt WebEngine 5.15.16 与 Mbed TLS 2.28.8；Linux x86_64 的 TLS 后端也来自发行版 Mbed TLS。精确包名和版本在各运行包的 `BUILD-METADATA.json` 中记录，系统前置库见 `RUNTIME-DEPENDENCIES.txt`。可以通过 Ubuntu 的 source package 仓库取得对应版本源码，例如先启用匹配 Ubuntu 发行版的 `deb-src`，再使用 `apt-get source <源码包名>=<源码包版本>`。
 
 这些 OS 库没有随 Linux 程序包复制。macOS 的 SecureTransport 和系统 Iconv 由操作系统提供，不是本仓库附带的第三方二进制。
+
+听书依赖设备系统提供的语音引擎与音色。Windows 使用 SAPI，macOS 使用系统语音；Linux 需可用的 Speech Dispatcher 服务及其语音数据，Ubuntu 系统 Qt 另需 `libqt5texttospeech5-dev`、`qtspeech5-speechd-plugin`。官方 Qt kit 需安装 `qtspeech` 模块，并部署 `texttospeech` 插件。Android 使用系统 `android.speech.tts.TextToSpeech`，需安装并启用相应语音引擎及中文音色；没有新增服务权限或下载系统音色的应用内实现。系统引擎和音色不包含在仓库、安装包或对应源码材料中，其安装与条款以系统或提供方为准。
 
 ## 许可证与分发
 

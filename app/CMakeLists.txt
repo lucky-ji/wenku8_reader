@@ -2,7 +2,7 @@
 if(ANDROID)
     set(QT_ANDROID_APPLICATION_BINARY wenku8_client)
     set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../platform/android")
-    set(ANDROID_VERSION_CODE 8)
+    set(ANDROID_VERSION_CODE 9)
     set(ANDROID_VERSION_NAME "${PROJECT_VERSION}")
 endif()
 
@@ -51,6 +51,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../platform" "${CMAKE_CURRENT_BINA
 add_library(wenku8_client_services STATIC
     services/OnlineSession.cpp services/OnlineSession.h
     services/DownloadManager.cpp services/DownloadManager.h
+    services/ReadAloudController.cpp services/ReadAloudController.h
 )
 target_include_directories(wenku8_client_services PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/services")
 target_link_libraries(wenku8_client_services PUBLIC wenku8_reader reader_platform Qt5::Concurrent)
@@ -61,10 +62,11 @@ add_library(wenku8_client_ui STATIC
     ui/ClientWindow.cpp ui/ClientWindow.h
     ui/MobilePages.cpp ui/ReaderSearch.cpp ui/DesktopReaderPanel.cpp ui/ReaderNavigation.cpp ui/PageControls.h ui/DesktopInformation.cpp ui/ReaderContents.cpp ui/DownloadActions.cpp
     ui/DownloadTaskPanel.cpp ui/DownloadTaskPanel.h
+    ui/ReadAloudPage.cpp ui/ReadAloudPanel.cpp ui/ReadAloudPanel.h
 )
 target_include_directories(wenku8_client_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ui")
 target_link_libraries(wenku8_client_ui PUBLIC wenku8_client_services)
-set_target_properties(wenku8_client_ui PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(wenku8_client_ui PROPERTIES POSITION_INDEPENDENT_CODE ON AUTOMOC ON)
 
 if(ANDROID)
     add_library(wenku8_client SHARED main.cpp)

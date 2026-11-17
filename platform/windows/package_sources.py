@@ -15,7 +15,7 @@ vProjectDirectories = ("sdk", "app", "platform", "cmake", "third_party", "licens
 vWindowsModules = (
     "qtbase", "qtimageformats", "qtsvg", "qtdeclarative", "qtwebchannel",
     "qtlocation", "qtserialport", "qtwebengine", "qttranslations",
-    "qtmacextras", "qtx11extras",
+    "qtmacextras", "qtx11extras", "qtspeech",
 )
 vAndroidModules = ("qtbase", "qtimageformats", "qtsvg", "qtandroidextras")
 vExcludedParts = {".git", ".vs", ".vscode", "__pycache__", "CMakeFiles", "android-build", "node_modules"}

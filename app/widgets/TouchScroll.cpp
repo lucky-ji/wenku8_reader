@@ -228,6 +228,7 @@ namespace Wenku8::Reader
             releaseFeedback();
             m_bActive = pTouch->touchPoints().size() == 1;
             m_bMoved = false;
+            m_bDragNotified = false;
             m_oTime.start();
             m_nTouchStartTimestamp = quint64(pTouch->timestamp());
             m_nLastInputTimestamp = 0;
@@ -281,6 +282,14 @@ namespace Wenku8::Reader
         const auto nTimestamp = inputTimestamp(pTouch);
         if ((oPoint.pos() - m_oStart).manhattanLength() > 12)
         {
+            if (!m_bDragNotified)
+            {
+                m_bDragNotified = true;
+                if (m_fnDrag)
+                {
+                    m_fnDrag();
+                }
+            }
             m_bMoved = true;
             releaseFeedback();
         }

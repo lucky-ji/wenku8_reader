@@ -35,6 +35,7 @@ namespace Wenku8::Reader
     class DownloadOption;
     class DownloadTaskPanel;
     class Toast;
+    class ReadAloudController;
     class ClientWindow final : public QMainWindow
     {
       public:
@@ -104,9 +105,9 @@ namespace Wenku8::Reader
                *m_pReadTitle = nullptr, *m_pChapterLabel = nullptr;
         QLineEdit* m_pSearch = nullptr;
         QPushButton *m_pRefresh = nullptr, *m_pLogin = nullptr, *m_pRead = nullptr,
-                    *m_pDownload = nullptr, *m_pLocalDownload = nullptr, *m_pShelfAdd = nullptr, *m_pFullscreen = nullptr,
-                    *m_pPrevious = nullptr, *m_pNext = nullptr, *m_pPreviousPage = nullptr,
-                    *m_pNextPage = nullptr;
+                    *m_pDownload = nullptr, *m_pLocalDownload = nullptr, *m_pShelfAdd = nullptr,
+                    *m_pFullscreen = nullptr, *m_pPrevious = nullptr, *m_pNext = nullptr,
+                    *m_pPreviousPage = nullptr, *m_pNextPage = nullptr;
         QPushButton* m_pReaderContents = nullptr;
         QSlider* m_pReaderProgress = nullptr;
         QLabel* m_pReaderProgressPercent = nullptr;
@@ -116,6 +117,14 @@ namespace Wenku8::Reader
         QListWidget* m_pCards = nullptr;
         QTreeWidget* m_pToc = nullptr;
         ReadingView* m_pReader = nullptr;
+        ReadAloudController* m_pReadAloud = nullptr;
+        QWidget* m_pSpeechMini = nullptr;
+        QLabel* m_pSpeechMiniText = nullptr;
+        QPushButton* m_pSpeechMiniPlay = nullptr;
+        bool m_bSpeechPreferencesReady = false;
+        bool m_bSpeechChangingChapter = false;
+        bool m_bReopenReadAloud = false;
+        int m_nSpeechPendingBook = 0, m_nSpeechPendingChapter = -1;
         QWidget* m_pOperations = nullptr;
         QWidget* m_pStatusArea = nullptr;
         QPushButton* m_pRetryNetwork = nullptr;
@@ -133,6 +142,14 @@ namespace Wenku8::Reader
         void showMobileReaderTools();
         void showReaderContents();
         void showReaderSearch();
+        void initializeReadAloud();
+        void showReadAloud();
+        QWidget* createSpeechMini();
+        void updateSpeechMini();
+        void requestSpeechChapter(int nDirection);
+        void cancelSpeechChapter();
+        void saveSpeechPosition();
+        bool speechPageActive() const;
         void showReaderPanel(QWidget*, const QString&);
         void closeReaderPanel();
         void showDesktopBookmarks();

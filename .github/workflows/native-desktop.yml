@@ -42,19 +42,20 @@ jobs:
       - name: Install native build and OS runtime dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libmbedtls-dev libgl1-mesa-dev libegl1-mesa-dev xvfb libegl1 libopengl0 libgl1 libnss3 libxss1 libpulse0 libdbus-1-3 libfontconfig1 libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxi6 libxcb-xinerama0 libxcb-xinput0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 fonts-noto-cjk libxkbcommon-x11-0 libx11-xcb1 libxrender1 libxext6 libglib2.0-0
+          sudo apt-get install -y ninja-build libmbedtls-dev libgl1-mesa-dev libegl1-mesa-dev xvfb libegl1 libopengl0 libgl1 libnss3 libxss1 libpulse0 libdbus-1-3 libfontconfig1 libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxi6 libxcb-xinerama0 libxcb-xinput0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 fonts-noto-cjk libxkbcommon-x11-0 libx11-xcb1 libxrender1 libxext6 libglib2.0-0 libspeechd2 speech-dispatcher
       - name: Install official Qt 5.15.2 with real WebEngine
         if: ${{ !matrix.system_qt }}
         run: |
           python3 -m pip install aqtinstall==3.3.0
           python3 -m aqt install-qt linux desktop 5.15.2 gcc_64 --outputdir "$RUNNER_TEMP/Qt" -m qtwebengine
+          test -f "$RUNNER_TEMP/Qt/5.15.2/gcc_64/lib/cmake/Qt5TextToSpeech/Qt5TextToSpeechConfig.cmake"
           echo "QT5_ROOT=$RUNNER_TEMP/Qt/5.15.2/gcc_64" >> "$GITHUB_ENV"
       - name: Install Ubuntu ARM64 Qt 5 with real WebEngine
         if: ${{ matrix.system_qt }}
         run: |
-          sudo apt-get install -y qtbase5-dev libqt5svg5-dev qtwebengine5-dev qttools5-dev-tools
+          sudo apt-get install -y qtbase5-dev libqt5svg5-dev qtwebengine5-dev qttools5-dev-tools libqt5texttospeech5-dev qtspeech5-speechd-plugin
           echo "QT5_ROOT=$(qmake -query QT_INSTALL_PREFIX)" >> "$GITHUB_ENV"
-          dpkg-query -W qtbase5-dev qtwebengine5-dev libqt5svg5-dev
+          dpkg-query -W qtbase5-dev qtwebengine5-dev libqt5svg5-dev libqt5texttospeech5-dev qtspeech5-speechd-plugin
       - name: Configure native Release client with Mbed TLS
         run: |
           cmake -S . -B build/native -G Ninja \
@@ -114,6 +115,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/aqt-venv"
           "$RUNNER_TEMP/aqt-venv/bin/pip" install aqtinstall==3.3.0
           "$RUNNER_TEMP/aqt-venv/bin/python" -m aqt install-qt mac desktop 5.15.2 clang_64 --outputdir "$RUNNER_TEMP/Qt" -m qtwebengine
+          test -f "$RUNNER_TEMP/Qt/5.15.2/clang_64/lib/cmake/Qt5TextToSpeech/Qt5TextToSpeechConfig.cmake"
           echo "QT5_ROOT=$RUNNER_TEMP/Qt/5.15.2/clang_64" >> "$GITHUB_ENV"
       - name: Configure native Release client with SecureTransport
         run: |

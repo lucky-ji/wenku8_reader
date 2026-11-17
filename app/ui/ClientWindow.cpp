@@ -2,6 +2,7 @@
 #include "ClientWindow.h"
 #include "DownloadManager.h"
 #include "DownloadTaskPanel.h"
+#include "ReadAloudController.h"
 #include "Toast.h"
 #include "AppInfo.h"
 #include "DownloadOption.h"
@@ -483,6 +484,7 @@ namespace Wenku8::Reader
             }
         });
         setReadingMode(ReadingMode(qBound(0, m_oSettings.value("readingMode", 0).toInt(), 1)));
+        initializeReadAloud();
         setTheme(m_eTheme);
         adaptLayout();
 #ifdef WENKU8_CLIENT_ONLINE
@@ -546,6 +548,18 @@ namespace Wenku8::Reader
                         if (bValue)
                             m_nActiveRequestContext = m_nBusinessContext;
                         updateBusy(bValue);
+                        if (!bValue && m_nSpeechPendingBook != 0)
+                        {
+                            QTimer::singleShot(0, this, [this]
+                            {
+                                if (m_nSpeechPendingBook != 0 && !m_bLoadingBusy &&
+                                    m_pReadAloud->state() == ReadAloudController::State::WaitingChapter)
+                                {
+                                    cancelSpeechChapter();
+                                    m_pReadAloud->pause("章节加载失败，检查网络后可继续听书");
+                                }
+                            });
+                        }
                     });
             connect(m_pSession, &OnlineSession::retryAvailableChanged, this,
                     [this](bool bAvailable)
@@ -653,6 +667,14 @@ namespace Wenku8::Reader
                     if (eState != Qt::ApplicationActive)
                     {
                         saveProgress();
+                        saveSpeechPosition();
+                        if (m_pReadAloud &&
+                            (m_pReadAloud->state() == ReadAloudController::State::Playing ||
+                             m_pReadAloud->state() == ReadAloudController::State::WaitingChapter))
+                        {
+                            cancelSpeechChapter();
+                            m_pReadAloud->pause("应用已进入后台，听书已暂停");
+                        }
                         m_oSettings.sync();
                     }
                     updateVolumePaging();
@@ -666,6 +688,9 @@ namespace Wenku8::Reader
     }
     ClientWindow::~ClientWindow()
     {
+        saveSpeechPosition();
+        delete m_pReadAloud;
+        m_pReadAloud = nullptr;
         setAndroidVolumePaging(false);
         setAndroidReadingActive(false, false);
         setAndroidSafeInsetsChangedHandler({});
@@ -1283,6 +1308,10 @@ namespace Wenku8::Reader
         setButtonIcon(pFindButton, Icon::Search);
         pReaderTools->addWidget(pFindButton);
         connect(pFindButton, &QPushButton::clicked, this, &ClientWindow::showReaderSearch);
+        auto* pSpeech = button("听书", "readerSpeech");
+        setButtonIcon(pSpeech, Icon::Headphones);
+        pReaderTools->addWidget(pSpeech);
+        connect(pSpeech, &QPushButton::clicked, this, &ClientWindow::showReadAloud);
         auto* pFindShortcut = new QShortcut(QKeySequence::Find, this);
         connect(pFindShortcut, &QShortcut::activated, this, [this]
         {
@@ -1351,6 +1380,7 @@ namespace Wenku8::Reader
         auto pFooterLayout = new QVBoxLayout(pFooterHost);
         pFooterLayout->setContentsMargins(8, 6, 8, 8);
         pFooterLayout->setSpacing(2);
+        pFooterLayout->addWidget(createSpeechMini());
         auto* pSeekRow = new QHBoxLayout;
         pSeekRow->setSpacing(8);
         pSeekRow->addWidget(label("本章", "muted"));
@@ -1374,6 +1404,10 @@ namespace Wenku8::Reader
                 m_pPages->currentIndex() != 3 || m_nChapter < 0)
             {
                 return;
+            }
+            if (m_pReadAloud)
+            {
+                m_pReadAloud->setFollow(false);
             }
             m_pReader->seekChapterProgress(m_pReaderProgress->value());
             updateReaderProgress();
@@ -1428,10 +1462,12 @@ namespace Wenku8::Reader
         auto* pQuickSearch = button("查找", "readerQuickSearch");
         auto* pQuickBookmarks = button("书签", "readerQuickBookmarks");
         auto* pQuickAppearance = button("外观", "readerQuickAppearance");
+        auto* pQuickSpeech = button("听书", "readerQuickSpeech");
         setButtonIcon(pQuickSearch, Icon::Search);
         setButtonIcon(pQuickBookmarks, Icon::Bookmark);
         setButtonIcon(pQuickAppearance, Icon::Sun);
-        for (auto* pAction : {pQuickSearch, pQuickBookmarks, pQuickAppearance})
+        setButtonIcon(pQuickSpeech, Icon::Headphones);
+        for (auto* pAction : {pQuickSearch, pQuickBookmarks, pQuickAppearance, pQuickSpeech})
         {
             pAction->setProperty("controlAction", true);
             pAction->setProperty("toolbarAction", true);
@@ -1441,6 +1477,7 @@ namespace Wenku8::Reader
         connect(pQuickSearch, &QPushButton::clicked, this, &ClientWindow::showReaderSearch);
         connect(pQuickBookmarks, &QPushButton::clicked, this, &ClientWindow::showBookmarks);
         connect(pQuickAppearance, &QPushButton::clicked, this, &ClientWindow::showMobileAppearance);
+        connect(pQuickSpeech, &QPushButton::clicked, this, &ClientWindow::showReadAloud);
         pFooterLayout->addWidget(pQuickTools);
         pReadingLayout->addWidget(pFooterHost);
         m_pPages->addWidget(pReading);
@@ -1599,6 +1636,13 @@ namespace Wenku8::Reader
             {
                 m_pReader->stopMotion();
             });
+        m_pReaderTouch->setDragAction([this]
+        {
+            if (m_pReadAloud)
+            {
+                m_pReadAloud->setFollow(false);
+            }
+        });
         m_pLoading = new LoadingPanel(m_pStartupPages);
         m_pLoading->setCancelable(true);
         m_pLoading->hide();
@@ -1677,6 +1721,12 @@ namespace Wenku8::Reader
         if (!bValue)
         {
             saveProgress();
+            saveSpeechPosition();
+            cancelSpeechChapter();
+            if (m_pReadAloud)
+            {
+                m_pReadAloud->stop();
+            }
             ++m_nBusinessContext;
         }
         m_bUnlocked = bValue;
@@ -1749,6 +1799,12 @@ namespace Wenku8::Reader
     {
         if (!m_bUnlocked || m_bLoadingBusy)
             return;
+        saveSpeechPosition();
+        cancelSpeechChapter();
+        if (m_pReadAloud)
+        {
+            m_pReadAloud->pause("已离开阅读页面，听书已暂停");
+        }
         ++m_nBusinessContext;
         m_strActiveSearch.clear();
         updateNetworkActions();
@@ -1961,6 +2017,12 @@ namespace Wenku8::Reader
     {
         if (!m_bUnlocked || m_bLoadingBusy)
             return;
+        saveSpeechPosition();
+        cancelSpeechChapter();
+        if (m_pReadAloud)
+        {
+            m_pReadAloud->stop();
+        }
         ++m_nBusinessContext;
         updateNetworkActions();
         if (mobileMode())
@@ -2076,6 +2138,12 @@ namespace Wenku8::Reader
 #endif
         if (!m_bUnlocked || nIndex < 0 || nIndex >= m_vFlat.size())
             return;
+        if (m_pReadAloud && !m_bSpeechChangingChapter)
+        {
+            saveSpeechPosition();
+            cancelSpeechChapter();
+            m_pReadAloud->pause("章节已切换，可从当前章节开始听书");
+        }
         ++m_nBusinessContext;
         updateNetworkActions();
         saveProgress();
@@ -2089,6 +2157,11 @@ namespace Wenku8::Reader
             catch (const std::exception&)
             {
                 message("本地章节无法读取，请重新下载这本小说。");
+                if (m_nSpeechPendingBook != 0)
+                {
+                    cancelSpeechChapter();
+                    m_pReadAloud->pause("缓存章节无法读取，听书已暂停");
+                }
             }
             return;
         }
@@ -2101,6 +2174,11 @@ namespace Wenku8::Reader
     {
         if (!m_bUnlocked || m_nPendingChapter < 0 || m_nPendingChapter >= m_vFlat.size())
             return;
+        const bool bSpeechResume = m_pReadAloud &&
+            m_pReadAloud->state() == ReadAloudController::State::WaitingChapter &&
+            m_nSpeechPendingBook == m_oBook.m_nId && m_nSpeechPendingChapter == m_nPendingChapter;
+        const bool bSpeechPage = bSpeechResume && m_bReopenReadAloud;
+        cancelSpeechChapter();
         m_bRestoring = true;
         const auto nGeneration = ++m_nRestoreGeneration;
         if (m_nChapter < 0)
@@ -2144,7 +2222,7 @@ namespace Wenku8::Reader
         m_nRestoreOffset = -1;
         m_pReader->restorePosition(nOffset);
         QTimer::singleShot(0, this,
-                           [this, nGeneration, nOffset]
+                           [this, nGeneration, nOffset, bSpeechResume, bSpeechPage]
                            {
                                if (nGeneration != m_nRestoreGeneration || !m_bUnlocked ||
                                    m_pPages->currentIndex() != 3)
@@ -2153,6 +2231,16 @@ namespace Wenku8::Reader
                                m_bRestoring = false;
                                saveProgress(true);
                                highlightChapter();
+                               const bool bStillWaiting = bSpeechResume &&
+                                   m_pReadAloud->state() == ReadAloudController::State::WaitingChapter;
+                               m_pReadAloud->loadChapter(m_oBook.m_nId,
+                                   m_vFlat[m_nChapter].m_nId, m_pReader->document()->toPlainText(),
+                                   nOffset, bStillWaiting);
+                               if (bSpeechPage && bStillWaiting &&
+                                   QGuiApplication::applicationState() == Qt::ApplicationActive)
+                               {
+                                   showReadAloud();
+                               }
                            });
         message(m_bLocalBook ? "缓存阅读 · 阅读位置自动保存" : "在线阅读 · 阅读位置自动保存");
         if (!mobileMode() && m_pReaderDock && m_bReaderDockRequested)
@@ -2172,6 +2260,10 @@ namespace Wenku8::Reader
                 else if (strPanel == "章内查找")
                 {
                     showReaderSearch();
+                }
+                else if (strPanel == "听书")
+                {
+                    showReadAloud();
                 }
                 else
                 {
@@ -2613,6 +2705,7 @@ namespace Wenku8::Reader
             return;
         }
         if (m_bUnlocked && m_bVolumePaging && m_pPages->currentIndex() == 3 &&
+            (!m_pReadAloud || m_pReadAloud->state() != ReadAloudController::State::Playing) &&
             (pEvent->key() == Qt::Key_VolumeUp || pEvent->key() == Qt::Key_VolumeDown))
         {
             if (!pEvent->isAutoRepeat())
@@ -2702,6 +2795,11 @@ namespace Wenku8::Reader
     void ClientWindow::closeEvent(QCloseEvent* pEvent)
     {
         saveProgress();
+        saveSpeechPosition();
+        if (m_pReadAloud)
+        {
+            m_pReadAloud->stop();
+        }
         m_oSettings.sync();
         QMainWindow::closeEvent(pEvent);
     }

@@ -32,6 +32,8 @@ def componentGuid(strPath, strArchitecture="x64"):
 
 
 def validateStage(pStage, strArchitecture):
+    if not (pStage / "Qt5TextToSpeech.dll").is_file() or not (pStage / "texttospeech/qtexttospeech_sapi.dll").is_file():
+        raise ValueError("Qt 5 TextToSpeech runtime or SAPI plugin is missing; run windeployqt before packaging")
     nExpectedMachine = 0x8664 if strArchitecture == "x64" else 0x014C
     for pFile in pStage.rglob("*"):
         if not pFile.is_file() or pFile.suffix.lower() not in (".exe", ".dll"):

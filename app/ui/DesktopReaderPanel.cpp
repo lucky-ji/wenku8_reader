@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "ClientWindow.h"
 #include "PageControls.h"
+#include "ReadAloudController.h"
 #include "AnimatedStack.h"
 #include <QDockWidget>
 #include <QHBoxLayout>
@@ -30,8 +31,8 @@ namespace Wenku8::Reader
         {
             return;
         }
-        if (mobileMode() || !m_bUnlocked || m_bLoadingBusy ||
-            m_pPages->currentIndex() != 3 || m_oBook.m_nId <= 0)
+        if (mobileMode() || !m_bUnlocked || m_bLoadingBusy || m_pPages->currentIndex() != 3 ||
+            m_oBook.m_nId <= 0)
         {
             pPage->deleteLater();
             return;
@@ -59,7 +60,7 @@ namespace Wenku8::Reader
         auto* pLayout = new QVBoxLayout(pHost);
         pLayout->setContentsMargins(8, 8, 8, 8);
         auto* pTabs = new QHBoxLayout;
-        const QStringList vTitles{"目录", "章内查找", "书签"};
+        const QStringList vTitles{"目录", "章内查找", "书签", "听书"};
         for (int nIndex = 0; nIndex < vTitles.size(); ++nIndex)
         {
             auto* pAction = new QPushButton(nIndex == 1 ? "查找" : vTitles[nIndex]);
@@ -85,9 +86,13 @@ namespace Wenku8::Reader
                         {
                             showReaderSearch();
                         }
-                        else
+                        else if (nIndex == 2)
                         {
                             showDesktopBookmarks();
+                        }
+                        else
+                        {
+                            showReadAloud();
                         }
                     });
         }
@@ -110,8 +115,7 @@ namespace Wenku8::Reader
     void ClientWindow::showDesktopBookmarks()
     {
         if (mobileMode() || !m_bUnlocked || m_bLoadingBusy || m_nChapter < 0 ||
-            m_nChapter >= m_vFlat.size() || m_oBook.m_nId <= 0 ||
-            m_pPages->currentIndex() != 3)
+            m_nChapter >= m_vFlat.size() || m_oBook.m_nId <= 0 || m_pPages->currentIndex() != 3)
         {
             return;
         }
@@ -147,8 +151,8 @@ namespace Wenku8::Reader
         auto fnCurrentPage = [this, pPage, nBook]
         {
             return m_bUnlocked && !m_bLoadingBusy && !m_bRestoring && !mobileMode() &&
-                   m_pPages->currentIndex() == 3 && m_oBook.m_nId == nBook &&
-                   m_pReaderDock && m_pReaderDock->isVisible() && m_pReaderDock->widget() &&
+                   m_pPages->currentIndex() == 3 && m_oBook.m_nId == nBook && m_pReaderDock &&
+                   m_pReaderDock->isVisible() && m_pReaderDock->widget() &&
                    m_pReaderDock->widget()->isAncestorOf(pPage);
         };
         auto fnReload = [this, pEntries, pList, pEmpty, pRemove, nBook]
@@ -157,8 +161,8 @@ namespace Wenku8::Reader
             pList->clear();
             for (const auto& oEntry : *pEntries)
             {
-                auto* pItem = new QListWidgetItem(oEntry.m_strTitle + "\n" + oEntry.m_strSnippet,
-                                                 pList);
+                auto* pItem =
+                    new QListWidgetItem(oEntry.m_strTitle + "\n" + oEntry.m_strSnippet, pList);
                 pItem->setSizeHint(QSize(200, 104));
             }
             pEmpty->setVisible(pEntries->isEmpty());
@@ -190,6 +194,10 @@ namespace Wenku8::Reader
                         return;
                     }
                     const auto oEntry = pEntries->at(nRow);
+                        if (m_pReadAloud)
+                        {
+                            m_pReadAloud->setFollow(false);
+                        }
                     for (int nIndex = 0; nIndex < m_vFlat.size(); ++nIndex)
                     {
                         if (m_vFlat[nIndex].m_nId != oEntry.m_nChapter)
@@ -246,4 +254,4 @@ namespace Wenku8::Reader
         fnReload();
         showReaderPanel(pPage, "书签");
     }
-}
+} // namespace Wenku8::Reader
