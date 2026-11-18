@@ -12,6 +12,7 @@
 #include <QScrollBar>
 #include <QSlider>
 #include <QProgressBar>
+#include <QTextBrowser>
 #include <QListWidget>
 #include <QLabel>
 namespace Wenku8::Reader
@@ -225,9 +226,32 @@ namespace Wenku8::Reader
 #endif
         setWidgetStyle(pWidget, strSheet + scrollBarStyle(eTheme));
         for (auto pLabel : pWidget->findChildren<QLabel*>())
+        {
             if (pLabel->objectName() == "muted" || pLabel->objectName() == "subtitle" ||
                 pLabel->objectName() == "eyebrow")
                 setWidgetStyle(pLabel, "QLabel { color:" + oC.m_oMuted.name() + "; }");
+            else if (pLabel->objectName() == "settingsSectionTitle")
+            {
+                setWidgetStyle(pLabel, "QLabel { color:" + oC.m_oText.name() +
+                    "; font-size:15px; font-weight:600; padding:0 0 2px; }");
+            }
+            else if (pLabel->objectName() == "settingsHint")
+            {
+                setWidgetStyle(pLabel, "QLabel { color:" + oC.m_oMuted.name() +
+                    "; font-size:12px; background:transparent; }");
+            }
+            else if (pLabel->property("settingsValue").toBool())
+            {
+                setWidgetStyle(pLabel, "QLabel { color:" + oC.m_oAccent.name() +
+                    "; font-size:14px; font-weight:600; background:transparent; }");
+            }
+            else if (pLabel->property("settingsStatus").toBool())
+            {
+                setWidgetStyle(pLabel, QString("QLabel { color:%1; background:%2; "
+                    "font-size:16px; font-weight:600; padding:10px 12px; border-radius:10px; }")
+                        .arg(oC.m_oSelectionText.name(), oC.m_oSelection.name()));
+            }
+        }
         for (auto pGroup : pWidget->findChildren<QWidget*>())
         {
             if (pGroup->objectName() == "controlGroup" || pGroup->property("controlGroup").toBool())
@@ -238,6 +262,18 @@ namespace Wenku8::Reader
                             "background:%1; border:1px solid %2; border-radius:14px; }")
                         .arg(oC.m_oPanel.name(), oC.m_oBorder.name()));
             }
+            else if (pGroup->property("settingsStepper").toBool())
+            {
+                pGroup->setAttribute(Qt::WA_StyledBackground, true);
+                setWidgetStyle(pGroup, QString("QWidget[settingsStepper=\"true\"] { "
+                    "background:%1; border:0; border-radius:10px; }").arg(oC.m_oSection.name()));
+            }
+        }
+        for (auto* pPreview : pWidget->findChildren<QTextBrowser*>("readerTypographyPreview"))
+        {
+            setWidgetStyle(pPreview, QString("QTextBrowser { background:%1; color:%2; "
+                "border:1px solid %3; border-radius:10px; padding:6px; }")
+                    .arg(oC.m_oPaper.name(), oC.m_oText.name(), oC.m_oBorder.name()));
         }
         // Qt 5 caches inherited palettes on reparented/polished mobile controls.
         // Give the fixed chrome an explicit surface and text color in each theme.
@@ -369,6 +405,18 @@ namespace Wenku8::Reader
             pInput->setPalette(oP);
             pInput->setProperty("hintColor", oC.m_oMuted);
             pInput->update();
+            if (pInput->property("settingsNumberInput").toBool())
+            {
+                setWidgetStyle(pInput,
+                    QString("QLineEdit, QLineEdit:hover { color:%1; background:transparent; "
+                            "border:0; border-bottom:2px solid transparent; border-radius:0; "
+                            "padding:4px 2px; font-size:20px; font-weight:600; "
+                            "selection-background-color:%2; selection-color:%3; } "
+                            "QLineEdit:focus { border:0; border-bottom:2px solid %4; padding:4px 2px; }")
+                        .arg(oC.m_oText.name(), oC.m_oSelection.name(),
+                             oC.m_oSelectionText.name(), oC.m_oAccent.name()));
+                continue;
+            }
             setWidgetStyle(pInput,
                 QString(
                     "QLineEdit { color:%1; background:%2; border:1px solid %3; border-radius:9px; "
@@ -516,6 +564,32 @@ namespace Wenku8::Reader
                 strStyle += QString("QPushButton:checked, QPushButton:checked:hover { "
                                     "background:%1; color:%2; border:1px solid %2; }")
                                 .arg(oC.m_oSelection.name(), oC.m_oSelectionText.name());
+            if (pButton->property("settingsChoice").toBool())
+            {
+                strStyle = QString("QPushButton { background:%1; color:%2; border:1px solid %3; "
+                    "border-radius:10px; padding:8px 3px; font-size:13px; } "
+                    "QPushButton:hover { background:%4; } QPushButton:pressed { background:%5; } "
+                    "QPushButton:checked, QPushButton:checked:hover { background:%5; color:%6; "
+                    "border-color:%6; font-weight:600; } QPushButton:disabled { color:%7; }")
+                        .arg(oC.m_oSection.name(), oC.m_oText.name(), oC.m_oBorder.name(),
+                             (pWidget->property("touchUi").toBool() ? oC.m_oSection : oC.m_oHover).name(),
+                             oC.m_oSelection.name(), oC.m_oSelectionText.name(), oC.m_oDisabled.name());
+            }
+            if (pButton->property("settingsCompactAction").toBool())
+            {
+                strStyle += "QPushButton, QPushButton:focus { padding:9px 4px; }";
+                pButton->setIconSize(QSize(18, 18));
+            }
+            if (pButton->property("settingsStepAction").toBool())
+            {
+                strStyle = QString("QPushButton { background:transparent; color:%1; "
+                    "border:0; border-radius:8px; padding:4px; font-size:17px; } "
+                    "QPushButton:hover { background:%2; } QPushButton:pressed { background:%3; } "
+                    "QPushButton:disabled { color:%4; }")
+                        .arg(oC.m_oText.name(),
+                             (pWidget->property("touchUi").toBool() ? oC.m_oSection : oC.m_oHover).name(),
+                             oC.m_oSelection.name(), oC.m_oDisabled.name());
+            }
             setWidgetStyle(pButton, strStyle);
             if (pWidget->property("touchUi").toBool() &&
                 pButton->property("textAction").toBool() && !bPrimary &&

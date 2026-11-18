@@ -46,6 +46,14 @@ namespace Wenku8::Reader
             return m_bAutoNext;
         }
         void setSleepMinutes(int nMinutes);
+        static constexpr int maximumSleepMinutes()
+        {
+            return 24 * 60;
+        }
+        int sleepDurationMinutes() const
+        {
+            return m_nSleepDuration / 60000;
+        }
         void setStopAtChapter(bool bValue);
         bool stopAtChapter() const
         {

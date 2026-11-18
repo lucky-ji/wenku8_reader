@@ -122,7 +122,7 @@ namespace Wenku8::Reader
     void setButtonIcon(QAbstractButton* pButton, Icon eIcon)
     {
         pButton->setProperty("wenkuIcon", int(eIcon));
-        pButton->setIconSize(QSize(20, 20));
+        pButton->setIconSize(pButton->property("toolbarAction").toBool() ? QSize(18, 18) : QSize(20, 20));
         const auto oP = pButton->palette();
         pButton->setIcon(makeIcon(eIcon, oP.color(QPalette::ButtonText),
                                   oP.color(QPalette::Disabled, QPalette::ButtonText),

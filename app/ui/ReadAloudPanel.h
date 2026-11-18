@@ -23,13 +23,11 @@ namespace Wenku8::Reader
       private:
         QPointer<ReadAloudController> m_pController;
         bool m_bMobile = false, m_bVoiceRefreshPending = false, m_bPauseButton = false;
-        int m_nSleepPreset = 0;
         QString m_strLocalStatus;
         QLabel* m_pChapter = nullptr;
         QLabel* m_pPreview = nullptr;
         QLabel* m_pProgressText = nullptr;
         QLabel* m_pStatus = nullptr;
-        QLabel* m_pSleepRemaining = nullptr;
         QLabel* m_pNetworkHint = nullptr;
         QLabel* m_pRateValue = nullptr;
         QLabel* m_pPitchValue = nullptr;
@@ -44,7 +42,6 @@ namespace Wenku8::Reader
         QCheckBox* m_pFollow = nullptr;
         QCheckBox* m_pAutoNext = nullptr;
         QCheckBox* m_pNetworkConsent = nullptr;
-        QComboBox* m_pSleep = nullptr;
         QComboBox* m_pVoice = nullptr;
         QSlider* m_pRate = nullptr;
         QSlider* m_pPitch = nullptr;

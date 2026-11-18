@@ -2,7 +2,7 @@
 if(ANDROID)
     set(QT_ANDROID_APPLICATION_BINARY wenku8_client)
     set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../platform/android")
-    set(ANDROID_VERSION_CODE 9)
+    set(ANDROID_VERSION_CODE 10)
     set(ANDROID_VERSION_NAME "${PROJECT_VERSION}")
 endif()
 
@@ -63,6 +63,7 @@ add_library(wenku8_client_ui STATIC
     ui/MobilePages.cpp ui/ReaderSearch.cpp ui/DesktopReaderPanel.cpp ui/ReaderNavigation.cpp ui/PageControls.h ui/DesktopInformation.cpp ui/ReaderContents.cpp ui/DownloadActions.cpp
     ui/DownloadTaskPanel.cpp ui/DownloadTaskPanel.h
     ui/ReadAloudPage.cpp ui/ReadAloudPanel.cpp ui/ReadAloudPanel.h
+    ui/ReaderSettings.cpp ui/SleepTimerControl.cpp ui/SleepTimerControl.h
 )
 target_include_directories(wenku8_client_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ui")
 target_link_libraries(wenku8_client_ui PUBLIC wenku8_client_services)

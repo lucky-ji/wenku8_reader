@@ -43,6 +43,20 @@ namespace Wenku8::Reader::PageControls
         pButton->setProperty("groupRow", true);
         pLayout->addWidget(pButton);
     }
+    inline QVBoxLayout* settingsGroup(QVBoxLayout* pParent, const QString& strTitle,
+                                      const QString& strDescription = {})
+    {
+        auto* pLayout = controlGroup(pParent);
+        pLayout->parentWidget()->setProperty("settingsSection", true);
+        pLayout->setContentsMargins(14, 14, 14, 14);
+        pLayout->setSpacing(10);
+        pLayout->addWidget(paragraph(strTitle, "settingsSectionTitle"));
+        if (!strDescription.isEmpty())
+        {
+            pLayout->addWidget(paragraph(strDescription, "settingsHint"));
+        }
+        return pLayout;
+    }
     inline QWidget* scrollPage(QVBoxLayout*& pContent)
     {
         auto pPage = new QWidget;
@@ -62,4 +76,4 @@ namespace Wenku8::Reader::PageControls
         (new TouchScroll(pScroll))->setEnabled(true);
         return pPage;
     }
-}
+} // namespace Wenku8::Reader::PageControls

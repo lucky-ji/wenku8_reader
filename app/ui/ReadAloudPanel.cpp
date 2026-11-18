@@ -2,6 +2,7 @@
 #include "ReadAloudPanel.h"
 #include "ReadAloudController.h"
 #include "PageControls.h"
+#include "SleepTimerControl.h"
 #include <QAbstractItemView>
 #include <QCheckBox>
 #include <QComboBox>
@@ -41,7 +42,7 @@ namespace Wenku8::Reader
         pScrollPage->setProperty("touchUi", bMobile);
         pScrollPage->setObjectName("readAloudScrollPage");
         pLayout->setContentsMargins(bMobile ? 12 : 4, 12, bMobile ? 12 : 4, 20);
-        pLayout->setSpacing(10);
+        pLayout->setSpacing(14);
         pOuter->addWidget(pScrollPage);
         if (!m_pController)
         {
@@ -61,10 +62,9 @@ namespace Wenku8::Reader
         };
         m_pChapter = paragraph("本章听书", "readAloudChapter");
         pLayout->addWidget(m_pChapter);
-        auto* pCurrent = controlGroup(pLayout);
-        pCurrent->addWidget(paragraph("当前短段", "sectionTitle"));
+        auto* pCurrent = settingsGroup(pLayout, "播放控制");
         m_pPreview = paragraph("本章没有可朗读的正文。", "readAloudPreview");
-        m_pPreview->setMinimumHeight(96);
+        m_pPreview->setMinimumHeight(80);
         m_pPreview->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
         pCurrent->addWidget(m_pPreview);
         m_pProgressText = paragraph("0 / 0 段", "readAloudProgressText");
@@ -86,6 +86,7 @@ namespace Wenku8::Reader
         for (auto* pAction : {m_pPrevious, m_pToggle, m_pNext})
         {
             pAction->setProperty("toolbarAction", true);
+            pAction->setProperty("settingsCompactAction", true);
         }
         pPlayback->addWidget(m_pPrevious, 1);
         pPlayback->addWidget(m_pToggle, 1);
@@ -146,8 +147,7 @@ namespace Wenku8::Reader
                     m_strLocalStatus.clear();
                     emit seekReadingPosition();
                 });
-        pLayout->addWidget(paragraph("播放偏好", "sectionTitle"));
-        auto* pPreferences = controlGroup(pLayout);
+        auto* pPreferences = settingsGroup(pLayout, "听书偏好");
         m_pFollow = new QCheckBox("随朗读滚动正文");
         m_pFollow->setObjectName("readAloudFollow");
         m_pAutoNext = new QCheckBox("本章结束后继续下一章");
@@ -173,38 +173,8 @@ namespace Wenku8::Reader
                         m_pController->setAutoNext(bChecked);
                     }
                 });
-        pPreferences->addWidget(paragraph("睡眠定时", "controlLabel"));
-        m_pSleep = new QComboBox;
-        m_pSleep->setObjectName("readAloudSleep");
-        m_pSleep->setMinimumHeight(bMobile ? 48 : 36);
-        m_pSleep->setPlaceholderText("定时进行中");
-        m_pSleep->addItem("关闭定时", 0);
-        m_pSleep->addItem("15 分钟后停止", 15);
-        m_pSleep->addItem("30 分钟后停止", 30);
-        m_pSleep->addItem("60 分钟后停止", 60);
-        m_pSleep->addItem("本章结束后停止", -1);
-        pPreferences->addWidget(m_pSleep);
-        m_pSleepRemaining = paragraph("未设置定时", "readAloudSleepRemaining");
-        pPreferences->addWidget(m_pSleepRemaining);
-        connect(m_pSleep, QOverload<int>::of(&QComboBox::activated), this,
-                [this](int nIndex)
-                {
-                    if (!m_pController || nIndex < 0)
-                    {
-                        return;
-                    }
-                    m_nSleepPreset = m_pSleep->itemData(nIndex).toInt();
-                    if (m_nSleepPreset == -1)
-                    {
-                        m_pController->setStopAtChapter(true);
-                    }
-                    else
-                    {
-                        m_pController->setSleepMinutes(m_nSleepPreset);
-                    }
-                });
-        pLayout->addWidget(paragraph("系统音色", "sectionTitle"));
-        auto* pVoices = controlGroup(pLayout);
+        pLayout->addWidget(new SleepTimerControl(m_pController, bMobile));
+        auto* pVoices = settingsGroup(pLayout, "系统音色");
         m_pVoice = new QComboBox;
         m_pVoice->setObjectName("readAloudVoice");
         m_pVoice->setMinimumWidth(0);
@@ -250,8 +220,7 @@ namespace Wenku8::Reader
                         updateState();
                     }
                 });
-        pLayout->addWidget(paragraph("声音调节", "sectionTitle"));
-        auto* pSound = controlGroup(pLayout);
+        auto* pSound = settingsGroup(pLayout, "声音调节");
         auto fnSlider = [this, pSound, bMobile](const QString& strTitle, const char* pName,
                                                 int nMinimum, int nMaximum, QLabel*& pValue,
                                                 const std::function<void(int)>& fnApply)
@@ -461,33 +430,6 @@ namespace Wenku8::Reader
                 : QStringLiteral("使用系统语音服务。是否联网取决于系统引擎和音色；标有[需联网]"
                                  "的音色须先允许。"));
         m_pEngineSettings->setVisible(pEngine && pEngine->canOpenSettings());
-        const int nRemaining = m_pController->remainingSleepSeconds();
-        if (m_pController->stopAtChapter())
-        {
-            m_nSleepPreset = -1;
-            setLabelText(m_pSleepRemaining, "本章结束后停止");
-        }
-        else if (nRemaining > 0)
-        {
-            if (m_nSleepPreset == -1)
-            {
-                m_nSleepPreset = 0;
-            }
-            setLabelText(m_pSleepRemaining, QString("剩余 %1:%2")
-                                                .arg(nRemaining / 60, 2, 10, QChar('0'))
-                                                .arg(nRemaining % 60, 2, 10, QChar('0')));
-        }
-        else
-        {
-            m_nSleepPreset = 0;
-            setLabelText(m_pSleepRemaining, "未设置定时");
-        }
-        if (!comboOpen(m_pSleep))
-        {
-            const QSignalBlocker oBlocker(m_pSleep);
-            m_pSleep->setCurrentIndex(
-                nRemaining > 0 && m_nSleepPreset == 0 ? -1 : m_pSleep->findData(m_nSleepPreset));
-        }
         if (!comboOpen(m_pVoice) && pEngine)
         {
             const QSignalBlocker oBlocker(m_pVoice);

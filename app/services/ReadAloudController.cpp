@@ -347,7 +347,7 @@ namespace Wenku8::Reader
         resetSleep();
         if (nMinutes > 0)
         {
-            m_nSleepDuration = qMin(120, nMinutes) * 60000;
+            m_nSleepDuration = qMin(maximumSleepMinutes(), nMinutes) * 60000;
             m_oSleepElapsed.start();
             m_oSleepTimer.start(m_nSleepDuration);
             m_oSleepTick.start();
