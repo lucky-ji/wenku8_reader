@@ -7,7 +7,7 @@ git clone https://github.com/lucky-ji/wenku8_reader.git
 cd wenku8_reader
 ```
 
-默认获取 `main` 分支。若需对应正式版本的工程代码，可执行 `git switch --detach v1.0.4`；最新环境与构建说明以主仓库的 [构建指南](https://github.com/lucky-ji/wenku8_reader/blob/main/docs/BUILDING.md) 为准。
+默认获取 `main` 分支。若需对应正式版本的工程代码，可执行 `git switch --detach v1.0.5`；最新环境与构建说明以主仓库的 [构建指南](https://github.com/lucky-ji/wenku8_reader/blob/main/docs/BUILDING.md) 为准。
 
 工程与 SDK 源码、平台适配、构建脚本及许可证均在主仓库中。Qt、NDK 等环境另行安装；未随仓库保存的第三方依赖源码按 [依赖来源](DEPENDENCIES.md) 获取，不从 Release 附件取得工程源码。
 

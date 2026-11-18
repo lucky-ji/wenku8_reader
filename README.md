@@ -4,7 +4,7 @@
 
 基于 C++17 与 Qt 5 的 Wenku8 阅读客户端，提供独立的纯 C++ SDK。
 
-[![Version](https://img.shields.io/badge/version-1.0.4-315b46)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.5-315b46)](docs/CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--2.0--only-blue)](LICENSE)
 [![Qt](https://img.shields.io/badge/Qt-5.15-41cd52)](https://doc.qt.io/archives/qt-5.15/)
 
@@ -24,7 +24,7 @@
 - 封面缓存、网络失败重试与保留已有内容，应用内提供开源地址与意见反馈入口。
 - 明亮、暗色、护眼三种外观，桌面与触屏分别适配。
 
-## 1.0.5 开发中的听书
+## 听书
 
 从阅读页的“听书”进入，使用系统语音引擎朗读当前小说，支持段落定位、暂停继续、语速与音色选择、自动切章和睡眠定时（支持 1–1440 分钟自定义）。阅读页保留简洁播控；手动滑动正文时暂停自动跟随，可随时重新开启。
 
@@ -83,7 +83,7 @@ git clone https://github.com/lucky-ji/wenku8_reader.git
 cd wenku8_reader
 ```
 
-默认获取 `main` 分支。若需对应正式版本的工程代码，可执行 `git switch --detach v1.0.4`；最新环境与构建说明以主仓库的 [构建指南](https://github.com/lucky-ji/wenku8_reader/blob/main/docs/BUILDING.md) 为准。
+默认获取 `main` 分支。若需对应正式版本的工程代码，可执行 `git switch --detach v1.0.5`；最新环境与构建说明以主仓库的 [构建指南](https://github.com/lucky-ji/wenku8_reader/blob/main/docs/BUILDING.md) 为准。
 
 需要 CMake 3.24+、支持 C++17 的编译器。客户端仅使用 Qt 5.15；Qt、Visual Studio、Android SDK/NDK 和 JDK 均由开发者自行安装，不包含在源码仓库中。
 
