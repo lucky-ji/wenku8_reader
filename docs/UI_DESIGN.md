@@ -54,5 +54,6 @@
 - 移动书架提供最近阅读入口，显示上次章节和进度，记住网格或紧凑列表偏好。发现和搜索默认使用紧凑列表，避免长标题和更新章节挤占封面空间。布局参考 [MewX 文库 2.0 的公开截图](https://github.com/MewX/light-novel-library_Wenku8_Android/tree/v2.0/screenshots/v2)。
 - 桌面阅读将书名和章名放在正文上方。`Ctrl+Shift+S` 开关阅读侧栏，`Ctrl+F` 可再次聚焦已有的查找输入，从目录过滤框按 Enter 打开匹配章节。交互参考 [Readest 阅读界面](https://readest.com/docs/reading) 和 [Foliate](https://johnfactotum.github.io/foliate/)。
 - 桌面书库记住封面网格或紧凑列表选择。`Ctrl+K` 聚焦搜索；搜索框按 ↓ 进入结果，方向键选择，Enter 打开。详情返回时恢复搜索条件、选中项和滚动位置。交互参考 [calibre](https://github.com/kovidgoyal/calibre) 和 [Readest 书库](https://readest.com/docs/library)。
+- 发现页滚动到底部时追加下一批结果。列表保持可滚动，重复小说不再展示，追加失败时可在页内重试。移动端下拉刷新和桌面刷新都从开头重新加载。
 - 详情展示最近阅读的章节及本章进度。目录可按卷名或章名筛选，清除时恢复卷的展开状态。桌面宽窗和宽幅移动横屏并排显示简介与目录。继续阅读参考 [Kavita](https://wiki.kavitareader.com/guides/features/opds/) 的章节进度。
 - 移动阅读的进度区在滚动模式显示章序，翻页模式显示当前页和总页数，拖动时预览目标页。正文中间显示或收起工具栏，翻页模式的两侧分别翻到上一页和下一页。参考 [KOReader 阅读进度](https://koreader.rocks/user_guide/#L2-reading-progress-1) 和 [Readest 阅读工具](https://readest.com/docs/reading#reader-interface)。

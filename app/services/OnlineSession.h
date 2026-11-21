@@ -46,7 +46,8 @@ namespace Wenku8::Reader
         void busyChanged(bool);
         void statusChanged(const QString&);
         void progressChanged(qint64 nCurrent, qint64 nTotal);
-        void novelsReady();
+        // Non-discovery lists report page and last page as zero.
+        void novelsReady(int nDiscoveryPage, int nDiscoveryLastPage, bool bStale);
         void bookshelfReady();
         void bookshelfAdded(int);
         void bookReady();

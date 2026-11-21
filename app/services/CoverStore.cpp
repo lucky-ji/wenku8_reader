@@ -65,6 +65,20 @@ namespace Wenku8::Reader
         auto pImage = m_vImages.object(nId);
         return pImage ? *pImage : QImage();
     }
+    QImage CoverStore::thumbnail(int nId) const
+    {
+        if (const auto* pImage = m_vThumbnails.object(nId))
+        {
+            return *pImage;
+        }
+        return image(nId);
+    }
+    bool CoverStore::canRequestThumbnail(int nId) const
+    {
+        // Keep fast flicks from queuing an unbounded number of off-screen covers.
+        return m_vPending.size() < 12 && !m_vThumbnails.contains(nId) &&
+               !m_vMissing.contains(nId) && canRequest(nId, false);
+    }
     bool CoverStore::unavailable(int nId) const
     {
         return m_vFailed.contains(nId) && !m_vImages.contains(nId);
@@ -95,12 +109,15 @@ namespace Wenku8::Reader
         m_vMissing.clear();
         m_vRounds.clear();
     }
+    bool CoverStore::canRequest(int nId, bool bDownloaded) const
+    {
+        return nId > 0 && !m_vImages.contains(nId) && !m_vPending.contains(nId) &&
+               (bDownloaded ||
+                m_vFailed.value(nId, 0) <= QDateTime::currentMSecsSinceEpoch() - 60000);
+    }
     void CoverStore::request(int nId, const QByteArray& baDownloaded)
     {
-        if (nId <= 0 || m_vImages.contains(nId) || m_vPending.contains(nId))
-            return;
-        if (baDownloaded.isEmpty() &&
-            m_vFailed.value(nId, 0) > QDateTime::currentMSecsSinceEpoch() - 60000)
+        if (!canRequest(nId, !baDownloaded.isEmpty()))
             return;
         if (m_vFailed.contains(nId))
         {
@@ -207,9 +224,13 @@ namespace Wenku8::Reader
                 }
                 if (pFlag->load())
                     return;
+                const auto oThumbnail = oImage.width() > 256 || oImage.height() > 400
+                                            ? oImage.scaled(256, 400, Qt::KeepAspectRatio,
+                                                            Qt::SmoothTransformation)
+                                            : oImage;
                 QMetaObject::invokeMethod(
                     this,
-                    [this, nId, oImage, bMissing, nGeneration]
+                    [this, nId, oImage, oThumbnail, bMissing, nGeneration]
                     {
                         if (nGeneration != m_nGeneration)
                             return;
@@ -218,6 +239,9 @@ namespace Wenku8::Reader
                         {
                             m_vImages.insert(nId, new QImage(oImage),
                                              int(qMax<qsizetype>(1, oImage.sizeInBytes() / 1024)));
+                            m_vThumbnails.insert(
+                                nId, new QImage(oThumbnail),
+                                int(qMax<qsizetype>(1, oThumbnail.sizeInBytes() / 1024)));
                             m_vFailed.remove(nId);
                             m_vMissing.remove(nId);
                             m_vRounds.remove(nId);

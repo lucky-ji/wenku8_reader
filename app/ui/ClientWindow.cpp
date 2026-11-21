@@ -51,6 +51,7 @@
 #include <QSlider>
 #include <QSignalBlocker>
 #include <algorithm>
+#include <functional>
 #include <QShortcut>
 #include <QDialog>
 #include <QDockWidget>
@@ -299,11 +300,19 @@ namespace Wenku8::Reader
                 pP->restore();
             }
         };
+        bool hasLazyCovers(const QListWidget* pCards)
+        {
+            return pCards->count() > 0 && pCards->item(0)->data(nLazyCoverRole).toBool();
+        }
         class BookCards final : public QStyledItemDelegate
         {
           public:
             Theme m_eTheme = Theme::Light;
-            using QStyledItemDelegate::QStyledItemDelegate;
+            BookCards(QListWidget* pView, CoverStore* pCovers, std::function<void(int)> fnRequestCover)
+                : QStyledItemDelegate(pView), m_pView(pView), m_pCovers(pCovers),
+                  m_fnRequestCover(std::move(fnRequestCover))
+            {
+            }
             QSize sizeHint(const QStyleOptionViewItem& oO, const QModelIndex&) const override
             {
                 auto pView = qobject_cast<const QListWidget*>(parent());
@@ -362,7 +371,7 @@ namespace Wenku8::Reader
                                 bSelected ? 2 : 1));
                 pP->drawRoundedRect(oR, 14, 14);
                 QRect oCover(oR.left() + 18, oR.top() + 19, 74, 118);
-                auto oImage = oIndex.data(Qt::UserRole + 3).value<QImage>();
+                const auto oImage = coverImage(oIndex);
                 QPainterPath oClip;
                 oClip.addRoundedRect(oCover, 6, 6);
                 pP->save();
@@ -387,10 +396,9 @@ namespace Wenku8::Reader
                     oF.setPointSize(7);
                     pP->setFont(oF);
                     pP->setPen(oC.m_oMuted);
+                    const auto strPlaceholder = coverPlaceholder(oIndex);
                     pP->drawText(oCover.adjusted(2, 62, -2, -4), Qt::AlignCenter | Qt::TextWordWrap,
-                                 oIndex.data(Qt::UserRole + 6).toString().isEmpty()
-                                     ? "封面加载中"
-                                     : oIndex.data(Qt::UserRole + 6).toString());
+                                 strPlaceholder.isEmpty() ? "封面加载中" : strPlaceholder);
                 }
                 pP->restore();
                 int nX = oCover.right() + 16, nW = oR.right() - nX - 14;
@@ -439,6 +447,43 @@ namespace Wenku8::Reader
 
           private:
             static constexpr int nWideDesktopRow = 720;
+            const QListWidget* m_pView;
+            CoverStore* m_pCovers;
+            std::function<void(int)> m_fnRequestCover;
+            mutable QSet<int> m_vQueuedCovers;
+
+            QImage coverImage(const QModelIndex& oIndex) const
+            {
+                if (!oIndex.data(nLazyCoverRole).toBool())
+                {
+                    return oIndex.data(Qt::UserRole + 3).value<QImage>();
+                }
+                const int nId = oIndex.data(Qt::UserRole).toInt();
+                const auto oImage = m_pCovers->thumbnail(nId);
+                if (oImage.isNull() && !m_vQueuedCovers.contains(nId) &&
+                    m_pCovers->canRequestThumbnail(nId))
+                {
+                    m_vQueuedCovers.insert(nId);
+                    QTimer::singleShot(0, this, [this, nId, oPending = QPersistentModelIndex(oIndex)]
+                    {
+                        m_vQueuedCovers.remove(nId);
+                        if (oPending.isValid() && m_pView->isVisible() &&
+                            m_pView->visualRect(oPending).intersects(m_pView->viewport()->rect()) &&
+                            m_pCovers->canRequestThumbnail(nId))
+                        {
+                            m_fnRequestCover(nId);
+                        }
+                    });
+                }
+                return oImage;
+            }
+
+            QString coverPlaceholder(const QModelIndex& oIndex) const
+            {
+                return oIndex.data(nLazyCoverRole).toBool()
+                           ? m_pCovers->placeholder(oIndex.data(Qt::UserRole).toInt())
+                           : oIndex.data(Qt::UserRole + 6).toString();
+            }
 
             void paintDesktopList(QPainter* pPainter, const QStyleOptionViewItem& oOption,
                                   const QModelIndex& oIndex) const
@@ -462,7 +507,7 @@ namespace Wenku8::Reader
                 oCoverClip.addRoundedRect(oCover, 6, 6);
                 pPainter->save();
                 pPainter->setClipPath(oCoverClip);
-                const auto oImage = oIndex.data(Qt::UserRole + 3).value<QImage>();
+                const auto oImage = coverImage(oIndex);
                 if (oImage.isNull())
                 {
                     pPainter->fillRect(oCover, oColors.m_oSection);
@@ -560,7 +605,7 @@ namespace Wenku8::Reader
                 pPainter->save();
                 pPainter->setClipPath(oClip);
                 pPainter->fillRect(oCover, oColors.m_oSection);
-                const auto oImage = oIndex.data(Qt::UserRole + 3).value<QImage>();
+                const auto oImage = coverImage(oIndex);
                 if (oImage.isNull())
                 {
                     makeIcon(Icon::Book, oColors.m_oMuted, oColors.m_oDisabled, oColors.m_oAccent)
@@ -573,7 +618,7 @@ namespace Wenku8::Reader
                                              oCover.width() - 6, 21),
                                        Qt::AlignCenter,
                                        pPainter->fontMetrics().elidedText(
-                                           oIndex.data(Qt::UserRole + 6).toString(), Qt::ElideRight,
+                                           coverPlaceholder(oIndex), Qt::ElideRight,
                                            oCover.width() - 6));
                 }
                 else
@@ -668,15 +713,22 @@ namespace Wenku8::Reader
                 {
                     if (!m_bUnlocked)
                         return;
-                    for (int nI = 0; nI < m_pCards->count(); ++nI)
+                    if (hasLazyCovers(m_pCards))
                     {
-                        auto pItem = m_pCards->item(nI);
-                        if (pItem->data(Qt::UserRole).toInt() == nId)
+                        m_pCards->viewport()->update();
+                    }
+                    else
+                    {
+                        for (int nI = 0; nI < m_pCards->count(); ++nI)
                         {
-                            pItem->setData(Qt::UserRole + 3, oImage);
-                            pItem->setData(Qt::UserRole + 6, oImage.isNull()
-                                                                 ? m_pCovers->placeholder(nId)
-                                                                 : QString());
+                            auto pItem = m_pCards->item(nI);
+                            if (pItem->data(Qt::UserRole).toInt() == nId)
+                            {
+                                pItem->setData(Qt::UserRole + 3, oImage);
+                                pItem->setData(Qt::UserRole + 6, oImage.isNull()
+                                                                     ? m_pCovers->placeholder(nId)
+                                                                     : QString());
+                            }
                         }
                     }
                     if (m_oBook.m_nId == nId && m_pDetailCover)
@@ -695,11 +747,14 @@ namespace Wenku8::Reader
                 {
                     if (!m_bUnlocked)
                         return;
-                    for (int nI = 0; nI < m_pCards->count(); ++nI)
+                    if (!hasLazyCovers(m_pCards))
                     {
-                        auto pItem = m_pCards->item(nI);
-                        if (pItem->data(Qt::UserRole).toInt() == nId)
-                            pItem->setData(Qt::UserRole + 6, m_pCovers->placeholder(nId));
+                        for (int nI = 0; nI < m_pCards->count(); ++nI)
+                        {
+                            auto pItem = m_pCards->item(nI);
+                            if (pItem->data(Qt::UserRole).toInt() == nId)
+                                pItem->setData(Qt::UserRole + 6, m_pCovers->placeholder(nId));
+                        }
                     }
                     if (m_oBook.m_nId == nId && m_pCovers->image(nId).isNull())
                         m_pDetailCover->setText(m_pCovers->placeholder(nId));
@@ -792,6 +847,8 @@ namespace Wenku8::Reader
                     {
                         if (bValue)
                             m_nActiveRequestContext = m_nBusinessContext;
+                        else
+                            finishDiscoveryLoad();
                         updateBusy(bValue);
                         if (!bValue && m_nSpeechPendingBook != 0)
                         {
@@ -812,7 +869,8 @@ namespace Wenku8::Reader
                         if (bAvailable)
                             m_nRetryContext = m_nActiveRequestContext;
                         updateNetworkActions();
-                        if (bAvailable && m_pPages->currentIndex() == 1 && m_pCards->count() > 0)
+                        if (bAvailable && m_nDiscoveryPendingPage == 0 &&
+                            m_pPages->currentIndex() == 1 && m_pCards->count() > 0)
                             m_pCount->setText(
                                 QString("暂未更新 · 保留上次列表（%1 本）").arg(m_pCards->count()));
                     });
@@ -850,9 +908,9 @@ namespace Wenku8::Reader
                         updateShelfAction();
                     });
             connect(m_pSession, &OnlineSession::novelsReady, this,
-                    [this]
+                    [this](int nDiscoveryPage, int nDiscoveryLastPage, bool bStale)
                     {
-                        populate(m_pSession->novels());
+                        receiveLibraryNovels(nDiscoveryPage, nDiscoveryLastPage, bStale);
                         if (m_nStartupNovel)
                         {
                             int nId = m_nStartupNovel;
@@ -1143,6 +1201,7 @@ namespace Wenku8::Reader
             m_oLibraryReturn = {};
             if (m_strActiveSearch != strQuery)
             {
+                resetDiscoveryFeed();
                 m_pCards->clear();
             }
             if (mobileMode())
@@ -1229,34 +1288,7 @@ namespace Wenku8::Reader
         pLibraryBar->addWidget(m_pCount, 1);
         buildMobileLibrary(pLibraryLayout, pLibraryBar);
         buildDesktopLibrary(pLibraryBar);
-        m_pPreviousPage = button("上一页", "quiet");
-        m_pPreviousPage->setProperty("textAction", true);
-        m_pNextPage = button("下一页", "quiet");
-        m_pNextPage->setProperty("textAction", true);
-        setButtonIcon(m_pPreviousPage, Icon::Left);
-        setButtonIcon(m_pNextPage, Icon::Right);
-        m_pNextPage->setLayoutDirection(Qt::RightToLeft);
-        pLibraryBar->addWidget(m_pPreviousPage);
-        pLibraryBar->addWidget(m_pNextPage);
         pLibraryLayout->addLayout(pLibraryBar);
-        connect(m_pPreviousPage, &QPushButton::clicked, this,
-                [this]
-                {
-                    if (m_nSection == 1 && m_nPage > 1)
-                    {
-                        --m_nPage;
-                        refresh();
-                    }
-                });
-        connect(m_pNextPage, &QPushButton::clicked, this,
-                [this]
-                {
-                    if (m_nSection == 1)
-                    {
-                        ++m_nPage;
-                        refresh();
-                    }
-                });
         m_pCards = new QListWidget;
         m_pCards->setObjectName("cards");
         m_pCards->setViewMode(QListView::IconMode);
@@ -1268,7 +1300,11 @@ namespace Wenku8::Reader
         m_pCards->setUniformItemSizes(true);
         m_pCards->setCursor(Qt::PointingHandCursor);
         m_pCards->installEventFilter(this);
-        m_pCards->setItemDelegate(new BookCards(m_pCards));
+        m_pCards->setItemDelegate(new BookCards(m_pCards, m_pCovers.get(),
+                                               [this](int nId)
+                                               {
+                                                   requestCover(nId);
+                                               }));
         pLibraryLayout->addWidget(m_pCards, 1);
         connect(m_pCards, &QListWidget::itemClicked, this,
                 [this](QListWidgetItem* pItem)
@@ -1277,6 +1313,7 @@ namespace Wenku8::Reader
                              m_nSection == 3 && m_strActiveSearch.isEmpty());
                 });
         m_pPages->addWidget(pLibrary);
+        wireLibraryFeed();
         auto pDetail = new QFrame;
         pDetail->setObjectName("surface");
         auto pInfo = new QVBoxLayout(pDetail);
@@ -1917,7 +1954,11 @@ namespace Wenku8::Reader
                 [this]
                 {
 #ifdef WENKU8_CLIENT_ONLINE
-                    if (m_pSession && m_nRetryContext == m_nBusinessContext)
+                    if (isDiscoveryFeed() && m_bDiscoveryAppendFailed)
+                    {
+                        loadMoreDiscovery(true);
+                    }
+                    else if (m_pSession && m_nRetryContext == m_nBusinessContext)
                         m_pSession->retryLastRequest();
 #endif
                 });
@@ -2140,6 +2181,7 @@ namespace Wenku8::Reader
         }
         m_bUnlocked = bValue;
         m_oLibraryReturn = {};
+        resetDiscoveryFeed();
         m_strActiveSearch.clear();
         m_pSearch->clear();
         m_nRetryContext = m_nBusinessContext;
@@ -2219,6 +2261,11 @@ namespace Wenku8::Reader
         }
         ++m_nBusinessContext;
         m_oLibraryReturn = {};
+        if (m_nSection != nSection || !m_strActiveSearch.isEmpty())
+        {
+            resetDiscoveryFeed();
+            m_pCards->clear();
+        }
         m_strActiveSearch.clear();
         updateNetworkActions();
         clearMobilePages();
@@ -2229,7 +2276,6 @@ namespace Wenku8::Reader
         ++m_nRestoreGeneration;
         m_bRestoring = false;
         m_nSection = nSection;
-        m_nPage = 1;
         m_pSearch->clear();
         for (int nI = 0; nI < m_vNav.size(); ++nI)
         {
@@ -2304,7 +2350,6 @@ namespace Wenku8::Reader
             return;
         updateMobileLibraryLayout();
         updateMobileContinueReading();
-        m_pPreviousPage->setEnabled(m_nPage > 1);
         if (m_nSection == 3 && m_strActiveSearch.isEmpty())
         {
             historyBooks();
@@ -2317,6 +2362,7 @@ namespace Wenku8::Reader
             return;
         }
         ++m_nBusinessContext;
+        m_bDiscoveryAppendFailed = false;
         updateNetworkActions();
         m_pCount->setText(m_pCards->count() > 0 ? "正在更新，保留上次列表…" : "正在加载小说…");
 #ifdef WENKU8_CLIENT_ONLINE
@@ -2327,46 +2373,9 @@ namespace Wenku8::Reader
             else if (m_nSection == 0)
                 m_pSession->shelf(bForce);
             else
-                m_pSession->latest(m_nPage, bForce);
+                m_pSession->latest(1, bForce);
         }
 #endif
-    }
-    void ClientWindow::populate(const std::vector<Novel>& vNovels)
-    {
-        if (!m_bUnlocked)
-            return;
-        m_pCards->clear();
-        const bool bSection = m_strActiveSearch.isEmpty();
-        for (const auto& oN : vNovels)
-        {
-            auto pItem = new QListWidgetItem(text(oN.m_strTitle), m_pCards);
-            pItem->setData(Qt::UserRole, oN.m_nId);
-            pItem->setData(Qt::UserRole + 1, text(oN.m_strAuthor));
-            pItem->setData(Qt::UserRole + 2,
-                           bSection && m_nSection == 2 ? "已缓存" : text(oN.m_strStatus));
-            pItem->setData(Qt::UserRole + 3, m_pCovers->image(oN.m_nId));
-            pItem->setData(Qt::UserRole + 5, text(oN.m_strLatestChapter));
-            pItem->setData(Qt::UserRole + 6, m_pCovers->placeholder(oN.m_nId));
-            if (auto oSaved = m_pReadingState->position(oN.m_nId))
-            {
-                setLibraryPosition(pItem, *oSaved);
-            }
-            pItem->setToolTip(text(oN.m_strTitle));
-            requestCover(oN.m_nId);
-        }
-        if (vNovels.empty())
-        {
-            const QStringList vEmptyStates{"书架还没有小说，试试搜索或发现页。", "本页暂无小说。",
-                                           "还没有缓存小说。", "还没有阅读记录。"};
-            m_pCount->setText(m_strActiveSearch.isEmpty() ? vEmptyStates.value(m_nSection)
-                                                        : QString("没有找到匹配的小说。"));
-        }
-        else
-        {
-            const QString strPage = m_nSection == 1 && m_strActiveSearch.isEmpty()
-                ? QString(" · 第 %1 页").arg(m_nPage) : QString();
-            m_pCount->setText(QString("%1 本小说%2").arg(vNovels.size()).arg(strPage));
-        }
     }
     void ClientWindow::historyBooks()
     {
@@ -2434,7 +2443,7 @@ namespace Wenku8::Reader
     {
         if (!m_bUnlocked || m_bLoadingBusy)
             return;
-        if (desktopLibraryActive())
+        if (desktopLibraryActive() || isDiscoveryFeed())
         {
             m_oLibraryReturn = {nId, m_pCards->verticalScrollBar()->value(),
                                 m_pTitle->text(), m_pSubtitle->text()};
@@ -2832,13 +2841,14 @@ namespace Wenku8::Reader
     void ClientWindow::updateBusy(bool bBusy)
     {
         const bool bWasBusy = m_bLoadingBusy;
+        const bool bAppending = m_nDiscoveryPendingPage != 0;
         m_bLoadingBusy = bBusy;
         for (auto pShortcut : findChildren<QShortcut*>())
             pShortcut->setEnabled(!bBusy);
         if (m_pDesktopMenuBar)
             m_pDesktopMenuBar->setEnabled(!bBusy);
         auto pShell = findChild<QWidget*>("shell");
-        if (bBusy)
+        if (bBusy && !bAppending)
         {
             if (!bWasBusy)
                 m_pLoadingFocus = QApplication::focusWidget();
@@ -2854,7 +2864,7 @@ namespace Wenku8::Reader
             m_pLoading->raise();
             m_pLoading->setFocus(Qt::OtherFocusReason);
         }
-        else
+        else if (!bBusy)
         {
             pShell->setEnabled(true);
             m_pLoading->hide();
@@ -2867,6 +2877,7 @@ namespace Wenku8::Reader
         updateShelfAction();
         m_pOperations->setEnabled(m_bUnlocked && !bBusy);
         m_pRefresh->setEnabled(m_bUnlocked && !bBusy);
+        m_pLogin->setEnabled(!bBusy);
         for (auto pB : m_vNav)
             pB->setEnabled(m_bUnlocked && !bBusy);
         for (auto pB : m_vMobileNav)
@@ -2881,7 +2892,7 @@ namespace Wenku8::Reader
         m_pNext->setEnabled(!bBusy && (m_nChapter + 1 < m_vFlat.size() ||
                                        (m_pReader->readingMode() == ReadingMode::Paged &&
                                         m_pReader->pageNumber() < m_pReader->pageCount())));
-        m_pCards->setEnabled(!bBusy);
+        m_pCards->setEnabled(!bBusy || bAppending);
         updateDesktopLibraryLayout();
         updateReaderProgress();
         updateVolumePaging();
@@ -2907,7 +2918,9 @@ namespace Wenku8::Reader
 #endif
         const bool bRecoverable =
             m_bUnlocked && !m_bLoadingBusy && m_nRetryContext == m_nBusinessContext;
-        const bool bRetryVisible = bRecoverable && bRetry;
+        const bool bRetryAppend = !m_bLoadingBusy && isDiscoveryFeed() && m_bDiscoveryAppendFailed;
+        const bool bRetryVisible = (bRecoverable && bRetry) || bRetryAppend;
+        m_pRetryNetwork->setText(bRetryAppend ? "重试加载更多" : "重新连接");
         m_pRetryNetwork->setVisible(bRetryVisible);
         const bool bAction = bRetryVisible;
         const bool bNormal = !mobileMode() || (m_pPages->currentIndex() != 3 &&
@@ -3119,7 +3132,7 @@ namespace Wenku8::Reader
             m_pTitle->setText("小说详情");
             return;
         }
-        if (m_pPages->currentIndex() == 2 && returnToDesktopLibrary())
+        if (m_pPages->currentIndex() == 2 && returnToLibrary())
         {
             return;
         }

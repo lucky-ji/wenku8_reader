@@ -199,9 +199,6 @@ namespace Wenku8::Reader
             m_pCards->setProperty("mobileCompactCards", bCompactCards);
             m_pCards->doItemsLayout();
         }
-        const bool bPaged = m_nSection == 1 && m_strActiveSearch.isEmpty();
-        m_pPreviousPage->setVisible(bPaged);
-        m_pNextPage->setVisible(bPaged);
     }
 
     void ClientWindow::applyMobileLibraryStyle()

@@ -29,8 +29,11 @@ class QMenuBar;
 class QDockWidget;
 class QSlider;
 class QShortcut;
+class QTimer;
 namespace Wenku8::Reader
 {
+    inline constexpr int nLazyCoverRole = Qt::UserRole + 8;
+
     class OnlineSession;
     class AnimatedStack;
     class TouchScroll;
@@ -112,7 +115,7 @@ namespace Wenku8::Reader
         QLineEdit* m_pDetailFilter = nullptr;
         QPushButton* m_pDetailFilterToggle = nullptr;
         bool m_bDetailFiltering = false;
-        int m_nSection = 0, m_nPage = 1, m_nChapter = -1, m_nPendingChapter = -1,
+        int m_nSection = 0, m_nChapter = -1, m_nPendingChapter = -1,
             m_nRestoreOffset = -1, m_nFontSize = 18, m_nStartupNovel = 0;
         std::unique_ptr<NovelDownloader> m_pStore;
         OnlineSession* m_pSession = nullptr;
@@ -132,8 +135,7 @@ namespace Wenku8::Reader
         QLineEdit* m_pSearch = nullptr;
         QPushButton *m_pRefresh = nullptr, *m_pLogin = nullptr, *m_pRead = nullptr,
                     *m_pDownload = nullptr, *m_pLocalDownload = nullptr, *m_pShelfAdd = nullptr,
-                    *m_pFullscreen = nullptr, *m_pPrevious = nullptr, *m_pNext = nullptr,
-                    *m_pPreviousPage = nullptr, *m_pNextPage = nullptr;
+                    *m_pFullscreen = nullptr, *m_pPrevious = nullptr, *m_pNext = nullptr;
         QPushButton* m_pReaderContents = nullptr;
         QBoxLayout* m_pReaderActionLayout = nullptr;
         QVector<QPushButton*> m_vReaderQuickActions;
@@ -144,6 +146,9 @@ namespace Wenku8::Reader
         DownloadOption* m_pIllustrations = nullptr;
         PullRefreshIndicator *m_pCardsRefresh = nullptr, *m_pTocRefresh = nullptr;
         QListWidget* m_pCards = nullptr;
+        QTimer* m_pDiscoveryLoadTimer = nullptr;
+        int m_nDiscoveryPage = 0, m_nDiscoveryLastPage = 0, m_nDiscoveryPendingPage = 0;
+        bool m_bDiscoveryAppendFailed = false;
         QTreeWidget* m_pToc = nullptr;
         ReadingView* m_pReader = nullptr;
         ReadAloudController* m_pReadAloud = nullptr;
@@ -173,7 +178,7 @@ namespace Wenku8::Reader
         bool handleDesktopLibraryKey(QObject*, QKeyEvent*);
         void applyDesktopLibraryStyle();
         void updateDesktopLibraryLayout();
-        bool returnToDesktopLibrary();
+        bool returnToLibrary();
         void setLibraryPosition(QListWidgetItem*, const ReadingEntry&);
         void pushMobilePage(QWidget*, const QString&);
         void popMobilePage();
@@ -214,6 +219,14 @@ namespace Wenku8::Reader
         void refresh(bool bForce = false);
         void refreshCurrentPage();
         void positionPullIndicators();
+        void wireLibraryFeed();
+        bool isDiscoveryFeed() const;
+        void resetDiscoveryFeed();
+        void loadMoreDiscovery(bool bRetry = false);
+        void finishDiscoveryLoad();
+        void receiveLibraryNovels(int nDiscoveryPage, int nDiscoveryLastPage, bool bStale);
+        int appendLibraryBooks(const std::vector<Novel>&);
+        void updateLibraryCount();
         void populate(const std::vector<Novel>&);
         void downloadedBooks();
         void cacheBook();

@@ -194,44 +194,6 @@ namespace Wenku8::Reader
         }
     }
 
-    bool ClientWindow::returnToDesktopLibrary()
-    {
-        if (mobileMode() || m_oLibraryReturn.m_nBook <= 0)
-        {
-            return false;
-        }
-        const auto oReturn = m_oLibraryReturn;
-        m_oLibraryReturn = {};
-        ++m_nBusinessContext;
-        m_pTitle->setText(oReturn.m_strTitle);
-        m_pSubtitle->setText(oReturn.m_strSubtitle);
-        m_pPages->returnTo(1);
-        m_pBodyLayout->activate();
-        QListWidgetItem* pSelected = nullptr;
-        for (int nRow = 0; nRow < m_pCards->count(); ++nRow)
-        {
-            auto* pItem = m_pCards->item(nRow);
-            if (pItem->data(Qt::UserRole).toInt() == oReturn.m_nBook)
-            {
-                if (auto oSaved = m_pReadingState->position(oReturn.m_nBook))
-                {
-                    setLibraryPosition(pItem, *oSaved);
-                }
-                m_pCards->setCurrentItem(pItem);
-                pSelected = pItem;
-                break;
-            }
-        }
-        m_pCards->setFocus(Qt::OtherFocusReason);
-        m_pCards->doItemsLayout();
-        m_pCards->verticalScrollBar()->setValue(oReturn.m_nScroll);
-        if (pSelected && !m_pCards->viewport()->rect().intersects(m_pCards->visualItemRect(pSelected)))
-        {
-            m_pCards->scrollToItem(pSelected, QAbstractItemView::EnsureVisible);
-        }
-        return true;
-    }
-
     void ClientWindow::setLibraryPosition(QListWidgetItem* pItem, const ReadingEntry& oSaved)
     {
         const int nProgress = qBound(0, qRound(oSaved.m_fProgress * 100), 100);

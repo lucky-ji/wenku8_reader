@@ -129,6 +129,7 @@ namespace Wenku8::Reader
         {
             Login,
             Novels,
+            DiscoveryAppend,
             Book,
             Chapter,
             ShelfAdd
@@ -144,13 +145,15 @@ namespace Wenku8::Reader
                  m_bTransient = false, m_bCancelled = false, m_bFromCache = false, m_bStale = false,
                  m_bIsShelf = false;
             QStringList m_vImageUrls;
+            int m_nDiscoveryPage = 0, m_nDiscoveryLastPage = 0;
             int m_nNovelId = 0, m_nChapterId = 0;
             int m_nId = 0;
         };
         using Job = std::function<Result(ClientOptions, std::shared_ptr<HttpTransport>)>;
         bool readOnly(Kind eKind)
         {
-            return eKind == Kind::Novels || eKind == Kind::Book || eKind == Kind::Chapter;
+            return eKind == Kind::Novels || eKind == Kind::DiscoveryAppend ||
+                   eKind == Kind::Book || eKind == Kind::Chapter;
         }
         struct CachedRead
         {
@@ -577,10 +580,12 @@ namespace Wenku8::Reader
             {
                 emit m_pQ->busyChanged(true);
                 emit m_pQ->progressChanged(0, 0);
-                emit m_pQ->statusChanged(eType == Kind::Book       ? "正在加载小说与目录…"
-                                         : eType == Kind::Chapter  ? "正在加载章节内容…"
-                                         : eType == Kind::ShelfAdd ? "正在加入书架…"
-                                                                   : "正在加载小说列表…");
+                emit m_pQ->statusChanged(
+                    eType == Kind::Book               ? "正在加载小说与目录…"
+                    : eType == Kind::Chapter          ? "正在加载章节内容…"
+                    : eType == Kind::ShelfAdd         ? "正在加入书架…"
+                    : eType == Kind::DiscoveryAppend ? "正在加载更多小说…"
+                                                     : "正在加载小说列表…");
             }
             if (readOnly(eType) && bFresh)
             {
@@ -754,7 +759,8 @@ namespace Wenku8::Reader
                     emit m_pQ->authenticationChanged(false);
                     if (!m_bResumed)
                     {
-                        if (readOnly(m_eKind))
+                        // Reauthentication refreshes the shelf. Only resume an explicit book read.
+                        if (m_eKind == Kind::Book || m_eKind == Kind::Chapter)
                         {
                             m_fnPending = m_fnCurrent;
                             m_ePendingKind = m_eKind;
@@ -785,9 +791,11 @@ namespace Wenku8::Reader
             switch (m_eKind)
             {
             case Kind::Novels:
+            case Kind::DiscoveryAppend:
                 if (m_oData.m_bIsShelf)
                     emit m_pQ->bookshelfReady();
-                emit m_pQ->novelsReady();
+                emit m_pQ->novelsReady(m_oData.m_nDiscoveryPage, m_oData.m_nDiscoveryLastPage,
+                                       m_oData.m_bStale);
                 break;
             case Kind::Book:
                 emit m_pQ->bookReady();
@@ -915,12 +923,15 @@ namespace Wenku8::Reader
     void OnlineSession::latest(int nPage, bool bForce)
     {
         m_pImpl->run(
-            Kind::Novels,
+            nPage > 1 ? Kind::DiscoveryAppend : Kind::Novels,
             [nPage](ClientOptions oO, std::shared_ptr<HttpTransport> pT)
             {
                 Client oC(oO, pT, RetryPolicy{false});
                 Result oR;
-                oR.m_vNovels = oC.list(Sort::LastUpdate, nPage, CachePolicy::NetworkOnly).m_vNovels;
+                auto oPage = oC.list(Sort::LastUpdate, nPage, CachePolicy::NetworkOnly);
+                oR.m_nDiscoveryPage = nPage;
+                oR.m_nDiscoveryLastPage = oPage.m_nPages;
+                oR.m_vNovels = std::move(oPage.m_vNovels);
                 oR.m_bSuccess = true;
                 return oR;
             },

@@ -23,6 +23,8 @@ namespace Wenku8::Reader
         CoverStore(QString strOrigin, QString strCacheDirectory, QObject* pParent = nullptr);
         ~CoverStore() override;
         QImage image(int nNovel) const;
+        QImage thumbnail(int nNovel) const;
+        bool canRequestThumbnail(int nNovel) const;
         bool unavailable(int nNovel) const;
         QString placeholder(int nNovel) const;
         void request(int nNovel, const QByteArray& baDownloadedCover = {});
@@ -33,8 +35,11 @@ namespace Wenku8::Reader
         void statusChanged(int nNovel);
 
       private:
+        bool canRequest(int nNovel, bool bDownloaded) const;
+
         QString m_strOrigin, m_strDirectory;
-        QCache<int, QImage> m_vImages{32 * 1024}; // KiB, bounded thumbnails.
+        QCache<int, QImage> m_vImages{32 * 1024}; // KiB, bounded originals.
+        QCache<int, QImage> m_vThumbnails{32 * 1024}; // KiB, for scrolling lists.
         QSet<int> m_vPending;
         QHash<int, qint64> m_vFailed;
         QSet<int> m_vMissing;
