@@ -2,6 +2,8 @@
 
 SDK 是与界面无关的 C++17 库。它实现协议、HTTP 传输抽象、解析、缓存、目录与正文访问、书架和下载存储；不依赖 Qt、Android WebView、Windows 窗口或应用资源。
 
+SDK 使用独立的语义版本。当前库版本为 **1.1.0**，可通过 `Wenku8::sdkVersion()` 查询实际链接的库。
+
 ## 目录与边界
 
 - `include/`：四个公开头文件，供调用方使用。
@@ -38,6 +40,28 @@ target_link_libraries(your_program PRIVATE Wenku8::Sdk)
 ```
 
 `WENKU8_BUILD_SHARED=ON` 生成共享库；`OFF` 生成静态库并向调用方传播 `WENKU8_STATIC`。公开接口保留 `WENKU8_API` Windows DLL 导入/导出约定。构建目标自行传播公开头目录，不应让调用方引用 `sdk/src`。
+
+## 启动时配置重试
+
+`Client`、`CatalogClient` 和 `NovelDownloader` 默认自动重试可恢复的只读请求，初次请求加最多两次重试。默认退避从 400 毫秒开始，启用多次尝试时每次最多 12 秒。所有尝试和等待共用请求的 `TransferOptions::m_oTimeout`。重试使用原传输及会话，认证与证书校验失败、请求取消和写入请求不会重新发送。
+
+```cpp
+Wenku8::ClientOptions oClientOptions;
+oClientOptions.m_strEndpoint = "https://www.wenku8.net";
+oClientOptions.m_eProtocol = Wenku8::Protocol::Website;
+Wenku8::Client oDefault(oClientOptions);
+
+Wenku8::RetryPolicy oRetry;
+oRetry.m_oOptions.m_nMaxAttempts = 5; // 首次请求加最多四次重试
+Wenku8::Client oWithRetries(oClientOptions, {}, oRetry);
+
+oRetry.m_bEnabled = false;
+Wenku8::Client oSingleAttempt(oClientOptions, {}, oRetry);
+```
+
+`m_nMaxAttempts` 可设为 1–10，包含首次请求。注入浏览器或系统传输时可使用 `defaultRetryOptions(RetryProfile::Browser)` 识别没有原生错误码的网络错误。`NovelDownloader` 可用同一策略配置正文和图片，也可分别指定两者。下载时每次尝试遵守请求间隔，429 额外受 `DownloadRequest` 的次数和等待上限约束。要求的等待超过剩余预算时直接返回 429。
+
+直接发送原始请求时可用 `makeSdkTransport` 应用同一策略。一个操作包含多个请求时，可在其外层使用 `makeDeadlineTransport`，让整个操作共享截止时间。未传入策略时会沿用直接注入的 SDK 重试传输。传入策略后会替换该传输的配置。自定义适配器内部若已自行重试，可关闭 SDK 重试。重试回调运行于调用线程，不能重入客户端。
 
 Android NDK r21 的共享 libc++ 缺少 `std::filesystem` 时，可通过 `WENKU8_ANDROID_FILESYSTEM_SOURCE_DIR` 指向匹配的 LLVM 9 filesystem 源码；不得以不匹配的 C++ 运行库替换 Qt 的运行库。
 

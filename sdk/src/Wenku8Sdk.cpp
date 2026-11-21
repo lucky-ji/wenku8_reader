@@ -45,6 +45,7 @@ namespace Wenku8
     } // namespace
     struct Client::Impl
     {
+        Impl(ClientOptions, std::shared_ptr<HttpTransport>, std::optional<RetryPolicy>);
         ClientOptions m_oOptions;
         std::shared_ptr<HttpTransport> m_pTransport;
         std::unique_ptr<FileCache> m_pCache;
@@ -106,8 +107,8 @@ namespace Wenku8
             return oResult;
         }
     };
-    Client::Client(ClientOptions oOptions, std::shared_ptr<HttpTransport> pTransport)
-        : m_pImpl(new Impl)
+    Client::Impl::Impl(ClientOptions oOptions, std::shared_ptr<HttpTransport> pTransport,
+                       std::optional<RetryPolicy> oRetry)
     {
         if ((oOptions.m_strEndpoint.rfind("https://", 0) != 0 &&
              oOptions.m_strEndpoint.rfind("http://", 0) != 0) ||
@@ -118,13 +119,22 @@ namespace Wenku8
             (oOptions.m_eProtocol != Protocol::LegacyApi &&
              oOptions.m_eProtocol != Protocol::Website))
             throw Error(ErrorCode::InvalidArgument, "Invalid client options");
-        m_pImpl->m_oOptions = std::move(oOptions);
-        m_pImpl->m_pTransport = pTransport ? std::move(pTransport) : makeCurlTransport();
-        if (!m_pImpl->m_oOptions.m_oCacheDirectory.empty())
-            m_pImpl->m_pCache.reset(new FileCache(m_pImpl->m_oOptions.m_oCacheDirectory));
-        if (m_pImpl->m_oOptions.m_eProtocol == Protocol::Website)
-            m_pImpl->m_pWeb.reset(
-                new Detail::WebBackend(m_pImpl->m_oOptions, m_pImpl->m_pTransport));
+        m_oOptions = std::move(oOptions);
+        m_pTransport = oRetry ? makeSdkTransport(std::move(pTransport), std::move(*oRetry))
+                              : makeSdkTransport(std::move(pTransport));
+        if (!m_oOptions.m_oCacheDirectory.empty())
+            m_pCache.reset(new FileCache(m_oOptions.m_oCacheDirectory));
+        if (m_oOptions.m_eProtocol == Protocol::Website)
+            m_pWeb.reset(new Detail::WebBackend(m_oOptions, m_pTransport));
+    }
+    Client::Client(ClientOptions oOptions, std::shared_ptr<HttpTransport> pTransport)
+        : m_pImpl(new Impl(std::move(oOptions), std::move(pTransport), std::nullopt))
+    {
+    }
+    Client::Client(ClientOptions oOptions, std::shared_ptr<HttpTransport> pTransport,
+                   RetryPolicy oRetry)
+        : m_pImpl(new Impl(std::move(oOptions), std::move(pTransport), std::move(oRetry)))
+    {
     }
     Client::~Client() = default;
     Client::Client(Client&&) noexcept = default;
@@ -232,9 +242,10 @@ namespace Wenku8
             auto oTransfer = m_pImpl->m_oOptions.m_oTransfer;
             // Do not forward a credential-bearing POST to a redirect destination.
             oTransfer.m_bFollowRedirects = false;
-            auto oResponse = m_pImpl->m_pTransport->perform(
-                m_pImpl->m_oOptions.m_pAuthentication->loginRequest(strName, strPassword),
-                oTransfer);
+            auto oRequest =
+                m_pImpl->m_oOptions.m_pAuthentication->loginRequest(strName, strPassword);
+            oRequest.m_bAllowRetries = false;
+            auto oResponse = m_pImpl->m_pTransport->perform(oRequest, oTransfer);
             httpOk(oResponse);
             auto oUser = m_pImpl->m_oOptions.m_pAuthentication->parseLogin(oResponse, strName);
             if (oUser.m_nId < 0 || oUser.m_strName.empty())
@@ -265,8 +276,10 @@ namespace Wenku8
         }
         try
         {
-            auto oResponse = m_pImpl->m_pTransport->perform(pProtocol->logoutRequest(),
-                                                            m_pImpl->m_oOptions.m_oTransfer);
+            auto oRequest = pProtocol->logoutRequest();
+            oRequest.m_bAllowRetries = false;
+            auto oResponse =
+                m_pImpl->m_pTransport->perform(oRequest, m_pImpl->m_oOptions.m_oTransfer);
             httpOk(oResponse);
             pProtocol->validateLogout(oResponse);
         }

@@ -145,6 +145,7 @@ namespace Wenku8
     } // namespace
     struct CatalogClient::Impl
     {
+        Impl(CatalogOptions, std::shared_ptr<HttpTransport>, std::optional<RetryPolicy>);
         CatalogOptions m_oOptions;
         std::string m_strSourceOrigin;
         std::shared_ptr<HttpTransport> m_pTransport;
@@ -336,16 +337,26 @@ namespace Wenku8
             throw Error(ErrorCode::Http, "Too many catalog redirects");
         }
     };
-    CatalogClient::CatalogClient(CatalogOptions oOptions, std::shared_ptr<HttpTransport> pTransport)
-        : m_pImpl(new Impl)
+    CatalogClient::Impl::Impl(CatalogOptions oOptions, std::shared_ptr<HttpTransport> pTransport,
+                              std::optional<RetryPolicy> oRetry)
     {
-        m_pImpl->m_strSourceOrigin = origin(oOptions.m_strEndpoint);
+        m_strSourceOrigin = origin(oOptions.m_strEndpoint);
         if (oOptions.m_oCacheMaxAge.count() < 0)
             throw Error(ErrorCode::InvalidArgument, "Negative catalog cache lifetime");
-        m_pImpl->m_oOptions = std::move(oOptions);
-        m_pImpl->m_pTransport = pTransport ? std::move(pTransport) : makeCurlTransport();
-        if (!m_pImpl->m_oOptions.m_oCacheDirectory.empty())
-            m_pImpl->m_pCache.reset(new FileCache(m_pImpl->m_oOptions.m_oCacheDirectory));
+        m_oOptions = std::move(oOptions);
+        m_pTransport = oRetry ? makeSdkTransport(std::move(pTransport), std::move(*oRetry))
+                              : makeSdkTransport(std::move(pTransport));
+        if (!m_oOptions.m_oCacheDirectory.empty())
+            m_pCache.reset(new FileCache(m_oOptions.m_oCacheDirectory));
+    }
+    CatalogClient::CatalogClient(CatalogOptions oOptions, std::shared_ptr<HttpTransport> pTransport)
+        : m_pImpl(new Impl(std::move(oOptions), std::move(pTransport), std::nullopt))
+    {
+    }
+    CatalogClient::CatalogClient(CatalogOptions oOptions, std::shared_ptr<HttpTransport> pTransport,
+                                 RetryPolicy oRetry)
+        : m_pImpl(new Impl(std::move(oOptions), std::move(pTransport), std::move(oRetry)))
+    {
     }
     CatalogClient::~CatalogClient() = default;
     CatalogClient::CatalogClient(CatalogClient&&) noexcept = default;

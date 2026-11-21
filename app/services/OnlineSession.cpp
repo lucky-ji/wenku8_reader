@@ -3,7 +3,6 @@
 #include "OnlineSession.h"
 #include "Icons.h"
 #include "Reader.h"
-#include "NetworkRetry.h"
 #include "LoginHost.h"
 #include "RasterImage.h"
 #include "DownloadManager.h"
@@ -88,7 +87,7 @@ namespace Wenku8::Reader
             {
                 m_pTransport->prepare(std::move(pCurrent), oOptions.m_oTransfer);
                 if (!m_pClient)
-                    m_pClient = std::make_unique<Client>(oOptions, m_pTransport);
+                    m_pClient = std::make_unique<Client>(oOptions, m_pTransport, RetryPolicy{false});
             }
             UserProfile profile(const ClientOptions& oOptions,
                                 std::shared_ptr<HttpTransport> pCurrent)
@@ -450,9 +449,9 @@ namespace Wenku8::Reader
                     oResult.m_nChapter = oChapter.m_nChapterId;
                     try
                     {
-                        auto oRetry = clientAssetRetryOptions();
+                        auto oRetry = defaultRetryOptions(assetRetryProfile());
                         oRetry.m_oAttemptTimeout = std::chrono::seconds(6);
-                        auto pAssets = makeRetryingTransport(makeClientAssetTransport(), oRetry);
+                        auto pAssets = makeSdkTransport(makeClientAssetTransport(), {true, oRetry});
                         const auto oDeadline =
                             std::chrono::steady_clock::now() + std::chrono::seconds(20);
                         for (const auto& strOriginal : vMissing)
@@ -613,27 +612,29 @@ namespace Wenku8::Reader
             {
                 return !pFlag->load();
             };
-            auto oRetry = clientRetryOptions(true, true);
-            oRetry.m_fnOnRetry = [this, eType, nRequestGeneration](unsigned nAttempt, int)
+            auto oRetry = defaultRetryOptions(RetryProfile::Browser);
+            oRetry.m_bRetryRefusedResponses = true;
+            const unsigned nMaxAttempts = oRetry.m_nMaxAttempts;
+            oRetry.m_fnOnRetry = [this, eType, nRequestGeneration, nMaxAttempts](unsigned nAttempt, int)
             {
                 if (eType != Kind::Login)
                     QMetaObject::invokeMethod(
                         m_pQ,
-                        [this, nAttempt, nRequestGeneration]
+                        [this, nAttempt, nRequestGeneration, nMaxAttempts]
                         {
                             if (!m_bActive || nRequestGeneration != m_nRequestGeneration)
                             {
                                 return;
                             }
                             emit m_pQ->statusChanged(
-                                QString("网络波动，正在进行第 %1/3 次尝试…").arg(nAttempt));
+                                QString("网络波动，正在进行第 %1/%2 次尝试…")
+                                    .arg(nAttempt).arg(nMaxAttempts));
                         },
                         Qt::QueuedConnection);
             };
-            std::shared_ptr<HttpTransport> pTransport = makeRetryingTransport(
-                std::make_shared<BrowserOwnedSession>(m_pHost->transport()), oRetry);
-            pTransport = makeClientDeadlineTransport(
-                std::move(pTransport), std::chrono::seconds(eType == Kind::Login ? 8 : 30));
+            auto pTransport = makeDeadlineTransport(
+                makeSdkTransport(std::make_shared<BrowserOwnedSession>(m_pHost->transport()), {true, oRetry}),
+                std::chrono::seconds(eType == Kind::Login ? 8 : 30));
             m_oWatcher.setFuture(QtConcurrent::run(
                 [fnJob, oOptions, pTransport]
                 {
@@ -917,7 +918,7 @@ namespace Wenku8::Reader
             Kind::Novels,
             [nPage](ClientOptions oO, std::shared_ptr<HttpTransport> pT)
             {
-                Client oC(oO, pT);
+                Client oC(oO, pT, RetryPolicy{false});
                 Result oR;
                 oR.m_vNovels = oC.list(Sort::LastUpdate, nPage, CachePolicy::NetworkOnly).m_vNovels;
                 oR.m_bSuccess = true;
@@ -933,7 +934,7 @@ namespace Wenku8::Reader
             Kind::Novels,
             [strQuery](ClientOptions oO, std::shared_ptr<HttpTransport> pT)
             {
-                Client oC(oO, pT);
+                Client oC(oO, pT, RetryPolicy{false});
                 Result oR;
                 oR.m_vNovels = oC.search(strQuery.toUtf8().toStdString(), SearchType::Title,
                                          CachePolicy::NetworkOnly)
@@ -949,7 +950,7 @@ namespace Wenku8::Reader
             Kind::Book,
             [nId](ClientOptions oO, std::shared_ptr<HttpTransport> pT)
             {
-                Client oC(oO, pT);
+                Client oC(oO, pT, RetryPolicy{false});
                 Result oR;
                 oR.m_oNovel = oC.novel(nId, CachePolicy::NetworkOnly);
                 oR.m_vVolumes = oC.index(nId, CachePolicy::NetworkOnly);
@@ -964,7 +965,7 @@ namespace Wenku8::Reader
             Kind::Chapter,
             [nNovel, nChapter](ClientOptions oO, std::shared_ptr<HttpTransport> pT)
             {
-                Client oC(oO, pT);
+                Client oC(oO, pT, RetryPolicy{false});
                 Result oR;
                 oR.m_strText = QString::fromUtf8(
                     oC.chapter(nNovel, nChapter, CachePolicy::NetworkOnly).c_str());
@@ -987,7 +988,7 @@ namespace Wenku8::Reader
             Kind::ShelfAdd,
             [nId, strExpected](ClientOptions oOptions, std::shared_ptr<HttpTransport> pTransport)
             {
-                Client oClient(oOptions, pTransport);
+                Client oClient(oOptions, pTransport, RetryPolicy{false});
                 auto oUser = oClient.userInfo();
                 if (QString::fromUtf8(oUser.m_strUsername.c_str()) != strExpected)
                     throw Error(ErrorCode::Cancelled, "Account changed before bookshelf operation");

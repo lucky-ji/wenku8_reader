@@ -10,6 +10,8 @@
 
 [下载与发布](https://github.com/lucky-ji/wenku8_reader/releases) · [构建指南](docs/BUILDING.md) · [SDK 架构](docs/ARCHITECTURE.md) · [更新日志](docs/CHANGELOG.md) · [开源许可](THIRD_PARTY_NOTICES.md)
 
+SDK 独立版本为 1.1.0，支持初始化时配置自动重试。详见 [SDK 使用说明](sdk/README.md)。
+
 ## 功能
 
 - 登录并保存本机会话，登录状态检查完成后进入主界面。

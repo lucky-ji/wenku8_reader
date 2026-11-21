@@ -35,7 +35,8 @@ namespace Wenku8
         CachePolicy m_eSourcePolicy = CachePolicy::PreferCache;
         bool m_bIncludeImages = true;
         bool m_bIncludeCover = true;
-        unsigned m_nRateLimitRetries = 1; // GET/429 only; other errors remain visible.
+        // GET/429 has this additional limit within the startup policy's total attempt budget.
+        unsigned m_nRateLimitRetries = 1;
         std::chrono::seconds m_oRateLimitWait{
             60}; // Retry-After upper bound; also fallback if absent.
         // Called on the downloading thread, including while transfers run.
@@ -88,6 +89,13 @@ namespace Wenku8
         NovelDownloader(ClientOptions, DownloadStoreOptions,
                         std::shared_ptr<HttpTransport> pContentTransport = {},
                         std::shared_ptr<HttpTransport> pAssetTransport = {});
+        NovelDownloader(ClientOptions, DownloadStoreOptions,
+                        std::shared_ptr<HttpTransport> pContentTransport,
+                        std::shared_ptr<HttpTransport> pAssetTransport, RetryPolicy);
+        NovelDownloader(ClientOptions, DownloadStoreOptions,
+                        std::shared_ptr<HttpTransport> pContentTransport,
+                        std::shared_ptr<HttpTransport> pAssetTransport, RetryPolicy oContentRetry,
+                        RetryPolicy oAssetRetry);
         ~NovelDownloader();
         NovelDownloader(NovelDownloader&&) noexcept;
         NovelDownloader& operator=(NovelDownloader&&) noexcept;

@@ -36,6 +36,7 @@ namespace Wenku8
     {
       public:
         explicit CatalogClient(CatalogOptions, std::shared_ptr<HttpTransport> pTransport = {});
+        CatalogClient(CatalogOptions, std::shared_ptr<HttpTransport>, RetryPolicy);
         ~CatalogClient();
         CatalogClient(CatalogClient&&) noexcept;
         CatalogClient& operator=(CatalogClient&&) noexcept;

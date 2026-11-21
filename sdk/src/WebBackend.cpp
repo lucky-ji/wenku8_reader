@@ -465,7 +465,8 @@ namespace Wenku8::Detail
             return strUrl;
         }
         HttpResponse request(std::string strPath, std::string strMethod = "GET",
-                             std::string strBody = {}, bool bAllowRetries = true)
+                             std::string strBody = {}, bool bAllowRetries = true,
+                             bool bAcceptSeeOther = false)
         {
             HttpRequest oRequest{
                 sameOrigin(strPath, m_strOrigin + '/'),
@@ -490,9 +491,16 @@ namespace Wenku8::Detail
                 if (oResponse.m_nStatus >= 300 && oResponse.m_nStatus < 400)
                 {
                     if (!bAllowRetries)
+                    {
+                        if (bAcceptSeeOther &&
+                            (oResponse.m_nStatus == 302 || oResponse.m_nStatus == 303))
+                        {
+                            return oResponse;
+                        }
                         throw Error(ErrorCode::Http,
                                     "State-changing request redirected; verify resulting state",
                                     oResponse.m_nStatus);
+                    }
                     // Never resend a credential-bearing POST. Only convert 302/303 to a same-origin
                     // GET.
                     if (oRequest.m_strMethod == "POST" && oResponse.m_nStatus != 302 &&
@@ -798,7 +806,8 @@ namespace Wenku8::Detail
         m_pImpl->m_bPrepared = false;
         try
         {
-            m_pImpl->request("/logout.php");
+            // The site logs out through a state-changing GET and commonly redirects afterwards.
+            m_pImpl->request("/logout.php", "GET", {}, false, true);
         }
         catch (...)
         {

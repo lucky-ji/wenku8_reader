@@ -2,7 +2,7 @@
 if(ANDROID)
     set(QT_ANDROID_APPLICATION_BINARY wenku8_client)
     set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../platform/android")
-    set(ANDROID_VERSION_CODE 10)
+    set(ANDROID_VERSION_CODE 11)
     set(ANDROID_VERSION_NAME "${PROJECT_VERSION}")
 endif()
 
@@ -33,7 +33,7 @@ add_library(wenku8_reader STATIC
     reader/ReadingState.cpp reader/ReadingState.h
     services/CoverStore.cpp services/CoverStore.h
     services/ClientNetwork.cpp services/ClientNetwork.h
-    services/NetworkRetry.h services/RasterImage.h
+    services/RasterImage.h
     services/AppInfo.cpp services/AppInfo.h
     services/DesktopNotices.cpp services/DesktopNotices.h
     resources/app_info.qrc
@@ -43,6 +43,7 @@ target_include_directories(wenku8_reader PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/services"
 )
 target_link_libraries(wenku8_reader PUBLIC Wenku8::Sdk reader_widgets)
+target_compile_definitions(wenku8_reader PRIVATE WENKU8_READER_VERSION="${PROJECT_VERSION}")
 set_target_properties(wenku8_reader PROPERTIES POSITION_INDEPENDENT_CODE ON AUTOMOC ON AUTORCC ON)
 
 # Platform hosts depend on SDK + widgets only, never on application services/UI.
@@ -60,7 +61,7 @@ set_target_properties(wenku8_client_services PROPERTIES POSITION_INDEPENDENT_COD
 
 add_library(wenku8_client_ui STATIC
     ui/ClientWindow.cpp ui/ClientWindow.h
-    ui/MobilePages.cpp ui/ReaderSearch.cpp ui/DesktopReaderPanel.cpp ui/ReaderNavigation.cpp ui/PageControls.h ui/DesktopInformation.cpp ui/ReaderContents.cpp ui/DownloadActions.cpp
+    ui/MobilePages.cpp ui/MobileLibrary.cpp ui/ReaderSearch.cpp ui/DesktopReaderPanel.cpp ui/ReaderNavigation.cpp ui/PageControls.h ui/DesktopInformation.cpp ui/ReaderContents.cpp ui/DownloadActions.cpp
     ui/DownloadTaskPanel.cpp ui/DownloadTaskPanel.h
     ui/ReadAloudPage.cpp ui/ReadAloudPanel.cpp ui/ReadAloudPanel.h
     ui/ReaderSettings.cpp ui/SleepTimerControl.cpp ui/SleepTimerControl.h

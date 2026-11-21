@@ -21,6 +21,16 @@ namespace Wenku8::Reader
             return;
         }
         const bool bMobile = mobileMode();
+        if (!bMobile)
+        {
+            if (m_bRestoring || m_pPages->currentIndex() != 3 ||
+                revealDesktopReaderPanel("章内查找"))
+            {
+                return;
+            }
+        }
+        const int nBook = m_oBook.m_nId;
+        const int nChapter = m_nChapter;
         QVBoxLayout* pLayout = nullptr;
         auto* pPage = scrollPage(pLayout);
         pPage->setObjectName("readerSearchPage");
@@ -63,8 +73,15 @@ namespace Wenku8::Reader
         pLayout->addStretch();
 
         auto pMatches = std::make_shared<QVector<int>>();
-        auto fnSearch = [this, pPage, pSearch, pStatus, pPreview, pRead, bMobile, pMatches](bool bBackward)
+        auto fnSearch = [this, pPage, pSearch, pStatus, pPreview, pRead, bMobile, pMatches,
+                         nBook, nChapter](bool bBackward)
         {
+            if (!bMobile && (!pPage->isVisible() || !m_bUnlocked || m_bLoadingBusy ||
+                             m_bRestoring || m_pPages->currentIndex() != 3 ||
+                             m_oBook.m_nId != nBook || m_nChapter != nChapter))
+            {
+                return;
+            }
             const QString strQuery = pSearch->text().trimmed();
             if (strQuery.isEmpty())
             {

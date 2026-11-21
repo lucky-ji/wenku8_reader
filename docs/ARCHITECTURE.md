@@ -49,7 +49,9 @@ cmake --install build/sdk --config Release --prefix out/sdk
 
 `WENKU8_BUILD_SHARED=ON` 生成动态库，`OFF` 生成静态库。CMake 自动传播公开头目录和静态库所需的 `WENKU8_STATIC` 定义。Windows 动态库保留 `WENKU8_API` 导出约定，调用方需使用兼容的编译器、C++ 运行库与构建配置。当前未提供独立 `find_package(Wenku8Sdk)` 配置，建议使用 `add_subdirectory`。
 
-SDK 接口为同步接口，GUI 应放入工作线程。调用方可注入自己的 `HttpTransport`；普通 cURL 请求无法自动完成源站浏览器验证。客户端使用平台会话适配，不关闭 TLS 校验。历史 Android 接口保留兼容实现，其端点和认证依赖服务端现状，不应将它们视为已经确认可用的主站替代服务。
+SDK 接口为同步接口，GUI 应放入工作线程。重试次数、退避、请求间隔和超时由 SDK 执行，客户端负责展示进度、取消操作和保留旧数据。平台可注入自己的 `HttpTransport`，浏览器继续管理会话和网站验证。SDK 版本与应用独立，启动配置及示例见 [SDK 使用说明](../sdk/README.md)。
+
+普通 cURL 请求无法自动完成源站浏览器验证，客户端使用平台会话并保留 TLS 校验。历史 Android 协议的端点和认证取决于服务端现状。
 
 ## 本地数据
 

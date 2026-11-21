@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "ClientNetwork.h"
 #include "CoverStore.h"
-#include "NetworkRetry.h"
 #include "RasterImage.h"
 #include <QBuffer>
 #include <QImageReader>
@@ -154,7 +153,7 @@ namespace Wenku8::Reader
                         };
                         // The canonical cover is an independent public image node. Never use the
                         // browser transport.
-                        auto oRetry = clientAssetRetryOptions();
+                        auto oRetry = defaultRetryOptions(assetRetryProfile());
                         oRetry.m_oAttemptTimeout = std::chrono::seconds(8);
                         oRetry.m_fnAcceptResponse = [](const HttpResponse& oResponse)
                         {
@@ -162,7 +161,7 @@ namespace Wenku8::Reader
                                                            int(oResponse.m_strBody.size())))
                                         .isNull();
                         };
-                        auto pAssets = makeRetryingTransport(makeClientAssetTransport(), oRetry);
+                        auto pAssets = makeSdkTransport(makeClientAssetTransport(), {true, oRetry});
                         HttpRequest oRequest;
                         oRequest.m_strUrl = coverUrl(nId).toStdString();
                         auto oResponse = pAssets->perform(oRequest, oOptions.m_oTransfer);

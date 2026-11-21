@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "AppInfo.h"
+#include "Wenku8Sdk.h"
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -16,7 +17,7 @@ namespace Wenku8::Reader
     }
     QString applicationVersion()
     {
-        return "1.0.5";
+        return QStringLiteral(WENKU8_READER_VERSION);
     }
     QUrl applicationRepositoryUrl()
     {
@@ -46,7 +47,7 @@ namespace Wenku8::Reader
     }
     QString versionDescription()
     {
-        return QString("<h2>轻小说文库</h2><p>让阅读，随时继续。</p><p><b>版本</b>　%1</p>"
+        return QString("<h2>轻小说文库</h2><p><b>应用版本</b>　%1</p><p><b>SDK 版本</b>　%4</p>"
                        "<p><b>开发者</b>　lucky_ji</p><p><a "
                        "href=\"https://github.com/lucky-ji\">GitHub · lucky-ji</a></p>"
                        "<p>"
@@ -60,7 +61,8 @@ namespace Wenku8::Reader
                        "<p>正式版本的功能更新与问题修复在「更新日志」中独立维护。</p>")
             .arg(applicationVersion().toHtmlEscaped(),
                  applicationRepositoryUrl().toString().toHtmlEscaped(),
-                 applicationFeedbackUrl().toString().toHtmlEscaped());
+                 applicationFeedbackUrl().toString().toHtmlEscaped(),
+                 QString::fromLatin1(sdkVersion()).toHtmlEscaped());
     }
     QString releaseNotes()
     {

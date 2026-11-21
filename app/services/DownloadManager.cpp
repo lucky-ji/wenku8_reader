@@ -2,7 +2,6 @@
 #include "DownloadManager.h"
 #include "Wenku8Download.h"
 #include "ClientNetwork.h"
-#include "NetworkRetry.h"
 #include "ExportDestination.h"
 #include <QCoreApplication>
 #include <QDir>
@@ -272,10 +271,12 @@ namespace Wenku8::Reader
             {
                 return !pCancel->load();
             };
-            auto oRetry = clientRetryOptions(true, false);
+            auto oRetry = defaultRetryOptions(RetryProfile::Browser);
+            oRetry.m_bRetryRefusedResponses = true;
             oRetry.m_oDelay = std::chrono::seconds(2);
-            NovelDownloader oDownloader(oOptions, oStore, makeRetryingTransport(pTransport, oRetry),
-                makeRetryingTransport(makeClientAssetTransport(), clientAssetRetryOptions(false)));
+            NovelDownloader oDownloader(
+                oOptions, oStore, pTransport, makeClientAssetTransport(),
+                {true, oRetry}, {true, defaultRetryOptions(assetRetryProfile())});
             DownloadRequest oRequest;
             oRequest.m_eMode = DownloadMode::Resume;
             oRequest.m_bIncludeImages = oTask.m_bImages;

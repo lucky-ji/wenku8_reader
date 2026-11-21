@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "Wenku8Download.h"
+#include "RetryTransport.h"
 #include "Storage.h"
 #include "tinyxml2.h"
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <curl/curl.h>
 #include <libxml/uri.h>
 #include <libxml/xmlmemory.h>
 #include <libxml/xmlstring.h>
@@ -17,101 +17,12 @@
 #include <set>
 #include <sstream>
 #include <regex>
-#include <thread>
-#include <ctime>
 
 namespace Wenku8
 {
     namespace
     {
         constexpr std::uint64_t nObjectLimit = 128ULL * 1024 * 1024;
-        struct RequestGate
-        {
-            std::chrono::steady_clock::time_point m_oNext{};
-            std::chrono::milliseconds m_oInterval{};
-        };
-        class TaskTransport final : public HttpTransport
-        {
-            std::shared_ptr<HttpTransport> m_pInner;
-            std::shared_ptr<RequestGate> m_pGate;
-            unsigned m_nRetries;
-            std::chrono::seconds m_oMaxWait;
-            void pause(std::chrono::steady_clock::time_point oUntil,
-                       const TransferOptions& oOptions)
-            {
-                while (std::chrono::steady_clock::now() < oUntil)
-                {
-                    if (oOptions.m_fnProgress && !oOptions.m_fnProgress(0, 0))
-                        throw Error(ErrorCode::Cancelled, "Download wait cancelled");
-                    auto oLeft = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        oUntil - std::chrono::steady_clock::now());
-                    if (oLeft.count() > 0)
-                        std::this_thread::sleep_for(
-                            (std::min)(oLeft, std::chrono::milliseconds(25)));
-                }
-            }
-
-          public:
-            TaskTransport(std::shared_ptr<HttpTransport> pInner, std::shared_ptr<RequestGate> pGate,
-                          const DownloadRequest& oRequest)
-                : m_pInner(std::move(pInner)), m_pGate(std::move(pGate)),
-                  m_nRetries(oRequest.m_nRateLimitRetries), m_oMaxWait(oRequest.m_oRateLimitWait)
-            {
-            }
-            bool supportsSameOriginGetRedirects() const noexcept override
-            {
-                return m_pInner->supportsSameOriginGetRedirects();
-            }
-            void clearCookies() override
-            {
-                m_pInner->clearCookies();
-            }
-            HttpResponse perform(const HttpRequest& oRequest,
-                                 const TransferOptions& oOptions) override
-            {
-                for (unsigned nAttempt = 0;; ++nAttempt)
-                {
-                    pause(m_pGate->m_oNext, oOptions);
-                    m_pGate->m_oNext = std::chrono::steady_clock::now() + m_pGate->m_oInterval;
-                    auto oResponse = m_pInner->perform(oRequest, oOptions);
-                    if (oResponse.m_nStatus != 429 || oRequest.m_strMethod != "GET" ||
-                        nAttempt >= m_nRetries)
-                        return oResponse;
-                    auto oDelay = m_oMaxWait;
-                    for (const auto& oHeader : oResponse.m_vHeaders)
-                    {
-                        auto strName = oHeader.first;
-                        std::transform(strName.begin(), strName.end(), strName.begin(),
-                                       [](unsigned char nC)
-                                       {
-                                           return static_cast<char>(std::tolower(nC));
-                                       });
-                        if (strName != "retry-after")
-                            continue;
-                        std::uint64_t nSeconds{};
-                        const auto& strValue = oHeader.second;
-                        const auto oParsed = std::from_chars(
-                            strValue.data(), strValue.data() + strValue.size(), nSeconds);
-                        if (oParsed.ec == std::errc{} &&
-                            oParsed.ptr == strValue.data() + strValue.size())
-                        {
-                            if (nSeconds > static_cast<std::uint64_t>(m_oMaxWait.count()))
-                                return oResponse;
-                            oDelay = std::chrono::seconds(nSeconds);
-                        }
-                        else if (const auto nDate = curl_getdate(strValue.c_str(), nullptr);
-                                 nDate != -1)
-                        {
-                            const auto nDelta = nDate - std::time(nullptr);
-                            if (nDelta > m_oMaxWait.count())
-                                return oResponse;
-                            oDelay = std::chrono::seconds(nDelta > 0 ? nDelta : 0);
-                        }
-                    }
-                    pause(std::chrono::steady_clock::now() + oDelay, oOptions);
-                }
-            }
-        };
         std::string hash(const std::string& strBytes)
         {
             // Accidental corruption detection and namespacing, not a cryptographic signature.
@@ -315,6 +226,7 @@ namespace Wenku8
         ClientOptions m_oSource;
         DownloadStoreOptions m_oStore;
         std::shared_ptr<HttpTransport> m_pContentTransport, m_pAssetTransport;
+        RetryPolicy m_oContentRetry, m_oAssetRetry;
         std::string m_strSourceKey;
         std::set<std::string> m_vOrigins;
         std::filesystem::path directory(int nNovelId) const
@@ -548,6 +460,23 @@ namespace Wenku8
     NovelDownloader::NovelDownloader(ClientOptions oSource, DownloadStoreOptions oStore,
                                      std::shared_ptr<HttpTransport> pContent,
                                      std::shared_ptr<HttpTransport> pAssets)
+        : NovelDownloader(std::move(oSource), std::move(oStore), pContent, pAssets,
+                          Detail::retryPolicyFor(pContent), Detail::retryPolicyFor(pAssets))
+    {
+    }
+
+    NovelDownloader::NovelDownloader(ClientOptions oSource, DownloadStoreOptions oStore,
+                                     std::shared_ptr<HttpTransport> pContent,
+                                     std::shared_ptr<HttpTransport> pAssets, RetryPolicy oRetry)
+        : NovelDownloader(std::move(oSource), std::move(oStore), std::move(pContent),
+                          std::move(pAssets), oRetry, oRetry)
+    {
+    }
+
+    NovelDownloader::NovelDownloader(ClientOptions oSource, DownloadStoreOptions oStore,
+                                     std::shared_ptr<HttpTransport> pContent,
+                                     std::shared_ptr<HttpTransport> pAssets,
+                                     RetryPolicy oContentRetry, RetryPolicy oAssetRetry)
         : m_pImpl(new Impl)
     {
         if (oStore.m_oDirectory.empty() || !oStore.m_oAssets.m_nMaxResponseBytes ||
@@ -559,7 +488,9 @@ namespace Wenku8
             oStore.m_oRequestInterval.count() < 0 ||
             oStore.m_oRequestInterval > std::chrono::seconds(60))
             throw Error(ErrorCode::InvalidArgument, "Invalid download store or object limit");
-        Client oValidate(oSource, pContent);
+        Client oValidate(oSource, pContent, RetryPolicy{false});
+        Detail::validateRetryPolicy(oContentRetry);
+        Detail::validateRetryPolicy(oAssetRetry);
         m_pImpl->m_strSourceKey =
             hash(formEncode({{"endpoint", oSource.m_strEndpoint},
                              {"protocol", std::to_string(static_cast<int>(oSource.m_eProtocol))},
@@ -576,6 +507,8 @@ namespace Wenku8
         m_pImpl->m_oStore = std::move(oStore);
         m_pImpl->m_pContentTransport = std::move(pContent);
         m_pImpl->m_pAssetTransport = std::move(pAssets);
+        m_pImpl->m_oContentRetry = std::move(oContentRetry);
+        m_pImpl->m_oAssetRetry = std::move(oAssetRetry);
     }
     NovelDownloader::~NovelDownloader() = default;
     NovelDownloader::NovelDownloader(NovelDownloader&&) noexcept = default;
@@ -730,11 +663,13 @@ namespace Wenku8
             {
                 return fnTransferProgress(fnOriginalProgress, oDone, oTotal);
             };
-            auto pGate = std::make_shared<RequestGate>();
+            auto pGate = std::make_shared<Detail::DownloadRequestGate>();
             pGate->m_oInterval = m_pImpl->m_oStore.m_oRequestInterval;
             auto pContent =
                 m_pImpl->m_pContentTransport ? m_pImpl->m_pContentTransport : makeCurlTransport();
-            Client oClient(oSource, std::make_shared<TaskTransport>(pContent, pGate, oRequest));
+            Client oClient(oSource, Detail::makeDownloadTransport(
+                                        std::move(pContent), m_pImpl->m_oContentRetry, pGate,
+                                        oRequest.m_nRateLimitRetries, oRequest.m_oRateLimitWait));
             const auto eSourcePolicy = oRequest.m_eMode == DownloadMode::Refresh &&
                                                oRequest.m_eSourcePolicy == CachePolicy::PreferCache
                                            ? CachePolicy::Refresh
@@ -821,8 +756,11 @@ namespace Wenku8
                 if (!m_pImpl->m_pAssetTransport)
                     m_pImpl->m_pAssetTransport = makeCurlTransport();
                 if (!pAssetFetcher)
-                    pAssetFetcher = std::make_shared<TaskTransport>(m_pImpl->m_pAssetTransport,
-                                                                    pGate, oRequest);
+                {
+                    pAssetFetcher = Detail::makeDownloadTransport(
+                        m_pImpl->m_pAssetTransport, m_pImpl->m_oAssetRetry, pGate,
+                        oRequest.m_nRateLimitRetries, oRequest.m_oRateLimitWait);
+                }
                 HttpResponse oResponse;
                 for (unsigned nHop = 0;; ++nHop)
                 {

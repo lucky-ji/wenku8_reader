@@ -105,19 +105,29 @@ namespace Wenku8::Reader
         auto pPage = scrollPage(pLayout);
         pPage->setObjectName("mobileAccountPage");
         pPage->setProperty("rootTab", bTab);
-        pLayout->addWidget(paragraph(m_pAccount->text(), "bookTitle"));
-        pLayout->addWidget(paragraph("你的文库账号与阅读偏好。"));
-        pLayout->addSpacing(8);
-        pLayout->addWidget(paragraph("阅读与存储", "sectionTitle"));
-        auto* pReadingGroup = controlGroup(pLayout);
-        auto pAppearance = action("外观\n明亮、暗色与护眼", "openAppearance", Icon::Sun);
+
+        auto* pAccountGroup = settingsGroup(pLayout, "文库账号");
+        auto* pAccountName = paragraph(m_pAccount->text(), "controlLabel");
+        pAccountName->setObjectName("mobileProfileName");
+        pAccountGroup->addWidget(pAccountName);
+        auto* pAccount = action(m_pLogin->text(), "mobileSignIn", Icon::SignIn);
+        addGroupAction(pAccountGroup, pAccount);
+        connect(pAccount, &QPushButton::clicked, this,
+                [this]
+                {
+                    clearMobilePages();
+                    m_pLogin->click();
+                });
+
+        auto* pReadingGroup = settingsGroup(pLayout, "阅读与存储");
+        auto pAppearance = action("外观", "openAppearance", Icon::Sun);
         addGroupAction(pReadingGroup, pAppearance);
         connect(pAppearance, &QPushButton::clicked, this,
                 [this]
                 {
                     showMobileAppearance();
                 });
-        auto* pDownloads = action("下载与存储\n缓存与本地保存位置", "mobileDownloadSettings", Icon::Folder);
+        auto* pDownloads = action("下载与存储", "mobileDownloadSettings", Icon::Folder);
         addGroupAction(pReadingGroup, pDownloads);
         connect(pDownloads, &QPushButton::clicked, this, &ClientWindow::showDownloadSettings);
         auto pHistory = action("阅读历史", "mobileHistory", Icon::History);
@@ -128,20 +138,7 @@ namespace Wenku8::Reader
                     clearMobilePages();
                     navigate(3);
                 });
-        pLayout->addSpacing(8);
-        pLayout->addWidget(paragraph("账号", "sectionTitle"));
-        auto* pAccountGroup = controlGroup(pLayout);
-        auto pAccount = action(m_pLogin->text(), "mobileSignIn", Icon::SignIn);
-        addGroupAction(pAccountGroup, pAccount);
-        connect(pAccount, &QPushButton::clicked, this,
-                [this]
-                {
-                    clearMobilePages();
-                    m_pLogin->click();
-                });
-        pLayout->addSpacing(8);
-        pLayout->addWidget(paragraph("关于轻小说文库", "sectionTitle"));
-        auto* pInformationGroup = controlGroup(pLayout);
+        auto* pInformationGroup = settingsGroup(pLayout, "关于轻小说文库");
         const QStringList vTitles{"版本说明", "更新日志", "开源许可"};
         const char* vNames[] = {"mobileVersion", "mobileChangelog", "mobileLicenses"};
         for (int nI = 0; nI < vTitles.size(); ++nI)
@@ -157,14 +154,14 @@ namespace Wenku8::Reader
                         showAppInformation(nI);
                     });
         }
-        auto pFeedback = action("意见反馈\n在 GitHub 提交问题与建议", "mobileFeedback", Icon::Discover);
+        auto pFeedback = action("意见反馈", "mobileFeedback", Icon::Discover);
         addGroupAction(pInformationGroup, pFeedback);
         connect(pFeedback, &QPushButton::clicked, pPage,
                 []
                 {
                     QDesktopServices::openUrl(applicationFeedbackUrl());
                 });
-        auto pRepository = action("开源项目\n在 GitHub 查看源码", "mobileRepository", Icon::Book);
+        auto pRepository = action("开源项目", "mobileRepository", Icon::Book);
         addGroupAction(pInformationGroup, pRepository);
         connect(pRepository, &QPushButton::clicked, pPage,
                 []

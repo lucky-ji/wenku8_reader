@@ -141,7 +141,30 @@ namespace Wenku8
     // TransferOptions::timeout bounds all attempts and waits for each perform().
     WENKU8_API std::shared_ptr<HttpTransport> makeRetryingTransport(std::shared_ptr<HttpTransport>,
                                                                     RetryOptions = {});
+    enum class RetryProfile
+    {
+        Standard,
+        Browser // Also recognizes code-0 Network errors from browser or platform transports.
+    };
+    // Recommended limits for read requests. Verification and authorization failures are terminal.
+    WENKU8_API RetryOptions defaultRetryOptions(RetryProfile = RetryProfile::Standard);
+    struct RetryPolicy
+    {
+        bool m_bEnabled = true;
+        RetryOptions m_oOptions = defaultRetryOptions();
+    };
+    // Uses cURL when no transport is supplied. With no policy, a directly supplied
+    // SDK retry wrapper is reused. An explicit policy replaces that wrapper's policy.
+    WENKU8_API std::shared_ptr<HttpTransport> makeSdkTransport(std::shared_ptr<HttpTransport> = {});
+    WENKU8_API std::shared_ptr<HttpTransport> makeSdkTransport(std::shared_ptr<HttpTransport>,
+                                                               RetryPolicy);
     WENKU8_API std::string formEncode(const Fields&);
+    // Semantic version of the linked SDK, independent of the reader application.
+    WENKU8_API const char* sdkVersion() noexcept;
+    // Create one transport per operation when related requests share a time budget.
+    // Wrap the retrying transport so connection attempts and wait time share that budget.
+    WENKU8_API std::shared_ptr<HttpTransport> makeDeadlineTransport(
+        std::shared_ptr<HttpTransport>, std::chrono::milliseconds oBudget);
     enum class Language
     {
         Simplified = 0,
@@ -268,6 +291,7 @@ namespace Wenku8
     {
       public:
         explicit Client(ClientOptions, std::shared_ptr<HttpTransport> pTransport = {});
+        Client(ClientOptions, std::shared_ptr<HttpTransport>, RetryPolicy);
         ~Client();
         Client(Client&&) noexcept;
         Client& operator=(Client&&) noexcept;

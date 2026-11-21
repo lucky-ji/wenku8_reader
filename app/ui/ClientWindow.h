@@ -36,6 +36,7 @@ namespace Wenku8::Reader
     class DownloadTaskPanel;
     class Toast;
     class ReadAloudController;
+    class MobileContinueCard;
     class ClientWindow final : public QMainWindow
     {
       public:
@@ -81,6 +82,10 @@ namespace Wenku8::Reader
         QLabel* m_pMobileTitle = nullptr;
         QWidget *m_pMobileHeader = nullptr, *m_pMobileNavigation = nullptr,
                 *m_pReaderTools = nullptr;
+        MobileContinueCard* m_pMobileContinue = nullptr;
+        QWidget* m_pMobileShelfView = nullptr;
+        QPushButton *m_pMobileGrid = nullptr, *m_pMobileList = nullptr;
+        bool m_bMobileShelfList = false;
         QPushButton* m_pReaderToolsToggle = nullptr;
         QList<QPushButton*> m_vMobileNav;
         QVBoxLayout *m_pBodyLayout = nullptr, *m_pDetailLayout = nullptr;
@@ -102,7 +107,7 @@ namespace Wenku8::Reader
         QLabel *m_pTitle = nullptr, *m_pSubtitle = nullptr, *m_pStatus = nullptr,
                *m_pAccount = nullptr, *m_pCount = nullptr, *m_pDetailCover = nullptr,
                *m_pDetailTitle = nullptr, *m_pDetailMeta = nullptr, *m_pDetailIntro = nullptr,
-               *m_pReadTitle = nullptr, *m_pChapterLabel = nullptr;
+               *m_pReadTitle = nullptr, *m_pReadBook = nullptr, *m_pChapterLabel = nullptr;
         QLineEdit* m_pSearch = nullptr;
         QPushButton *m_pRefresh = nullptr, *m_pLogin = nullptr, *m_pRead = nullptr,
                     *m_pDownload = nullptr, *m_pLocalDownload = nullptr, *m_pShelfAdd = nullptr,
@@ -134,6 +139,11 @@ namespace Wenku8::Reader
         void adaptLayout();
         void showAccountSheet();
         bool mobileMode() const;
+        void buildMobileLibrary(QVBoxLayout*, QHBoxLayout*);
+        void updateMobileLibraryLayout();
+        void applyMobileLibraryStyle();
+        void updateMobileContinueReading();
+        void updateMobileContinueCover(int nNovel, const QImage&);
         void pushMobilePage(QWidget*, const QString&);
         void popMobilePage();
         void clearMobilePages();
@@ -151,6 +161,9 @@ namespace Wenku8::Reader
         void saveSpeechPosition();
         bool speechPageActive() const;
         void showReaderPanel(QWidget*, const QString&);
+        void initializeDesktopReaderPanelShortcut();
+        void toggleDesktopReaderPanel();
+        bool revealDesktopReaderPanel(const QString&);
         void closeReaderPanel();
         void showDesktopBookmarks();
         void updateReaderProgress();

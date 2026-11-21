@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 cmake_minimum_required(VERSION 3.24)
 
-if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    project(Wenku8Sdk VERSION 1.0.5 LANGUAGES C CXX)
-endif()
+project(Wenku8Sdk VERSION 1.1.0 LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
@@ -51,9 +49,11 @@ add_library(Wenku8::Sdk ALIAS Wenku8Sdk)
 
 target_sources(Wenku8Sdk PRIVATE
     src/Wenku8Sdk.cpp
+    src/SdkVersion.cpp
     src/Wenku8Api.cpp
     src/HttpTransport.cpp
     src/RetryTransport.cpp
+    src/OperationDeadline.cpp
     src/FileCache.cpp
     src/WebBackend.cpp
     src/TextEncoding.cpp
@@ -64,10 +64,10 @@ target_sources(Wenku8Sdk PRIVATE
 )
 
 target_compile_features(Wenku8Sdk PUBLIC cxx_std_17)
-target_compile_definitions(Wenku8Sdk PRIVATE WENKU8SDK_EXPORTS)
+target_compile_definitions(Wenku8Sdk PRIVATE WENKU8SDK_EXPORTS WENKU8_SDK_VERSION="${PROJECT_VERSION}")
 set_target_properties(Wenku8Sdk PROPERTIES
-    VERSION 1.0.5
-    SOVERSION 1
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
     POSITION_INDEPENDENT_CODE ON
 )
 

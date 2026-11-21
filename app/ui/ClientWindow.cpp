@@ -19,6 +19,7 @@
 #include "TouchScroll.h"
 #include "AndroidKeys.h"
 #include <QInputMethod>
+#include <QButtonGroup>
 #ifdef WENKU8_CLIENT_ONLINE
 #include "OnlineSession.h"
 #endif
@@ -118,7 +119,7 @@ namespace Wenku8::Reader
             using QPushButton::QPushButton;
             QSize sizeHint() const override
             {
-                return {74, 64};
+                return {68, 56};
             }
 
           protected:
@@ -129,29 +130,22 @@ namespace Wenku8::Reader
                 auto oInk = property(isChecked() ? "navActive" : "navMuted").value<QColor>();
                 if (!oInk.isValid())
                     oInk = palette().color(QPalette::ButtonText);
-                if (isDown())
+                if (isDown() || isChecked())
                 {
                     oPainter.setPen(Qt::NoPen);
-                    oPainter.setBrush(property("navPressed").value<QColor>());
+                    oPainter.setBrush(property(isDown() ? "navPressed" : "navSelection").value<QColor>());
                     oPainter.drawRoundedRect(rect().adjusted(2, 1, -2, -1), 14, 14);
-                }
-                QRect oPill((width() - 54) / 2, 3, 54, 30);
-                if (isChecked())
-                {
-                    oPainter.setPen(Qt::NoPen);
-                    oPainter.setBrush(property("navSelection").value<QColor>());
-                    oPainter.drawRoundedRect(oPill, 15, 15);
                 }
                 makeIcon(Icon(property("wenkuIcon").toInt()), oInk,
                          property("navDisabled").value<QColor>(), oInk)
-                    .paint(&oPainter, QRect((width() - 22) / 2, 7, 22, 22), Qt::AlignCenter,
+                    .paint(&oPainter, QRect((width() - 20) / 2, 7, 20, 20), Qt::AlignCenter,
                            isEnabled() ? QIcon::Normal : QIcon::Disabled);
                 auto oF = font();
                 oF.setPixelSize(12);
                 oF.setBold(isChecked());
                 oPainter.setFont(oF);
                 oPainter.setPen(isEnabled() ? oInk : property("navDisabled").value<QColor>());
-                oPainter.drawText(QRect(0, 36, width(), 24), Qt::AlignCenter, text());
+                oPainter.drawText(QRect(0, 28, width(), 23), Qt::AlignCenter, text());
             }
         };
         class SearchInput final : public QLineEdit
@@ -258,9 +252,13 @@ namespace Wenku8::Reader
                                         : oO.rect.width();
                 if (pView && pView->property("mobileCards").toBool())
                 {
-                    int nColumns = qMax(2, nWidth / 176),
-                        nCell = qMax(116, (nWidth - nColumns * 12 - 2) / nColumns);
-                    return {nCell, qRound(qMin(130, nCell - 36) * 1.45) + 112};
+                    if (pView->property("mobileCompactCards").toBool())
+                    {
+                        return {qMax(1, nWidth - 14), 124};
+                    }
+                    const int nColumns = qBound(2, nWidth / 116, 5);
+                    const int nCell = qMax(100, (nWidth - nColumns * 12 - 2) / nColumns);
+                    return {nCell, qRound(qMin(136, nCell - 26) * 1.42) + 84};
                 }
                 int nColumns = qMax(1, (nWidth + 6) / 322);
                 return {qMax(240, (nWidth - 12 - (nColumns - 1) * 12) / nColumns), 188};
@@ -268,6 +266,12 @@ namespace Wenku8::Reader
             void paint(QPainter* pP, const QStyleOptionViewItem& oO,
                        const QModelIndex& oIndex) const override
             {
+                auto* pView = qobject_cast<const QListWidget*>(parent());
+                if (pView && pView->property("mobileCards").toBool())
+                {
+                    paintMobile(pP, oO, oIndex, pView->property("mobileCompactCards").toBool());
+                    return;
+                }
                 auto oC = colors(m_eTheme);
                 pP->save();
                 pP->setRenderHint(QPainter::Antialiasing);
@@ -284,62 +288,6 @@ namespace Wenku8::Reader
                 pP->setPen(QPen(bSelected || bHover ? oC.m_oSelectionText : oC.m_oBorder,
                                 bSelected ? 2 : 1));
                 pP->drawRoundedRect(oR, 14, 14);
-                auto pView = qobject_cast<const QListWidget*>(parent());
-                if (pView && pView->property("mobileCards").toBool())
-                {
-                    int nCw = qMin(130, oR.width() - 24), nCh = qRound(nCw * 1.45);
-                    QRect oCover(oR.center().x() - nCw / 2, oR.top() + 12, nCw, nCh);
-                    auto oImage = oIndex.data(Qt::UserRole + 3).value<QImage>();
-                    QPainterPath oClip;
-                    oClip.addRoundedRect(oCover, 8, 8);
-                    pP->save();
-                    pP->setClipPath(oClip);
-                    if (!oImage.isNull())
-                    {
-                        pP->setRenderHint(QPainter::SmoothPixmapTransform);
-                        QSizeF oSource = oImage.size();
-                        oSource.scale(QSizeF(oCover.size()), Qt::KeepAspectRatioByExpanding);
-                        QRectF oTarget(QPointF(oCover.center()) -
-                                           QPointF(oSource.width() / 2, oSource.height() / 2),
-                                       oSource);
-                        pP->drawImage(oTarget, oImage);
-                    }
-                    else
-                    {
-                        pP->fillRect(oCover, oC.m_oSection);
-                        makeIcon(Icon::Book, oC.m_oMuted, oC.m_oDisabled, oC.m_oAccent)
-                            .paint(pP, QRect(oCover.center().x() - 16, oCover.center().y() - 30, 32,
-                                             32));
-                        pP->setPen(oC.m_oMuted);
-                        pP->drawText(oCover.adjusted(2, 55, -2, -4),
-                                     Qt::AlignCenter | Qt::TextWordWrap,
-                                     oIndex.data(Qt::UserRole + 6).toString());
-                    }
-                    pP->restore();
-                    auto oF = oO.font;
-                    oF.setPointSize(10);
-                    oF.setBold(true);
-                    pP->setFont(oF);
-                    pP->setPen(oC.m_oText);
-                    pP->drawText(QRect(oR.left() + 10, oCover.bottom() + 10, oR.width() - 20, 38),
-                                 Qt::TextWordWrap, oIndex.data().toString());
-                    oF.setPointSize(8);
-                    oF.setBold(false);
-                    pP->setFont(oF);
-                    pP->setPen(oC.m_oMuted);
-                    pP->drawText(
-                        QRect(oR.left() + 10, oCover.bottom() + 50, oR.width() - 20, 18),
-                        Qt::AlignVCenter,
-                        pP->fontMetrics().elidedText(oIndex.data(Qt::UserRole + 1).toString(),
-                                                     Qt::ElideRight, oR.width() - 20));
-                    pP->setPen(oC.m_oAccent);
-                    pP->drawText(QRect(oR.left() + 10, oCover.bottom() + 70, oR.width() - 20, 18),
-                                 Qt::AlignVCenter,
-                                 pP->fontMetrics().elidedText(oIndex.data(Qt::UserRole + 2).toString(),
-                                                              Qt::ElideRight, oR.width() - 20));
-                    pP->restore();
-                    return;
-                }
                 QRect oCover(oR.left() + 18, oR.top() + 19, 74, 118);
                 auto oImage = oIndex.data(Qt::UserRole + 3).value<QImage>();
                 QPainterPath oClip;
@@ -410,6 +358,123 @@ namespace Wenku8::Reader
                         .paint(pP, QRect(oR.right() - 28, oR.bottom() - 29, 16, 16));
                 pP->restore();
             }
+
+          private:
+            void paintMobile(QPainter* pPainter, const QStyleOptionViewItem& oOption,
+                             const QModelIndex& oIndex, bool bList) const
+            {
+                const auto oColors = colors(m_eTheme);
+                const auto oCard = oOption.rect.adjusted(0, 0, -1, -1);
+                const bool bSelected = oOption.state & QStyle::State_Selected;
+                const bool bEnabled = oOption.state & QStyle::State_Enabled;
+                pPainter->save();
+                pPainter->setRenderHint(QPainter::Antialiasing);
+                pPainter->setBrush(bSelected ? oColors.m_oSelection : oColors.m_oPanel);
+                pPainter->setPen(QPen(bSelected ? oColors.m_oSelectionText : oColors.m_oBorder, 1));
+                pPainter->drawRoundedRect(oCard, 14, 14);
+                const int nCoverWidth = bList ? 62 : qMin(136, oCard.width() - 26);
+                const int nCoverHeight = qRound(nCoverWidth * 1.42);
+                const QRect oCover(bList ? oCard.left() + 12 : oCard.center().x() - nCoverWidth / 2,
+                    bList ? oCard.center().y() - nCoverHeight / 2 : oCard.top() + 10,
+                    nCoverWidth, nCoverHeight);
+                QPainterPath oClip;
+                oClip.addRoundedRect(oCover, 8, 8);
+                pPainter->save();
+                pPainter->setClipPath(oClip);
+                pPainter->fillRect(oCover, oColors.m_oSection);
+                const auto oImage = oIndex.data(Qt::UserRole + 3).value<QImage>();
+                if (oImage.isNull())
+                {
+                    makeIcon(Icon::Book, oColors.m_oMuted, oColors.m_oDisabled, oColors.m_oAccent)
+                        .paint(pPainter, QRect(oCover.center() - QPoint(13, 18), QSize(26, 26)));
+                    auto oFont = oOption.font;
+                    oFont.setPixelSize(10);
+                    pPainter->setFont(oFont);
+                    pPainter->setPen(oColors.m_oMuted);
+                    pPainter->drawText(QRect(oCover.left() + 3, oCover.center().y() + 12,
+                                             oCover.width() - 6, 21),
+                                       Qt::AlignCenter,
+                                       pPainter->fontMetrics().elidedText(
+                                           oIndex.data(Qt::UserRole + 6).toString(), Qt::ElideRight,
+                                           oCover.width() - 6));
+                }
+                else
+                {
+                    auto oScaled = oImage.size();
+                    oScaled.scale(oCover.size(), Qt::KeepAspectRatioByExpanding);
+                    QRect oTarget(QPoint{}, oScaled);
+                    oTarget.moveCenter(oCover.center());
+                    pPainter->setRenderHint(QPainter::SmoothPixmapTransform);
+                    pPainter->drawImage(oTarget, oImage);
+                }
+                pPainter->restore();
+
+                const int nTextLeft = bList ? oCover.right() + 13 : oCard.left() + 10;
+                const int nTextRight = oCard.right() - (bList ? 31 : 9);
+                const int nTextWidth = nTextRight - nTextLeft;
+                auto fnText = [&](const QString& strText, int nY, int nSize, const QColor& oInk,
+                                  bool bBold)
+                {
+                    auto oFont = oOption.font;
+                    oFont.setPixelSize(nSize);
+                    oFont.setBold(bBold);
+                    pPainter->setFont(oFont);
+                    pPainter->setPen(bEnabled ? oInk : oColors.m_oDisabled);
+                    const auto strLine =
+                        pPainter->fontMetrics().elidedText(strText, Qt::ElideRight, nTextWidth);
+                    pPainter->drawText(QRect(nTextLeft, nY, nTextWidth, 20),
+                                       Qt::AlignLeft | Qt::AlignVCenter, strLine);
+                };
+                const auto strAuthor = oIndex.data(Qt::UserRole + 1).toString();
+                const auto strStatus = oIndex.data(Qt::UserRole + 2).toString();
+                const auto oReadingProgress = oIndex.data(Qt::UserRole + 7);
+                if (bList)
+                {
+                    fnText(oIndex.data().toString(), oCard.top() + 16, 15, oColors.m_oText, true);
+                    fnText(strAuthor.isEmpty() || strStatus.isEmpty() ? strAuthor + strStatus
+                               : QString("%1  ·  %2").arg(strAuthor, strStatus),
+                           oCard.top() + 43, 12, oColors.m_oMuted, false);
+                    const auto strChapter = oIndex.data(Qt::UserRole + 5).toString();
+                    const auto strPosition = oIndex.data(Qt::UserRole + 4).toString();
+                    fnText(strPosition.isEmpty() ? strChapter : strPosition,
+                           oCard.top() + 69, 12, oColors.m_oAccent, false);
+                    makeIcon(Icon::Right, oColors.m_oMuted, oColors.m_oDisabled, oColors.m_oAccent)
+                        .paint(pPainter,
+                               QRect(oCard.right() - 24, oCard.center().y() - 8, 16, 16));
+                }
+                else
+                {
+                    auto oTitleFont = oOption.font;
+                    oTitleFont.setBold(true);
+                    oTitleFont.setPixelSize(13);
+                    pPainter->setFont(oTitleFont);
+                    pPainter->setPen(bEnabled ? oColors.m_oText : oColors.m_oDisabled);
+                    const QRect oTitleRect(nTextLeft, oCover.bottom() + 7, nTextWidth, 36);
+                    pPainter->save();
+                    pPainter->setClipRect(oTitleRect);
+                    pPainter->drawText(oTitleRect, Qt::AlignLeft | Qt::TextWrapAnywhere,
+                                       oIndex.data().toString());
+                    pPainter->restore();
+                    fnText(strAuthor.isEmpty() ? strStatus : strAuthor, oCover.bottom() + 43, 11,
+                           oColors.m_oMuted, false);
+                }
+                if (oReadingProgress.isValid())
+                {
+                    const int nValue = qBound(0, oReadingProgress.toInt(), 100);
+                    const QRect oTrack(nTextLeft, oCard.bottom() - 11, nTextWidth, 3);
+                    pPainter->setPen(Qt::NoPen);
+                    pPainter->setBrush(oColors.m_oSection);
+                    pPainter->drawRoundedRect(oTrack, 1, 1);
+                    if (nValue > 0)
+                    {
+                        pPainter->setBrush(oColors.m_oAccent);
+                        pPainter->drawRoundedRect(
+                            QRect(oTrack.topLeft(), QSize(qMax(3, oTrack.width() * nValue / 100), 3)),
+                            1, 1);
+                    }
+                }
+                pPainter->restore();
+            }
         };
     } // namespace
     ClientWindow::ClientWindow(const QString& strDirectory, const QString& strOrigin,
@@ -445,6 +510,7 @@ namespace Wenku8::Reader
                         else
                             m_pDetailCover->setText(m_pCovers->placeholder(nId));
                     }
+                    updateMobileContinueCover(nId, oImage);
                 });
         connect(m_pCovers.get(), &CoverStore::statusChanged, this,
                 [this](int nId)
@@ -713,6 +779,7 @@ namespace Wenku8::Reader
             showInformationDocument("阅读快捷键",
                 "Ctrl+F：章内查找\nF3 / Shift+F3：下一处 / 上一处\n"
                 "Ctrl+D：添加当前位置书签\nAlt+← / Alt+→：上一章 / 下一章\n"
+                "Ctrl+Shift+S：开关阅读侧栏\n目录筛选框中按 Enter：打开第一项\n"
                 "PageUp / PageDown、← / →：正文聚焦时翻页\nF11：切换全屏\nEsc：关闭侧栏或退出全屏");
         });
         const QStringList vInfoTitles{"版本说明", "更新日志", "开源许可"};
@@ -842,7 +909,10 @@ namespace Wenku8::Reader
         m_pMobileHeader->setObjectName("mobileHeader");
         auto pMobileTop = new QHBoxLayout(m_pMobileHeader);
         pMobileTop->setContentsMargins(0, 0, 0, 0);
-        auto pMobileBack = button("返回", "mobileBack");
+        auto pMobileBack = button({}, "mobileBack");
+        pMobileBack->setAccessibleName("返回");
+        pMobileBack->setToolTip("返回");
+        pMobileBack->setFixedWidth(48);
         setButtonIcon(pMobileBack, Icon::Left);
         pMobileBack->setProperty("textAction", true);
         pMobileBack->setProperty("keepIcon", true);
@@ -852,16 +922,11 @@ namespace Wenku8::Reader
                 {
                     goBack();
                 });
-        m_pMobileTitle = label(applicationName(), "brand");
+        m_pMobileTitle = new ElidedLabel;
+        m_pMobileTitle->setObjectName("mobilePageTitle");
+        m_pMobileTitle->setText(applicationName());
         m_pMobileTitle->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
         pMobileTop->addWidget(m_pMobileTitle, 1);
-        auto pMore = button("我的", "mobileAccount");
-        pMobileTop->addWidget(pMore);
-        connect(pMore, &QPushButton::clicked, this,
-                [this]
-                {
-                    showAccountSheet();
-                });
         pBody->addWidget(m_pMobileHeader);
         m_pMobileHeader->hide();
         m_pHeading = new QWidget;
@@ -890,7 +955,7 @@ namespace Wenku8::Reader
         auto pSearchRow = new QHBoxLayout(m_pOperations);
         pSearchRow->setContentsMargins(0, 0, 0, 0);
         pSearchRow->setSpacing(10);
-        m_pSearch = new SearchInput("搜索轻小说，发现下一本喜欢的故事");
+        m_pSearch = new SearchInput("搜索书名");
         m_pSearch->setObjectName("novelSearch");
         m_pSearch->setClearButtonEnabled(true);
         pSearchRow->addWidget(m_pSearch, 1);
@@ -901,18 +966,30 @@ namespace Wenku8::Reader
         pBody->addWidget(m_pOperations);
         auto fnDoSearch = [this]
         {
-            if (!m_bUnlocked || m_bLoadingBusy || m_pSearch->text().trimmed().isEmpty())
+            const auto strQuery = m_pSearch->text().trimmed();
+            if (!m_bUnlocked || m_bLoadingBusy || strQuery.isEmpty())
                 return;
             ++m_nBusinessContext;
-            m_strActiveSearch = m_pSearch->text().trimmed();
+            if (mobileMode())
+            {
+                m_pSearch->clearFocus();
+                QGuiApplication::inputMethod()->hide();
+                if (m_strActiveSearch != strQuery)
+                {
+                    m_pCards->clear();
+                }
+                m_pCount->setText("正在搜索…");
+            }
+            m_strActiveSearch = strQuery;
             updateNetworkActions();
             saveProgress();
             m_pTitle->setText("搜索结果");
-            m_pSubtitle->setText("关于「" + m_pSearch->text().trimmed() + "」的故事");
+            m_pSubtitle->setText("关于「" + strQuery + "」的故事");
             m_pPages->setCurrentIndex(1);
+            adaptLayout();
 #ifdef WENKU8_CLIENT_ONLINE
             if (m_pSession)
-                m_pSession->search(m_pSearch->text().trimmed());
+                m_pSession->search(strQuery);
 #endif
         };
         connect(pSearchButton, &QPushButton::clicked, this, fnDoSearch);
@@ -972,7 +1049,10 @@ namespace Wenku8::Reader
         auto pLibraryBar = new QHBoxLayout;
         m_pCount = label("正在准备你的书库", "muted");
         m_pCount->setObjectName("listCount");
+        m_pCount->setWordWrap(true);
+        m_pCount->setMinimumWidth(0);
         pLibraryBar->addWidget(m_pCount, 1);
+        buildMobileLibrary(pLibraryLayout, pLibraryBar);
         m_pPreviousPage = button("上一页", "quiet");
         m_pPreviousPage->setProperty("textAction", true);
         m_pNextPage = button("下一页", "quiet");
@@ -1203,11 +1283,28 @@ namespace Wenku8::Reader
                     m_pSubtitle->setText("一段故事，从这里开始。");
                     m_pPages->setCurrentIndex(2);
                 });
+        auto* pReaderTitles = new QVBoxLayout;
+        pReaderTitles->setContentsMargins(2, 0, 2, 0);
+        pReaderTitles->setSpacing(2);
+        m_pReadBook = new ElidedLabel;
+        m_pReadBook->setObjectName("controlLabel");
+        m_pReadBook->setAccessibleName("当前小说");
+        m_pReadBook->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+        QFont oBookFont = m_pReadBook->font();
+        oBookFont.setBold(true);
+        m_pReadBook->setFont(oBookFont);
+        pReaderTitles->addWidget(m_pReadBook);
         m_pReadTitle = new ElidedLabel;
         m_pReadTitle->setObjectName("muted");
         m_pReadTitle->setAccessibleName("当前阅读章节");
         m_pReadTitle->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-        pReaderTopLayout->addWidget(m_pReadTitle, 1);
+        pReaderTitles->addWidget(m_pReadTitle);
+        pReaderTopLayout->addLayout(pReaderTitles, 1);
+        auto* pSidebarToggle = button("侧栏", "readerSidebarToggle");
+        setButtonIcon(pSidebarToggle, Icon::List);
+        pSidebarToggle->setToolTip("开关阅读侧栏（Ctrl+Shift+S）");
+        pReaderTopLayout->addWidget(pSidebarToggle);
+        connect(pSidebarToggle, &QPushButton::clicked, this, &ClientWindow::toggleDesktopReaderPanel);
         m_pFullscreen = button("全屏阅读", "readerFullscreen");
         setButtonIcon(m_pFullscreen, Icon::Fullscreen);
         m_pFullscreen->setToolTip("全屏阅读（F11），按 Esc 退出");
@@ -1244,7 +1341,11 @@ namespace Wenku8::Reader
         connect(pEscapeShortcut, &QShortcut::activated, this,
                 [this]
                 {
-                    if (!mobileMode() && !m_bReaderFullscreen && m_pReaderDock && m_pReaderDock->isVisible())
+                    if (QApplication::activePopupWidget())
+                    {
+                        return;
+                    }
+                    if (!mobileMode() && m_pReaderDock && m_pReaderDock->isVisible())
                     {
                         closeReaderPanel();
                         return;
@@ -1312,6 +1413,7 @@ namespace Wenku8::Reader
         setButtonIcon(pSpeech, Icon::Headphones);
         pReaderTools->addWidget(pSpeech);
         connect(pSpeech, &QPushButton::clicked, this, &ClientWindow::showReadAloud);
+        initializeDesktopReaderPanelShortcut();
         auto* pFindShortcut = new QShortcut(QKeySequence::Find, this);
         connect(pFindShortcut, &QShortcut::activated, this, [this]
         {
@@ -1531,16 +1633,19 @@ namespace Wenku8::Reader
         m_pMobileNavigation = new QWidget;
         m_pMobileNavigation->setObjectName("mobileNavigation");
         auto pTabs = new QHBoxLayout(m_pMobileNavigation);
-        pTabs->setContentsMargins(8, 8, 8, 6);
+        pTabs->setContentsMargins(5, 5, 5, 5);
         pTabs->setSpacing(2);
         m_pMobileNavigation->setAttribute(Qt::WA_StyledBackground);
         const QStringList vShortNames{"书架", "发现", "下载缓存", "我的"};
+        auto* pDestinations = new QButtonGroup(m_pMobileNavigation);
         for (int nI = 0; nI < 4; ++nI)
         {
             auto pTab = new NavigationButton(vShortNames[nI]);
             pTab->setObjectName("mobileNav");
             pTab->setCheckable(true);
-            pTab->setAccessibleName(vNames[nI]);
+            pTab->setAccessibleName(vShortNames[nI]);
+            pTab->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+            pDestinations->addButton(pTab);
             setButtonIcon(pTab, nI == 0   ? Icon::Library
                                 : nI == 1 ? Icon::Discover
                                 : nI == 2 ? Icon::Download
@@ -1551,10 +1656,14 @@ namespace Wenku8::Reader
                     [this, nI]
                     {
                         if (nI == 3)
-                            showMobileAccount(true);
+                        {
+                            if (!m_pPages->currentWidget()->property("rootTab").toBool())
+                            {
+                                showMobileAccount(true);
+                            }
+                        }
                         else
                         {
-                            clearMobilePages();
                             navigate(nI);
                         }
                     });
@@ -1676,6 +1785,7 @@ namespace Wenku8::Reader
         m_pThemes->setCurrentIndex(int(eTheme));
         m_pThemes->blockSignals(false);
         applyTheme(this, eTheme);
+        applyMobileLibraryStyle();
 #ifdef WENKU8_CLIENT_ONLINE
         if (m_pSession)
             m_pSession->setTheme(eTheme);
@@ -1730,6 +1840,7 @@ namespace Wenku8::Reader
             ++m_nBusinessContext;
         }
         m_bUnlocked = bValue;
+        m_strActiveSearch.clear();
         m_nRetryContext = m_nBusinessContext;
         updateNetworkActions();
         m_pOperations->setEnabled(bValue);
@@ -1884,8 +1995,8 @@ namespace Wenku8::Reader
     {
         if (!m_bUnlocked || m_bLoadingBusy)
             return;
-        m_pPreviousPage->setVisible(m_nSection == 1);
-        m_pNextPage->setVisible(m_nSection == 1);
+        updateMobileLibraryLayout();
+        updateMobileContinueReading();
         m_pPreviousPage->setEnabled(m_nPage > 1);
         if (m_nSection == 3)
         {
@@ -1926,6 +2037,7 @@ namespace Wenku8::Reader
             pItem->setData(Qt::UserRole + 2,
                            m_nSection == 2 ? "已缓存" : text(oN.m_strStatus));
             pItem->setData(Qt::UserRole + 3, m_pCovers->image(oN.m_nId));
+            pItem->setData(Qt::UserRole + 5, text(oN.m_strLatestChapter));
             pItem->setData(Qt::UserRole + 6, m_pCovers->placeholder(oN.m_nId));
             if (auto oSaved = m_pReadingState->position(oN.m_nId))
             {
@@ -1934,6 +2046,7 @@ namespace Wenku8::Reader
                                                               ? "已读"
                                                               : oSaved->m_strChapterTitle)
                                                      .arg(int(oSaved->m_fProgress * 100)));
+                pItem->setData(Qt::UserRole + 7, qRound(oSaved->m_fProgress * 100));
                 if (m_nSection == 3)
                     pItem->setData(Qt::UserRole + 2,
                                    oSaved->m_oUpdated.toLocalTime().toString("MM-dd HH:mm") +
@@ -1943,13 +2056,19 @@ namespace Wenku8::Reader
                                                                      : "\n点击查看简介与章节"));
             requestCover(oN.m_nId);
         }
-        m_pCount->setText(
-            vNovels.empty()
-                ? m_nSection == 3 ? "还没有阅读记录，开始阅读后会自动出现在这里。"
-                                  : "这里还没有小说，试试搜索或发现页。"
-                : QString("%1 本小说%2")
-                      .arg(vNovels.size())
-                      .arg(m_nSection == 1 ? QString(" · 第 %1 页").arg(m_nPage) : QString()));
+        if (vNovels.empty())
+        {
+            const QStringList vEmptyStates{"书架还没有小说，试试搜索或发现页。", "本页暂无小说。",
+                                           "还没有缓存小说。", "还没有阅读记录。"};
+            m_pCount->setText(m_strActiveSearch.isEmpty() ? vEmptyStates.value(m_nSection)
+                                                        : QString("没有找到匹配的小说。"));
+        }
+        else
+        {
+            const QString strPage = m_nSection == 1 && m_strActiveSearch.isEmpty()
+                ? QString(" · 第 %1 页").arg(m_nPage) : QString();
+            m_pCount->setText(QString("%1 本小说%2").arg(vNovels.size()).arg(strPage));
+        }
     }
     void ClientWindow::historyBooks()
     {
@@ -2212,6 +2331,8 @@ namespace Wenku8::Reader
                                    }
                                });
         m_pReadTitle->setText(text(m_vFlat[m_nChapter].m_strTitle));
+        m_pReadBook->setText(text(m_oBook.m_strTitle));
+        m_pReadBook->setToolTip(m_pReadBook->text());
         m_pReadTitle->setToolTip(text(m_oBook.m_strTitle));
         updateReaderFooter();
         auto oSaved = m_pReadingState->position(m_oBook.m_nId);
@@ -2524,17 +2645,17 @@ namespace Wenku8::Reader
         }
         const bool bTab = bExtra && m_pPages->currentWidget()->property("rootTab").toBool();
         const bool bLandscape = bMobile && height() < 520;
+        const bool bMobileSearch = bMobile && m_pPages->currentIndex() == 1 &&
+                                   !m_strActiveSearch.isEmpty();
         if (property("touchUi").toBool() != bMobile)
         {
             setProperty("touchUi", bMobile);
             applyTheme(this, m_eTheme);
+            applyMobileLibraryStyle();
+            updateMobileContinueReading();
         }
         m_pIllustrations->setTouchUi(bMobile);
-        if (m_pCards->property("mobileCards").toBool() != bMobile)
-        {
-            m_pCards->setProperty("mobileCards", bMobile);
-            m_pCards->doItemsLayout();
-        }
+        updateMobileLibraryLayout();
         m_pPages->setMotionEnabled(bMobile);
         m_pCardsTouch->setEnabled(bMobile);
         m_pTocTouch->setEnabled(bMobile);
@@ -2545,19 +2666,21 @@ namespace Wenku8::Reader
         m_pSidebar->setFixedWidth(width() < 1000 ? 160 : 216);
         m_pSidebar->setVisible(!bMobile && !m_bReaderFullscreen);
         m_pMobileHeader->setVisible(bMobile && !bReading);
-        m_pMobileNavigation->setVisible(bMobile && !bReading && (!bExtra || bTab));
+        m_pMobileNavigation->setVisible(bMobile && m_bUnlocked &&
+                                         (bTab || (m_pPages->currentIndex() == 1 && !bMobileSearch)));
         m_pMobileTitle->setText(bExtra
                                     ? m_pPages->currentWidget()->property("mobileTitle").toString()
                                 : m_pPages->currentIndex() == 1 ? m_pTitle->text()
+                                : m_pPages->currentIndex() == 2 ? QString("小说详情")
                                                                 : applicationName());
-        findChild<QPushButton*>("mobileAccount")->hide();
-        m_pHeading->setVisible(!m_bReaderFullscreen && !bMobile);
+        m_pHeading->setVisible(!m_bReaderFullscreen && !bMobile && !bReading);
         m_pSubtitle->setVisible(!bMobile);
         m_pHeading->findChild<QLabel*>("eyebrow")->setVisible(!bMobile);
-        findChild<QPushButton*>("mobileBack")->setVisible(m_pPages->currentIndex() >= 2 && !bTab);
+        findChild<QPushButton*>("mobileBack")->setVisible(
+            bMobile && ((m_pPages->currentIndex() >= 2 && !bTab) || bMobileSearch));
         findChild<QPushButton*>("detailBack")->setVisible(!bMobile);
-        m_pBodyLayout->setContentsMargins(bMobile ? 12 : 36, bMobile ? 8 : 30, bMobile ? 12 : 36,
-                                          bMobile ? 8 : 18);
+        m_pBodyLayout->setContentsMargins(bMobile ? 12 : 36, (bReading || bMobile) ? 8 : 30,
+                                          bMobile ? 12 : 36, bMobile ? 8 : 18);
         m_pBodyLayout->setSpacing(bMobile ? 8 : 20);
         m_pDetailLayout->setContentsMargins(bMobile ? 12 : 32, bMobile ? 10 : 28, bMobile ? 12 : 32,
                                             bMobile ? 10 : 28);
@@ -2616,6 +2739,8 @@ namespace Wenku8::Reader
                                                      : Qt::ScrollBarAsNeeded);
         m_pReaderToolsToggle->setVisible(bMobile);
         m_pReaderToolsToggle->setText("设置");
+        m_pReadBook->setVisible(!bMobile);
+        findChild<QPushButton*>("readerSidebarToggle")->setVisible(!bMobile);
         m_pReadTitle->setAlignment(bMobile ? Qt::AlignCenter : Qt::AlignLeft | Qt::AlignVCenter);
         for (auto pAction : {findChild<QPushButton*>("readerBack"), m_pReaderToolsToggle})
         {
@@ -2654,8 +2779,9 @@ namespace Wenku8::Reader
         {
             for (auto pControl : findChildren<QPushButton*>())
                 pControl->setMinimumHeight(pControl->objectName() == "themeChoice" ? 80
-                                           : pControl->objectName() == "mobileNav" ? 64
-                                                                                   : 48);
+                                           : pControl->objectName() == "mobileNav" ? 56
+                                           : pControl->objectName() == "mobileContinueReading" ? 108
+                                                                                              : 48);
             m_pThemes->setMinimumHeight(48);
             m_pSearch->setMinimumHeight(48);
         }
@@ -2691,8 +2817,17 @@ namespace Wenku8::Reader
             m_pTitle->setText("小说详情");
             return;
         }
-        if (m_pPages->currentIndex() == 2)
+        if (m_pPages->currentIndex() == 2 && mobileMode() && !m_strActiveSearch.isEmpty())
+        {
+            m_pTitle->setText("搜索结果");
+            m_pSubtitle->setText("关于「" + m_strActiveSearch + "」的故事");
+            m_pPages->returnTo(1);
+        }
+        else if (m_pPages->currentIndex() == 2 ||
+                 (m_pPages->currentIndex() == 1 && !m_strActiveSearch.isEmpty()))
+        {
             navigate(m_nSection);
+        }
     }
     void ClientWindow::keyPressEvent(QKeyEvent* pEvent)
     {
@@ -2721,7 +2856,8 @@ namespace Wenku8::Reader
             return;
         }
 #ifdef Q_OS_ANDROID
-        if (pEvent->key() == Qt::Key_Back && m_pPages->currentIndex() <= 1 && !m_bReaderFullscreen)
+        if (pEvent->key() == Qt::Key_Back && m_pPages->currentIndex() <= 1 && !m_bReaderFullscreen &&
+            m_strActiveSearch.isEmpty())
         {
             close();
             pEvent->accept();

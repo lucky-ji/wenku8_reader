@@ -11,6 +11,7 @@
 #include <QPushButton>
 #include <QTimer>
 #include <QTreeWidget>
+#include <QTreeWidgetItemIterator>
 #include <QVBoxLayout>
 
 namespace Wenku8::Reader
@@ -25,30 +26,25 @@ namespace Wenku8::Reader
         const int nBook = m_oBook.m_nId;
         const int nCurrentChapter = m_nChapter;
         const bool bMobile = mobileMode();
+        if (!bMobile && revealDesktopReaderPanel("目录"))
+        {
+            return;
+        }
         const Colors oStColors = colors(m_eTheme);
         auto* pPage = new QWidget;
         pPage->setObjectName("readerContentsPage");
         pPage->setProperty("readerContents", true);
         auto* pLayout = new QVBoxLayout(pPage);
-        pLayout->setContentsMargins(bMobile ? 12 : 24, bMobile ? 12 : 20, bMobile ? 12 : 24,
-                                    bMobile ? 12 : 20);
+        pLayout->setContentsMargins(bMobile ? 12 : 4, bMobile ? 12 : 4, bMobile ? 12 : 4,
+                                    bMobile ? 12 : 4);
         pLayout->setSpacing(10);
 
-        auto* pTop = new QHBoxLayout;
-        auto* pBack = new QPushButton("返回阅读");
-        pBack->setObjectName("readerContentsBack");
-        pBack->setCursor(Qt::PointingHandCursor);
-        pBack->setMinimumHeight(bMobile ? 48 : 40);
-        setButtonIcon(pBack, Icon::Left);
-        pBack->setVisible(!bMobile);
-        pTop->addWidget(pBack);
         auto* pTitle = new QLabel(
             QString::fromUtf8(m_oBook.m_strTitle.data(), int(m_oBook.m_strTitle.size())));
-        pTitle->setObjectName("bookTitle");
+        pTitle->setObjectName(bMobile ? "bookTitle" : "controlLabel");
         pTitle->setTextFormat(Qt::PlainText);
         pTitle->setWordWrap(true);
-        pTop->addWidget(pTitle, 1);
-        pLayout->addLayout(pTop);
+        pLayout->addWidget(pTitle);
 
         auto* pCurrent = new QLabel(
             nCurrentChapter >= 0 && nCurrentChapter < m_vFlat.size()
@@ -63,7 +59,12 @@ namespace Wenku8::Reader
         pSearchRow->setSpacing(8);
         auto* pSearch = new QLineEdit;
         pSearch->setObjectName("readerContentsSearch");
+        pSearch->setAccessibleName("筛选章节目录");
         pSearch->setPlaceholderText("搜索章节或卷名");
+        if (!bMobile)
+        {
+            pSearch->setToolTip("按 Enter 打开第一项匹配章节");
+        }
         pSearch->setClearButtonEnabled(true);
         pSearch->setMinimumHeight(bMobile ? 48 : 40);
         pSearchRow->addWidget(pSearch, 1);
@@ -79,7 +80,8 @@ namespace Wenku8::Reader
         pSearchRow->addWidget(pLocate);
         pLayout->addLayout(pSearchRow);
 
-        auto* pCount = new QLabel(QString("共 %1 章 · 点击章节开始阅读").arg(m_vFlat.size()));
+        auto* pCount = new QLabel(
+            QString(bMobile ? "共 %1 章 · 点击章节开始阅读" : "共 %1 章").arg(m_vFlat.size()));
         pCount->setObjectName("muted");
         pCount->setWordWrap(true);
         pLayout->addWidget(pCount);
@@ -96,6 +98,7 @@ namespace Wenku8::Reader
         pTree->setMouseTracking(true);
         pTree->setIndentation(bMobile ? 16 : 24);
         pTree->setUniformRowHeights(true);
+        pTree->setExpandsOnDoubleClick(bMobile);
         pLayout->addWidget(pTree, 1);
 
         QTreeWidgetItem* pCurrentItem = nullptr;
@@ -175,9 +178,12 @@ namespace Wenku8::Reader
                     fnActivate(pItem);
                 });
         connect(pTree, &QTreeWidget::itemActivated, pPage,
-                [fnActivate](QTreeWidgetItem* pItem, int)
+                [fnActivate, bMobile](QTreeWidgetItem* pItem, int)
                 {
-                    fnActivate(pItem);
+                    if (bMobile || (pItem && pItem->data(0, Qt::UserRole).isValid()))
+                    {
+                        fnActivate(pItem);
+                    }
                 });
         auto* pTouch = new TouchScroll(pTree,
                                        [pTree, fnActivate](QPoint oPtPosition)
@@ -193,19 +199,13 @@ namespace Wenku8::Reader
                                        });
         pTouch->setEnabled(bMobile);
 
-        connect(pBack, &QPushButton::clicked, pPage,
-                [this, pPage]
-                {
-                    if (m_pPages->currentWidget() == pPage && !m_bLoadingBusy)
-                    {
-                        popMobilePage();
-                    }
-                });
         connect(pSearch, &QLineEdit::textChanged, pPage,
-                [pTree, pCount](const QString& strText)
+                [pTree, pCount, bMobile](const QString& strText)
                 {
                     const QString strQuery = strText.trimmed();
                     int nMatches = 0;
+                    const bool bUpdates = pTree->updatesEnabled();
+                    pTree->setUpdatesEnabled(false);
                     for (int nVolume = 0; nVolume < pTree->topLevelItemCount(); ++nVolume)
                     {
                         auto* pVolume = pTree->topLevelItem(nVolume);
@@ -231,11 +231,34 @@ namespace Wenku8::Reader
                             pVolume->setExpanded(true);
                         }
                     }
+                    pTree->setUpdatesEnabled(bUpdates);
                     pCount->setText(strQuery.isEmpty()
-                                        ? QString("共 %1 章 · 点击章节开始阅读").arg(nMatches)
+                                        ? QString(bMobile ? "共 %1 章 · 点击章节开始阅读" : "共 %1 章").arg(nMatches)
                                     : nMatches == 0 ? "没有匹配的章节，试试其他关键词"
-                                                    : QString("找到 %1 个章节").arg(nMatches));
+                                    : bMobile ? QString("找到 %1 个章节").arg(nMatches)
+                                              : QString("找到 %1 个章节 · Enter 打开第一项").arg(nMatches));
                 });
+        if (!bMobile)
+        {
+            connect(pSearch, &QLineEdit::returnPressed, pPage, [pTree, pSearch, fnActivate]
+            {
+                if (pSearch->text().trimmed().isEmpty())
+                {
+                    return;
+                }
+                QTreeWidgetItemIterator oItem(pTree,
+                                             QTreeWidgetItemIterator::NotHidden |
+                                                 QTreeWidgetItemIterator::NoChildren);
+                while (*oItem && !(*oItem)->data(0, Qt::UserRole).isValid())
+                {
+                    ++oItem;
+                }
+                if (*oItem)
+                {
+                    fnActivate(*oItem);
+                }
+            });
+        }
         auto fnLocate = [pTree, pSearch, pCurrentItem]
         {
             if (!pCurrentItem)
@@ -259,7 +282,6 @@ namespace Wenku8::Reader
         }
         else
         {
-            pBack->hide();
             showReaderPanel(pPage, "目录");
         }
         QTimer::singleShot(0, pPage, fnLocate);
