@@ -171,6 +171,7 @@ namespace Wenku8::Reader
         };
         QVector<Page> m_vPages;
         int m_nPage = 0;
+        int m_nPageAnchor = 0;
         ReadingMode m_eMode = ReadingMode::Scroll;
         int m_nWheelDelta = 0, m_nWheelDirection = 0;
         bool m_bWheelGestureActive = false, m_bWheelGestureTurned = false,

@@ -54,7 +54,7 @@ namespace Wenku8::Reader
         }
         pModeLayout->addLayout(pModes);
         pModeLayout->addWidget(
-            paragraph(bMobile ? "滚动时上下滑动；翻页时轻点两侧或滑动。轻点正文中间显示工具栏。"
+            paragraph(bMobile ? "轻点正文中间可开关工具栏。滚动时上下滑动，翻页时可轻点两侧或滑动。"
                               : "滚动模式使用滚轮；翻页模式支持滚轮、方向键和 PageUp／PageDown。",
                       "settingsHint"));
         auto pVolume = new QCheckBox("音量键翻页");

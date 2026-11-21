@@ -371,7 +371,7 @@ namespace Wenku8::Reader
             return m_nPendingPosition;
         }
         if (m_eMode == ReadingMode::Paged && !m_vPages.isEmpty())
-            return m_vPages[m_nPage].m_nOffset;
+            return m_nPageAnchor;
         return cursorForPosition(QPoint(26, 2)).position();
     }
     QString ReadingView::readingSnippet(int nPosition, int nLength) const
@@ -398,6 +398,9 @@ namespace Wenku8::Reader
         setTextCursor(oCursor);
         if (m_eMode == ReadingMode::Paged && !m_vPages.isEmpty())
         {
+            // Keep the text offset through reflow. The visible page containing
+            // it can start earlier after changing the viewport height.
+            m_nPageAnchor = oCursor.position();
             m_nPage = 0;
             for (int nI = 1; nI < m_vPages.size(); ++nI)
                 if (m_vPages[nI].m_nOffset <= oCursor.position())
@@ -807,6 +810,7 @@ namespace Wenku8::Reader
             const bool bMobile = textInteractionFlags() == Qt::NoTextInteraction;
             auto oBefore = bMobile ? pageSnapshot(m_nPage) : viewport()->grab();
             m_nPage = nTarget;
+            m_nPageAnchor = m_vPages[m_nPage].m_nOffset;
             m_nWarmDirection = nDirection;
             verticalScrollBar()->setValue(m_vPages[m_nPage].m_nY);
             auto oAfter = bMobile ? pageSnapshot(m_nPage) : viewport()->grab();

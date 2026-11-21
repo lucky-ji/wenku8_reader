@@ -63,7 +63,35 @@ namespace Wenku8::Reader
         m_pReaderProgress->setValue(nProgress);
         m_pReaderProgress->setEnabled(m_nChapter >= 0 && m_pRead->isEnabled() && !m_bLoadingBusy &&
                                       m_pReader->canSeekProgress());
-        m_pReaderProgressPercent->setText(QString("%1%").arg(nProgress / 10));
+        updateReaderPositionText(nProgress);
+    }
+    void ClientWindow::updateReaderPositionText(int nPermille)
+    {
+        const auto strPercent = QString("%1%").arg(nPermille / 10);
+        if (m_pReaderProgressPercent->text() != strPercent)
+        {
+            m_pReaderProgressPercent->setText(strPercent);
+        }
+        QString strPosition = "本章";
+        if (mobileMode() && m_nChapter >= 0 && m_nChapter < m_vFlat.size())
+        {
+            const int nPageCount = m_pReader->pageCount();
+            if (m_pReader->readingMode() == ReadingMode::Paged && nPageCount > 0)
+            {
+                const int nPage = m_pReaderProgress->isSliderDown()
+                    ? int((qint64(nPermille) * (nPageCount - 1) + 500) / 1000) + 1
+                    : m_pReader->pageNumber();
+                strPosition = QString("第 %1/%2 页").arg(nPage).arg(nPageCount);
+            }
+            else
+            {
+                strPosition = QString("第 %1/%2 章").arg(m_nChapter + 1).arg(m_vFlat.size());
+            }
+        }
+        if (m_pReaderPosition->text() != strPosition)
+        {
+            m_pReaderPosition->setText(strPosition);
+        }
     }
     void ClientWindow::turnReaderPage(int nDirection)
     {
