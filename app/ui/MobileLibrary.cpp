@@ -157,12 +157,12 @@ namespace Wenku8::Reader
         for (auto* pChoice : {m_pMobileGrid, m_pMobileList})
         {
             const bool bList = pChoice == m_pMobileList;
-            pChoice->setAccessibleName(bList ? "紧凑列表" : "封面网格");
+            pChoice->setAccessibleName(bList ? "紧凑列表" : "封面平铺");
             pChoice->setToolTip(pChoice->accessibleName());
             pChoice->setCheckable(true);
             pChoice->setChecked(bList == m_bMobileShelfList);
             pChoice->setFixedWidth(48);
-            setButtonIcon(pChoice, bList ? Icon::List : Icon::Library);
+            setButtonIcon(pChoice, bList ? Icon::List : Icon::Grid);
             pChoices->addButton(pChoice);
             pControls->addWidget(pChoice);
             connect(pChoice, &QPushButton::clicked, this, [this, bList]

@@ -330,7 +330,7 @@ namespace Wenku8::Reader
                     }
                     const int nColumns = qBound(2, nWidth / 116, 5);
                     const int nCell = qMax(100, (nWidth - nColumns * 12 - 2) / nColumns);
-                    return {nCell, qRound(qMin(136, nCell - 26) * 1.42) + 84};
+                    return {nCell, qRound(qMin(136, nCell - 26) * 1.42) + 104};
                 }
                 if (pView && pView->property("desktopCompactCards").toBool())
                 {
@@ -412,26 +412,13 @@ namespace Wenku8::Reader
                 pP->setClipRect(oTitle);
                 pP->drawText(oTitle, Qt::TextWrapAnywhere, oIndex.data().toString());
                 pP->restore();
+                paintMetadata(pP, oO, QRect(nX, oR.top() + 77, nW, 20),
+                              oIndex.data(Qt::UserRole + 1).toString(), {});
+                paintMetadata(pP, oO, QRect(nX, oR.top() + 103, nW, 22), {},
+                              oIndex.data(Qt::UserRole + 2).toString());
                 oFont.setPointSize(9);
                 oFont.setBold(false);
                 pP->setFont(oFont);
-                pP->setPen(oC.m_oMuted);
-                pP->drawText(QRect(nX, oR.top() + 77, nW, 20), Qt::AlignVCenter,
-                             pP->fontMetrics().elidedText(oIndex.data(Qt::UserRole + 1).toString(),
-                                                          Qt::ElideRight, nW));
-                auto strStatus = oIndex.data(Qt::UserRole + 2).toString();
-                if (!strStatus.isEmpty())
-                {
-                    QRect oBadge(nX, oR.top() + 106,
-                                 std::min(nW, pP->fontMetrics().horizontalAdvance(strStatus) + 16), 23);
-                    pP->setPen(Qt::NoPen);
-                    pP->setBrush(oC.m_oSelection);
-                    pP->drawRoundedRect(oBadge, 6, 6);
-                    pP->setPen(oC.m_oSelectionText);
-                    pP->drawText(
-                        oBadge.adjusted(8, 0, -5, 0), Qt::AlignVCenter,
-                        pP->fontMetrics().elidedText(strStatus, Qt::ElideRight, oBadge.width() - 12));
-                }
                 pP->setPen(oC.m_oMuted);
                 const QRect oPosition(oR.left() + 18, oR.top() + 144, oR.width() - 53, 22);
                 const auto strProgress = oIndex.data(Qt::UserRole + 4).toString();
@@ -451,6 +438,50 @@ namespace Wenku8::Reader
             CoverStore* m_pCovers;
             std::function<void(int)> m_fnRequestCover;
             mutable QSet<int> m_vQueuedCovers;
+
+            void paintMetadata(QPainter* pPainter, const QStyleOptionViewItem& oOption,
+                               const QRect& oArea, const QString& strAuthor,
+                               const QString& strStatus) const
+            {
+                if (oArea.isEmpty() || (strAuthor.isEmpty() && strStatus.isEmpty()))
+                {
+                    return;
+                }
+                const auto oColors = colors(m_eTheme);
+                const bool bEnabled = oOption.state & QStyle::State_Enabled;
+                const bool bSelected = oOption.state & QStyle::State_Selected;
+                auto oFont = oOption.font;
+                oFont.setPixelSize(12);
+                oFont.setBold(false);
+                pPainter->save();
+                pPainter->setFont(oFont);
+                const auto oMetrics = pPainter->fontMetrics();
+                QRect oAuthor = oArea;
+                if (!strStatus.isEmpty())
+                {
+                    const int nLimit = strAuthor.isEmpty() ? oArea.width() : oArea.width() / 2;
+                    const int nBadgeWidth = qMin(nLimit, oMetrics.horizontalAdvance(strStatus) + 14);
+                    const int nBadgeLeft = strAuthor.isEmpty() ? oArea.left()
+                                                               : oArea.right() - nBadgeWidth + 1;
+                    const QRect oBadge(nBadgeLeft, oArea.top() + 1, nBadgeWidth, oArea.height() - 2);
+                    pPainter->setPen(Qt::NoPen);
+                    pPainter->setBrush(bSelected ? oColors.m_oSection : oColors.m_oSelection);
+                    pPainter->drawRoundedRect(oBadge, 6, 6);
+                    pPainter->setPen(bEnabled ? (bSelected ? oColors.m_oText : oColors.m_oSelectionText)
+                                              : oColors.m_oDisabled);
+                    pPainter->drawText(oBadge.adjusted(7, 0, -7, 0), Qt::AlignCenter,
+                                       oMetrics.elidedText(strStatus, Qt::ElideRight,
+                                                           qMax(0, nBadgeWidth - 14)));
+                    oAuthor.setRight(nBadgeLeft - 8);
+                }
+                if (!strAuthor.isEmpty() && oAuthor.width() > 0)
+                {
+                    pPainter->setPen(bEnabled ? oColors.m_oMuted : oColors.m_oDisabled);
+                    pPainter->drawText(oAuthor, Qt::AlignLeft | Qt::AlignVCenter,
+                                       oMetrics.elidedText(strAuthor, Qt::ElideRight, oAuthor.width()));
+                }
+                pPainter->restore();
+            }
 
             QImage coverImage(const QModelIndex& oIndex) const
             {
@@ -551,14 +582,14 @@ namespace Wenku8::Reader
                 const int nTop = oRow.top();
                 fnDrawText(oIndex.data().toString(), QRect(nLeft, nTop + nTitleY, nTitleWidth, 20),
                            15, oColors.m_oText, true);
-                const auto strAuthorLine = bWide || strStatus.isEmpty() ? strAuthor
-                    : strAuthor.isEmpty() ? strStatus : QString("%1  ·  %2").arg(strAuthor, strStatus);
-                fnDrawText(strAuthorLine, QRect(nLeft, nTop + nTitleY + 22, nTitleWidth, 20),
-                           12, oColors.m_oMuted, false);
+                paintMetadata(pPainter, oOption,
+                              QRect(nLeft, nTop + nTitleY + 22, nTitleWidth, 20), strAuthor,
+                              bWide ? QString() : strStatus);
                 if (bWide)
                 {
-                    fnDrawText(strStatus, QRect(nDetailLeft, nTop + (strChapter.isEmpty() ? 24 : 11),
-                                                nDetailWidth, 20), 12, oColors.m_oMuted, false);
+                    paintMetadata(pPainter, oOption,
+                                  QRect(nDetailLeft, nTop + (strChapter.isEmpty() ? 24 : 11),
+                                        nDetailWidth, 20), {}, strStatus);
                 }
                 const int nChapterY = bWide ? (strStatus.isEmpty() ? 24 : 33) : 48;
                 fnDrawText(strChapter, QRect(nDetailLeft, nTop + nChapterY, nDetailWidth, 20),
@@ -654,9 +685,9 @@ namespace Wenku8::Reader
                 if (bList)
                 {
                     fnText(oIndex.data().toString(), oCard.top() + 16, 15, oColors.m_oText, true);
-                    fnText(strAuthor.isEmpty() || strStatus.isEmpty() ? strAuthor + strStatus
-                               : QString("%1  ·  %2").arg(strAuthor, strStatus),
-                           oCard.top() + 43, 12, oColors.m_oMuted, false);
+                    paintMetadata(pPainter, oOption,
+                                  QRect(nTextLeft, oCard.top() + 43, nTextWidth, 22),
+                                  strAuthor, strStatus);
                     const auto strChapter = oIndex.data(Qt::UserRole + 5).toString();
                     const auto strPosition = oIndex.data(Qt::UserRole + 4).toString();
                     fnText(strPosition.isEmpty() ? strChapter : strPosition,
@@ -678,8 +709,12 @@ namespace Wenku8::Reader
                     pPainter->drawText(oTitleRect, Qt::AlignLeft | Qt::TextWrapAnywhere,
                                        oIndex.data().toString());
                     pPainter->restore();
-                    fnText(strAuthor.isEmpty() ? strStatus : strAuthor, oCover.bottom() + 43, 11,
-                           oColors.m_oMuted, false);
+                    paintMetadata(pPainter, oOption,
+                                  QRect(nTextLeft, oCover.bottom() + 42, nTextWidth, 19),
+                                  strAuthor, {});
+                    paintMetadata(pPainter, oOption,
+                                  QRect(nTextLeft, oCover.bottom() + 62, nTextWidth, 20),
+                                  {}, strStatus);
                 }
                 if (oReadingProgress.isValid())
                 {

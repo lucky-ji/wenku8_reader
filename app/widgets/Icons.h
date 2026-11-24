@@ -36,7 +36,8 @@ namespace Wenku8::Reader
         Headphones,
         Play,
         Pause,
-        Stop
+        Stop,
+        Grid
     };
     QIcon makeIcon(Icon, const QColor& oNormal, const QColor& oDisabled, const QColor& oActive);
     void setButtonIcon(QAbstractButton*, Icon);

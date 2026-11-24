@@ -38,7 +38,7 @@ namespace Wenku8::Reader
                                 "profile",      "folder",
                                 "settings",     "headphones",
                                 "play",         "pause",
-                                "stop"};
+                                "stop",         "grid"};
         QSvgRenderer* renderer(Icon eIcon, const QColor& oColor)
         {
             initializeWenkuIcons();

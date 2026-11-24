@@ -29,5 +29,6 @@
 <file alias="play.svg">assets/icons/play.svg</file>
 <file alias="pause.svg">assets/icons/pause.svg</file>
 <file alias="stop.svg">assets/icons/stop.svg</file>
+<file alias="grid.svg">assets/icons/grid.svg</file>
 </qresource></RCC>
 

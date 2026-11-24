@@ -45,13 +45,13 @@ namespace Wenku8::Reader
         for (auto* pChoice : {m_pDesktopGrid, m_pDesktopList})
         {
             const bool bList = pChoice == m_pDesktopList;
-            pChoice->setAccessibleName(bList ? "紧凑列表" : "封面网格");
+            pChoice->setAccessibleName(bList ? "紧凑列表" : "封面平铺");
             pChoice->setToolTip(pChoice->accessibleName());
             pChoice->setCheckable(true);
             pChoice->setChecked(bList == m_bDesktopShelfList);
             pChoice->setFixedSize(38, 30);
             pChoice->setCursor(Qt::PointingHandCursor);
-            setButtonIcon(pChoice, bList ? Icon::List : Icon::Library);
+            setButtonIcon(pChoice, bList ? Icon::List : Icon::Grid);
             pGroup->addButton(pChoice);
             pLayout->addWidget(pChoice);
             connect(pChoice, &QPushButton::clicked, this, [this, bList]

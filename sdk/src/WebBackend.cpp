@@ -6,9 +6,12 @@
 #include <libxml/uri.h>
 #include <algorithm>
 #include <cctype>
+#include <initializer_list>
 #include <limits>
+#include <optional>
 #include <regex>
 #include <set>
+#include <string_view>
 
 namespace Wenku8::Detail
 {
@@ -234,7 +237,133 @@ namespace Wenku8::Detail
                 strResult += '\n';
             return strResult;
         }
-        NovelPage parsePage(const std::string& strHtml)
+        std::optional<std::string> listField(const std::string& strText,
+                                             std::initializer_list<std::string_view> vLabels)
+        {
+            for (const auto strLabel : vLabels)
+            {
+                if (strText.compare(0, strLabel.size(), strLabel) != 0)
+                {
+                    continue;
+                }
+                auto strTail = trim(strText.substr(strLabel.size()));
+                if (strTail.compare(0, 1, ":") == 0)
+                {
+                    return trim(strTail.substr(1));
+                }
+                if (strTail.compare(0, sizeof(u8"：") - 1, u8"：") == 0)
+                {
+                    return trim(strTail.substr(sizeof(u8"：") - 1));
+                }
+            }
+            return std::nullopt;
+        }
+        std::string serializationStatus(const std::string& strStatus)
+        {
+            constexpr std::string_view vStatuses[] = {
+                u8"连载", u8"连载中", u8"連載", u8"連載中", u8"已完成",
+                u8"完结", u8"已完结", u8"完結", u8"已完結", u8"完本", u8"已完本",
+                u8"全本", u8"完成"};
+            for (const auto strKnown : vStatuses)
+            {
+                if (strStatus == strKnown)
+                {
+                    return strStatus;
+                }
+            }
+            return {};
+        }
+        void readListMetadata(const Html& oDoc, xmlNodePtr pTitle, Novel& oNovel)
+        {
+            // Browse and search grids put one book in each direct div under a cell.
+            const auto pCard = oDoc.one("ancestor::div[parent::td][1]", pTitle);
+            if (!pCard)
+            {
+                return;
+            }
+            for (const auto pLine : oDoc.select(".//p", pCard))
+            {
+                const auto strLine = nodeText(pLine);
+                if (oNovel.m_strAuthor.empty())
+                {
+                    if (auto oAuthor = listField(strLine, {u8"小说作者", u8"小說作者", u8"作者"}))
+                    {
+                        // Preserve a slash in a joint byline unless it introduces a field.
+                        for (auto nSlash = oAuthor->find('/'); nSlash != std::string::npos;
+                             nSlash = oAuthor->find('/', nSlash + 1))
+                        {
+                            if (listField(trim(oAuthor->substr(nSlash + 1)),
+                                          {u8"分类", u8"分類", u8"状态", u8"狀態", u8"更新"}))
+                            {
+                                oAuthor->resize(nSlash);
+                                break;
+                            }
+                        }
+                        oNovel.m_strAuthor = trim(*oAuthor);
+                    }
+                }
+                if (oNovel.m_strStatus.empty())
+                {
+                    const std::initializer_list<std::string_view> vStatusLabels{
+                        u8"文章状态", u8"小说状态", u8"文章狀態", u8"小說狀態", u8"狀態", u8"状态"};
+                    const auto nSlash = strLine.rfind('/');
+                    auto oStatus = listField(strLine, vStatusLabels);
+                    if (!oStatus && nSlash != std::string::npos && nSlash > 0)
+                    {
+                        const auto strTail = trim(strLine.substr(nSlash + 1));
+                        oStatus = listField(strTail, vStatusLabels);
+                        const auto nPrevious = strLine.rfind('/', nSlash - 1);
+                        const auto nWordStart = nPrevious == std::string::npos ? 0 : nPrevious + 1;
+                        if (!oStatus && nWordStart < nSlash &&
+                            listField(trim(strLine.substr(nWordStart, nSlash - nWordStart)),
+                                      {u8"字数", u8"字數"}))
+                        {
+                            oStatus = strTail;
+                        }
+                    }
+                    if (oStatus)
+                    {
+                        oNovel.m_strStatus = serializationStatus(*oStatus);
+                    }
+                }
+            }
+        }
+        std::string readShelfAuthor(const Html& oDoc, xmlNodePtr pTitle)
+        {
+            const auto pRow = oDoc.one("ancestor::tr[1]", pTitle);
+            if (!pRow)
+            {
+                return {};
+            }
+            const auto pAuthor = oDoc.one(".//a[contains(@href,'authorarticle') or "
+                                         "contains(@href,'searchtype=author')]", pRow);
+            if (pAuthor)
+            {
+                return nodeText(pAuthor);
+            }
+            const auto pTable = oDoc.one("ancestor::table[1]", pRow);
+            if (!pTable)
+            {
+                return {};
+            }
+            const auto vHeaders = oDoc.select(
+                "(./tr | ./thead/tr | ./tbody/tr)[1]/*[self::th or self::td]", pTable);
+            const auto vCells = oDoc.select("./td", pRow);
+            if (vHeaders.size() == vCells.size())
+            {
+                for (std::size_t nColumn = 0; nColumn < vHeaders.size(); ++nColumn)
+                {
+                    const auto strHeading = nodeText(vHeaders[nColumn]);
+                    if (strHeading == u8"作者" || strHeading == u8"小说作者" ||
+                        strHeading == u8"小說作者")
+                    {
+                        return nodeText(vCells[nColumn]);
+                    }
+                }
+            }
+            return {};
+        }
+        NovelPage parseList(const std::string& strHtml, bool bBookshelf)
         {
             Html oDoc(strHtml);
             NovelPage oResult;
@@ -281,6 +410,14 @@ namespace Wenku8::Detail
                     Novel oN;
                     oN.m_nId = nId;
                     oN.m_strTitle = strTitle;
+                    if (bBookshelf)
+                    {
+                        oN.m_strAuthor = readShelfAuthor(oDoc, pA);
+                    }
+                    else
+                    {
+                        readListMetadata(oDoc, pA, oN);
+                    }
                     oResult.m_vNovels.push_back(std::move(oN));
                 }
             }
@@ -296,6 +433,10 @@ namespace Wenku8::Detail
                 throw Error(ErrorCode::Parse, "No recognized website novel list");
             return oResult;
         }
+        NovelPage parsePage(const std::string& strHtml)
+        {
+            return parseList(strHtml, false);
+        }
         std::vector<Novel> parseBookshelf(const std::string& strHtml)
         {
             Html oDoc(strHtml);
@@ -309,7 +450,7 @@ namespace Wenku8::Detail
                 requireContent(oDoc, true);
                 return {};
             }
-            return parsePage(strHtml).m_vNovels;
+            return parseList(strHtml, true).m_vNovels;
         }
         Novel parseNovel(const std::string& strHtml, int nId)
         {

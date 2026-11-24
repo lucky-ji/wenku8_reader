@@ -176,10 +176,21 @@ namespace Wenku8::Reader
                 continue;
             }
             auto* pItem = new QListWidgetItem(QString::fromStdString(oNovel.m_strTitle));
+            const QString strAuthor = QString::fromStdString(oNovel.m_strAuthor).simplified();
+            QString strStatus = QString::fromStdString(oNovel.m_strStatus).simplified();
+            if (strStatus == "连载" || strStatus == "連載" || strStatus == "連載中")
+            {
+                strStatus = "连载中";
+            }
+            else if (strStatus == "完成" || strStatus == "已完成" || strStatus == "完结" ||
+                     strStatus == "完本" || strStatus == "已完本" || strStatus == "全本" ||
+                     strStatus == "完結" || strStatus == "已完結")
+            {
+                strStatus = "已完结";
+            }
             pItem->setData(Qt::UserRole, oNovel.m_nId);
-            pItem->setData(Qt::UserRole + 1, QString::fromStdString(oNovel.m_strAuthor));
-            pItem->setData(Qt::UserRole + 2,
-                           bDownloads ? "已缓存" : QString::fromStdString(oNovel.m_strStatus));
+            pItem->setData(Qt::UserRole + 1, strAuthor);
+            pItem->setData(Qt::UserRole + 2, bDownloads ? QString("已缓存") : strStatus);
             if (bDiscovery)
             {
                 pItem->setData(nLazyCoverRole, true);
@@ -195,7 +206,22 @@ namespace Wenku8::Reader
             {
                 setLibraryPosition(pItem, *oSaved);
             }
-            pItem->setToolTip(pItem->text());
+            QStringList vMetadata;
+            if (!strAuthor.isEmpty())
+            {
+                vMetadata.append(QString("作者 · %1").arg(strAuthor));
+            }
+            if (!strStatus.isEmpty())
+            {
+                vMetadata.append(QString("连载状态 · %1").arg(strStatus));
+            }
+            pItem->setData(Qt::AccessibleDescriptionRole, vMetadata.join("，"));
+            QString strToolTip = pItem->text().toHtmlEscaped();
+            for (const auto& strField : vMetadata)
+            {
+                strToolTip += "<br>" + strField.toHtmlEscaped();
+            }
+            pItem->setToolTip("<qt>" + strToolTip + "</qt>");
             m_pCards->addItem(pItem);
             if (!bDiscovery)
             {
