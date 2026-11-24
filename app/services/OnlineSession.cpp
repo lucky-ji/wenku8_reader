@@ -864,7 +864,8 @@ namespace Wenku8::Reader
     }
     void OnlineSession::restoreSession()
     {
-        if (m_pImpl->m_bActive || m_pImpl->m_bAuthenticated || restoringSession() ||
+        if (m_pImpl->m_bShuttingDown || m_pImpl->m_bActive || m_pImpl->m_bAuthenticated ||
+            restoringSession() ||
             m_pImpl->m_pHost->visible() || !persistent())
         {
             return;

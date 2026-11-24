@@ -1016,6 +1016,8 @@ namespace Wenku8::Reader
     }
     ClientWindow::~ClientWindow()
     {
+        ++m_nRestoreGeneration;
+        cancelSpeechChapter();
         saveSpeechPosition();
         delete m_pReadAloud;
         m_pReadAloud = nullptr;
@@ -2583,7 +2585,7 @@ namespace Wenku8::Reader
         QTimer::singleShot(0, this,
                            [this, nGeneration, nOffset, bSpeechResume, bSpeechPage]
                            {
-                               if (nGeneration != m_nRestoreGeneration || !canReadBook() ||
+                               if (nGeneration != m_nRestoreGeneration || !m_pReadAloud || !canReadBook() ||
                                    m_pPages->currentIndex() != 3)
                                    return;
                                m_pReader->restorePosition(nOffset);
