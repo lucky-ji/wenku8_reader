@@ -29,7 +29,6 @@ namespace Wenku8::Reader
         void keyPressEvent(QKeyEvent*) override;
         void wheelEvent(QWheelEvent*) override;
         void mousePressEvent(QMouseEvent*) override;
-        bool event(QEvent*) override;
 
       private:
         Theme m_eTheme = Theme::Light;
@@ -41,6 +40,5 @@ namespace Wenku8::Reader
         qint64 m_nCurrent = 0, m_nTotal = 0;
         bool m_bCancelable = false, m_bCancelling = false;
         void arrange();
-        bool startup() const;
     };
 } // namespace Wenku8::Reader

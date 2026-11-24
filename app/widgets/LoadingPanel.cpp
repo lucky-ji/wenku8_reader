@@ -10,8 +10,6 @@
 #include <QMouseEvent>
 #include <QShowEvent>
 #include <QHideEvent>
-#include <QDynamicPropertyChangeEvent>
-#include <QVariant>
 #include <algorithm>
 #include <cmath>
 namespace Wenku8::Reader
@@ -55,10 +53,6 @@ namespace Wenku8::Reader
         setTheme(m_eTheme);
         setProgress(0, 0);
         hide();
-    }
-    bool LoadingPanel::startup() const
-    {
-        return property("startupMode").toBool();
     }
     void LoadingPanel::setTheme(Theme eTheme)
     {
@@ -117,17 +111,17 @@ namespace Wenku8::Reader
         m_bCancelling = bValue;
         m_pCancel->setEnabled(!bValue);
         m_pCancel->setText(bValue ? "正在取消…" : "取消加载");
-        m_pTitle->setText(startup() ? "轻小说文库" : bValue ? "正在取消" : "正在加载");
+        m_pTitle->setText(bValue ? "正在取消" : "正在加载");
     }
     void LoadingPanel::arrange()
     {
-        const bool bCanCancel = m_bCancelable && !startup();
+        const bool bCanCancel = m_bCancelable;
         const int nCardWidth = qMax(160, qMin(360, width() - 32)),
                   nCardHeight = bCanCancel ? 298 : 244;
         m_oCard = QRect((width() - nCardWidth) / 2, qMax(12, (height() - nCardHeight) / 2),
                         nCardWidth, nCardHeight);
         m_oRing = QRect(m_oCard.center().x() - 24, m_oCard.top() + 30, 48, 48);
-        m_pTitle->setText(startup() ? "轻小说文库" : m_bCancelling ? "正在取消" : "正在加载");
+        m_pTitle->setText(m_bCancelling ? "正在取消" : "正在加载");
         m_pTitle->setGeometry(m_oCard.left() + 20, m_oCard.top() + 96, nCardWidth - 40, 30);
         m_pMessage->setGeometry(m_oCard.left() + 20, m_oCard.top() + 134, nCardWidth - 40, 48);
         m_pProgressText->setGeometry(m_oCard.left() + 20, m_oCard.top() + 190, nCardWidth - 40, 20);
@@ -141,16 +135,12 @@ namespace Wenku8::Reader
         const auto oC = colors(m_eTheme);
         QPainter oPainter(this);
         oPainter.setRenderHint(QPainter::Antialiasing);
-        if (startup())
-            oPainter.fillRect(rect(), oC.m_oBackground);
-        else
+        auto oVeil = m_eTheme == Theme::Dark ? QColor(8, 13, 20, 192) : oC.m_oBackground;
+        if (m_eTheme != Theme::Dark)
         {
-            auto oVeil =
-                m_eTheme == Theme::Dark ? QColor(8, 13, 20, 192) : QColor(oC.m_oBackground);
-            if (m_eTheme != Theme::Dark)
-                oVeil.setAlpha(224);
-            oPainter.fillRect(rect(), oVeil);
+            oVeil.setAlpha(224);
         }
+        oPainter.fillRect(rect(), oVeil);
         oPainter.setPen(QPen(oC.m_oBorder, 1));
         oPainter.setBrush(oC.m_oPanel);
         oPainter.drawRoundedRect(QRectF(m_oCard).adjusted(.5, .5, -.5, -.5), 22, 22);
@@ -212,7 +202,7 @@ namespace Wenku8::Reader
     void LoadingPanel::keyPressEvent(QKeyEvent* pEvent)
     {
         if ((pEvent->key() == Qt::Key_Escape || pEvent->key() == Qt::Key_Back) && m_bCancelable &&
-            !startup() && !m_bCancelling && m_fnOnCancel)
+            !m_bCancelling && m_fnOnCancel)
             m_fnOnCancel();
         pEvent->accept();
     }
@@ -223,12 +213,5 @@ namespace Wenku8::Reader
     void LoadingPanel::mousePressEvent(QMouseEvent* pEvent)
     {
         pEvent->accept();
-    }
-    bool LoadingPanel::event(QEvent* pEvent)
-    {
-        if (pEvent->type() == QEvent::DynamicPropertyChange &&
-            static_cast<QDynamicPropertyChangeEvent*>(pEvent)->propertyName() == "startupMode")
-            arrange();
-        return QWidget::event(pEvent);
     }
 } // namespace Wenku8::Reader

@@ -46,7 +46,7 @@ namespace Wenku8::Reader
 
     void ClientWindow::cacheBook()
     {
-        if (!m_bUnlocked || m_pSession->busy() || m_bLocalBook || m_oBook.m_nId <= 0)
+        if (!m_bAuthenticated || m_pSession->busy() || m_bLocalBook || m_oBook.m_nId <= 0)
         {
             return;
         }
@@ -94,7 +94,7 @@ namespace Wenku8::Reader
 
     void ClientWindow::downloadBookToLocal()
     {
-        if (!m_bUnlocked || m_pSession->busy() || m_oBook.m_nId <= 0)
+        if (!m_bAuthenticated || m_pSession->busy() || m_oBook.m_nId <= 0)
         {
             return;
         }
@@ -105,7 +105,7 @@ namespace Wenku8::Reader
             const int nBook = m_oBook.m_nId;
             chooseLocalDownloadDirectory([this, nBook](bool bSelected)
             {
-                if (bSelected && m_bUnlocked && !m_pSession->busy() && m_oBook.m_nId == nBook)
+                if (bSelected && m_bAuthenticated && !m_pSession->busy() && m_oBook.m_nId == nBook)
                 {
                     downloadBookToLocal();
                 }

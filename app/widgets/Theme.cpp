@@ -101,7 +101,7 @@ namespace Wenku8::Reader
         QWidget { color:%1; font-size:13px; }
         QMainWindow, QDialog, QWidget#shell { background:%2; }
         QFrame#sidebar { background:%3; border-right:1px solid %4; }
-        QFrame#surface { background:%5; border:1px solid %4; border-radius:16px; }
+        QFrame#surface, QFrame#guestLibraryGate { background:%5; border:1px solid %4; border-radius:16px; }
         QDockWidget { color:%1; }
         QDockWidget::title { background:%3; padding:9px; border-bottom:1px solid %4; }
         QMainWindow::separator { background:%4; width:5px; height:5px; }
@@ -133,10 +133,11 @@ namespace Wenku8::Reader
         QPushButton:hover { background:%7; }
         QPushButton:pressed { border-color:%8; }
         QPushButton:disabled { color:%6; }
-        QPushButton#primary { background:%8; color:%9; border:0; font-weight:600; }
-        QPushButton#nav { text-align:left; background:transparent; border:0; padding:12px 14px; border-radius:9px; }
-        QPushButton#nav:hover, QPushButton#nav:checked { background:%7; }
-        QPushButton#nav:checked { font-weight:600; }
+        QPushButton#primary, QPushButton#openMyPage { background:%8; color:%9; border:0; font-weight:600; }
+        QPushButton#nav, QPushButton#desktopMyPage { text-align:left; background:transparent; border:0; padding:12px 14px; border-radius:9px; }
+        QPushButton#nav:hover, QPushButton#nav:checked, QPushButton#desktopMyPage:hover,
+        QPushButton#desktopMyPage:checked { background:%7; }
+        QPushButton#nav:checked, QPushButton#desktopMyPage:checked { font-weight:600; }
         QPushButton#quiet { background:transparent; border:0; color:%6; }
         QLineEdit, QComboBox { color:%1; background:%5; border:1px solid %4; border-radius:9px; padding:10px 12px; selection-background-color:%8; }
         QLineEdit:focus, QComboBox:focus { border-color:%8; }

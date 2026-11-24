@@ -97,7 +97,7 @@ namespace Wenku8::Reader
     {
         if (m_bLoadingBusy)
             return;
-        if (!m_bUnlocked || m_pPages->currentIndex() != 3 || m_nChapter < 0 || m_bRestoring ||
+        if (!canReadBook() || m_pPages->currentIndex() != 3 || m_nChapter < 0 || m_bRestoring ||
             !m_pRead->isEnabled())
             return;
         if (m_pReadAloud)
@@ -119,10 +119,10 @@ namespace Wenku8::Reader
     {
         const bool bListening = m_pReadAloud && speechPageActive() &&
                                 m_pReadAloud->state() == ReadAloudController::State::Playing;
-        setAndroidReadingActive(m_bUnlocked && (m_pPages->currentIndex() == 3 || bListening) &&
+        setAndroidReadingActive(canReadBook() && (m_pPages->currentIndex() == 3 || bListening) &&
                                     QGuiApplication::applicationState() == Qt::ApplicationActive,
                                 m_bKeepAwake || bListening);
-        setAndroidVolumePaging(m_bVolumePaging && m_bUnlocked && !m_bLoadingBusy && !bListening &&
+        setAndroidVolumePaging(m_bVolumePaging && canReadBook() && !m_bLoadingBusy && !bListening &&
                                m_pPages->currentIndex() == 3 &&
                                QGuiApplication::applicationState() == Qt::ApplicationActive);
     }

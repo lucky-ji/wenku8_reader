@@ -27,7 +27,7 @@ namespace Wenku8::Reader
         bool canRequestThumbnail(int nNovel) const;
         bool unavailable(int nNovel) const;
         QString placeholder(int nNovel) const;
-        void request(int nNovel, const QByteArray& baDownloadedCover = {});
+        void request(int nNovel, const QByteArray& baDownloadedCover = {}, bool bAllowNetwork = true);
         void cancelPending();
         void retryFailures();
       signals:

@@ -16,7 +16,7 @@ namespace Wenku8::Reader
     using namespace PageControls;
     void ClientWindow::showReaderSearch()
     {
-        if (!m_bUnlocked || m_bLoadingBusy || m_nChapter < 0 || m_nChapter >= m_vFlat.size())
+        if (!canReadBook() || m_bLoadingBusy || m_nChapter < 0 || m_nChapter >= m_vFlat.size())
         {
             return;
         }
@@ -76,7 +76,7 @@ namespace Wenku8::Reader
         auto fnSearch = [this, pPage, pSearch, pStatus, pPreview, pRead, bMobile, pMatches,
                          nBook, nChapter](bool bBackward)
         {
-            if (!bMobile && (!pPage->isVisible() || !m_bUnlocked || m_bLoadingBusy ||
+            if (!bMobile && (!pPage->isVisible() || !canReadBook() || m_bLoadingBusy ||
                              m_bRestoring || m_pPages->currentIndex() != 3 ||
                              m_oBook.m_nId != nBook || m_nChapter != nChapter))
             {

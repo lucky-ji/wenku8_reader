@@ -18,6 +18,7 @@ namespace Wenku8::Reader
                       const QString& strSessionDirectory = {});
         ~OnlineSession() override;
         bool authenticated() const;
+        bool restoringSession() const;
         bool busy() const;
         bool loginVisible() const;
         QString username() const;

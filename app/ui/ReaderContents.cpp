@@ -18,7 +18,7 @@ namespace Wenku8::Reader
 {
     void ClientWindow::showReaderContents()
     {
-        if (!m_bUnlocked || m_bLoadingBusy || m_pPages->currentIndex() != 3 || m_vFlat.isEmpty())
+        if (!canReadBook() || m_bLoadingBusy || m_pPages->currentIndex() != 3 || m_vFlat.isEmpty())
         {
             return;
         }

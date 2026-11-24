@@ -3,6 +3,7 @@
 #include "AnimatedStack.h"
 #include "Icons.h"
 #include <QButtonGroup>
+#include <QCheckBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -17,13 +18,25 @@ namespace Wenku8::Reader
     class MobileContinueCard final : public QPushButton
     {
       public:
-        MobileContinueCard()
+        MobileContinueCard() : m_pDismiss(new QPushButton(this))
         {
             setObjectName("mobileContinueReading");
             setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
             setFixedHeight(108);
             setCursor(Qt::PointingHandCursor);
             setAccessibleName("继续阅读");
+            m_pDismiss->setObjectName("dismissContinueReading");
+            m_pDismiss->setProperty("settingsStepAction", true);
+            m_pDismiss->setFixedSize(48, 48);
+            m_pDismiss->setCursor(Qt::PointingHandCursor);
+            m_pDismiss->setAccessibleName("隐藏继续阅读");
+            m_pDismiss->setToolTip(m_pDismiss->accessibleName());
+            setButtonIcon(m_pDismiss, Icon::Cancel);
+        }
+
+        QPushButton* dismissButton() const
+        {
+            return m_pDismiss;
         }
 
         int book() const
@@ -53,6 +66,12 @@ namespace Wenku8::Reader
         }
 
       protected:
+        void resizeEvent(QResizeEvent* pEvent) override
+        {
+            QPushButton::resizeEvent(pEvent);
+            m_pDismiss->move(width() - m_pDismiss->width() - 2, 2);
+        }
+
         void paintEvent(QPaintEvent*) override
         {
             const auto oColors = colors(m_eTheme);
@@ -85,7 +104,7 @@ namespace Wenku8::Reader
             oPainter.restore();
 
             const int nTextLeft = oCover.right() + 13;
-            const int nTextWidth = width() - nTextLeft - 42;
+            const int nTextWidth = width() - nTextLeft - 56;
             auto fnDrawText = [&](const QString& strText, int nY, int nSize,
                                   const QColor& oInk, bool bBold)
             {
@@ -118,11 +137,12 @@ namespace Wenku8::Reader
                     QSize(qMax(4, oProgress.width() * nProgress / 100), oProgress.height())), 2, 2);
             }
             makeIcon(Icon::Right, oColors.m_oAccent, oColors.m_oDisabled, oColors.m_oAccent)
-                .paint(&oPainter, QRect(width() - 31, 44, 18, 18), Qt::AlignCenter,
+                .paint(&oPainter, QRect(width() - 35, 56, 18, 18), Qt::AlignCenter,
                        isEnabled() ? QIcon::Normal : QIcon::Disabled);
         }
 
       private:
+        QPushButton* m_pDismiss;
         ReadingEntry m_oEntry;
         QImage m_oCover;
         Theme m_eTheme = Theme::Light;
@@ -131,9 +151,15 @@ namespace Wenku8::Reader
     void ClientWindow::buildMobileLibrary(QVBoxLayout* pLibrary, QHBoxLayout* pBar)
     {
         m_bMobileShelfList = m_oSettings.value("mobileShelfList", false).toBool();
+        m_bMobileRecentUpdatesList = m_oSettings.value("mobileRecentUpdatesList", true).toBool();
+        m_bShowContinueReading = m_oSettings.value("showShelfContinueReading", true).toBool();
         m_pMobileContinue = new MobileContinueCard;
         m_pMobileContinue->hide();
         pLibrary->addWidget(m_pMobileContinue);
+        connect(m_pMobileContinue->dismissButton(), &QPushButton::clicked, this, [this]
+        {
+            setContinueReadingVisible(false);
+        });
         connect(m_pMobileContinue, &QPushButton::clicked, this, [this]
         {
             if (m_pMobileContinue->book() > 0)
@@ -167,10 +193,13 @@ namespace Wenku8::Reader
             pControls->addWidget(pChoice);
             connect(pChoice, &QPushButton::clicked, this, [this, bList]
             {
-                if (m_bMobileShelfList != bList)
+                const bool bRecentUpdates = m_nSection == 1;
+                auto& bListPreference = bRecentUpdates ? m_bMobileRecentUpdatesList : m_bMobileShelfList;
+                if (bListPreference != bList)
                 {
-                    m_bMobileShelfList = bList;
-                    m_oSettings.setValue("mobileShelfList", bList);
+                    bListPreference = bList;
+                    m_oSettings.setValue(bRecentUpdates ? "mobileRecentUpdatesList" : "mobileShelfList",
+                                         bList);
                     updateMobileLibraryLayout();
                 }
             });
@@ -186,18 +215,29 @@ namespace Wenku8::Reader
             return;
         }
         const bool bTouch = mobileMode();
-        const bool bLibrary = m_bUnlocked && m_pPages->currentIndex() == 1;
+        const bool bLibrary = m_bAuthenticated && m_pPages->currentIndex() == 1;
         const bool bShelf = m_nSection == 0 && m_strActiveSearch.isEmpty();
-        const bool bCompactCards = bTouch && (!bShelf || m_bMobileShelfList);
-        m_pMobileShelfView->setVisible(bTouch && bLibrary && bShelf);
-        m_pMobileContinue->setVisible(bTouch && bLibrary && bShelf && height() >= 500 &&
+        const bool bRecentUpdates = m_nSection == 1 && m_strActiveSearch.isEmpty();
+        const bool bList = bShelf ? m_bMobileShelfList
+                                  : !bRecentUpdates || m_bMobileRecentUpdatesList;
+        const bool bCompactCards = bTouch && bList;
+        m_pMobileGrid->setChecked(!bList);
+        m_pMobileList->setChecked(bList);
+        m_pMobileShelfView->setVisible(bTouch && bLibrary && (bShelf || bRecentUpdates));
+        m_pMobileContinue->setVisible(bTouch && bLibrary && bShelf && m_bShowContinueReading &&
+                                      height() >= 500 &&
                                       m_pMobileContinue->book() > 0);
         if (m_pCards->property("mobileCards").toBool() != bTouch ||
             m_pCards->property("mobileCompactCards").toBool() != bCompactCards)
         {
+            auto* pAnchor = m_pCards->itemAt(QPoint(7, 7));
             m_pCards->setProperty("mobileCards", bTouch);
             m_pCards->setProperty("mobileCompactCards", bCompactCards);
             m_pCards->doItemsLayout();
+            if (bTouch && bLibrary && pAnchor)
+            {
+                m_pCards->scrollToItem(pAnchor, QAbstractItemView::PositionAtTop);
+            }
         }
     }
 
@@ -235,7 +275,7 @@ namespace Wenku8::Reader
 
     void ClientWindow::updateMobileContinueReading()
     {
-        if (!m_bUnlocked || !mobileMode() || m_pPages->currentIndex() != 1 || m_nSection != 0 ||
+        if (!m_bShowContinueReading || !m_bAuthenticated || !mobileMode() || m_nSection != 0 ||
             !m_strActiveSearch.isEmpty())
         {
             return;
@@ -257,6 +297,34 @@ namespace Wenku8::Reader
             }
         }
         updateMobileLibraryLayout();
+    }
+
+    QCheckBox* ClientWindow::createContinueReadingToggle()
+    {
+        auto* pToggle = new QCheckBox("显示书架的继续阅读卡片");
+        pToggle->setObjectName("showShelfContinueReading");
+        pToggle->setChecked(m_bShowContinueReading);
+        pToggle->setMinimumHeight(48);
+        connect(pToggle, &QCheckBox::toggled, this, &ClientWindow::setContinueReadingVisible);
+        return pToggle;
+    }
+
+    void ClientWindow::setContinueReadingVisible(bool bShow)
+    {
+        if (bShow == m_bShowContinueReading)
+        {
+            return;
+        }
+        m_bShowContinueReading = bShow;
+        m_oSettings.setValue("showShelfContinueReading", bShow);
+        if (bShow)
+        {
+            updateMobileContinueReading();
+        }
+        else
+        {
+            updateMobileLibraryLayout();
+        }
     }
 
     void ClientWindow::updateMobileContinueCover(int nNovel, const QImage& oCover)

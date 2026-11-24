@@ -39,7 +39,7 @@ int main(int nArgumentCount, char** ppArguments)
     oArguments.addHelpOption();
     oArguments.addVersionOption();
     oArguments.addOption({"origin", "文库来源", "url", "https://www.wenku8.net"});
-    oArguments.addOption({"novel", "登录后打开的小说 ID", "id"});
+    oArguments.addOption({"novel", "启动时打开的小说 ID（在线作品需要登录）", "id"});
     oArguments.process(oApplication);
     const QString strApplicationDirectory =
         QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);

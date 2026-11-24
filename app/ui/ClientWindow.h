@@ -67,15 +67,15 @@ namespace Wenku8::Reader
         QString m_strDirectory, m_strOrigin;
         Theme m_eTheme = Theme::Light;
         bool m_bThemeApplied = false;
-        bool m_bUnlocked = false, m_bRestoring = false, m_bLocalBook = false,
+        bool m_bAuthenticated = false, m_bRestoring = false, m_bLocalBook = false,
              m_bResumeOnOpen = false;
+        bool m_bReturnAfterLogin = false;
         quint64 m_nRestoreGeneration = 0;
         QSet<int> m_vShelfIds;
         bool m_bReaderFullscreen = false, m_bLoadingBusy = false;
         DownloadTaskPanel* m_pDownloadTasks = nullptr;
         Toast* m_pToast = nullptr;
         LoadingPanel* m_pLoading = nullptr;
-        LoadingPanel* m_pStartupLoading = nullptr;
         QPointer<QWidget> m_pLoadingFocus;
         Qt::WindowStates m_oPreviousWindowState;
         QWidget* m_pHeading = nullptr;
@@ -92,12 +92,13 @@ namespace Wenku8::Reader
         MobileContinueCard* m_pMobileContinue = nullptr;
         QWidget* m_pMobileShelfView = nullptr;
         QPushButton *m_pMobileGrid = nullptr, *m_pMobileList = nullptr;
-        bool m_bMobileShelfList = false;
+        bool m_bMobileShelfList = false, m_bMobileRecentUpdatesList = true;
+        bool m_bShowContinueReading = true;
         QWidget* m_pDesktopShelfView = nullptr;
         QPushButton *m_pDesktopGrid = nullptr, *m_pDesktopList = nullptr,
                     *m_pDesktopClearSearch = nullptr;
         QList<QShortcut*> m_vDesktopLibraryShortcuts;
-        bool m_bDesktopShelfList = false;
+        bool m_bDesktopShelfList = false, m_bDesktopRecentUpdatesList = false;
         struct LibraryReturn
         {
             int m_nBook = 0, m_nScroll = 0;
@@ -127,13 +128,13 @@ namespace Wenku8::Reader
         bool m_bReaderDockRequested = false;
         QMenuBar* m_pDesktopMenuBar = nullptr;
         AnimatedStack* m_pPages = nullptr;
-        QStackedWidget* m_pStartupPages = nullptr;
+        QWidget* m_pRoot = nullptr;
         QLabel *m_pTitle = nullptr, *m_pSubtitle = nullptr, *m_pStatus = nullptr,
-               *m_pAccount = nullptr, *m_pCount = nullptr, *m_pDetailCover = nullptr,
+               *m_pGuestTitle = nullptr, *m_pCount = nullptr, *m_pDetailCover = nullptr,
                *m_pDetailTitle = nullptr, *m_pDetailMeta = nullptr, *m_pDetailIntro = nullptr,
                *m_pReadTitle = nullptr, *m_pReadBook = nullptr, *m_pChapterLabel = nullptr;
         QLineEdit* m_pSearch = nullptr;
-        QPushButton *m_pRefresh = nullptr, *m_pLogin = nullptr, *m_pRead = nullptr,
+        QPushButton *m_pRefresh = nullptr, *m_pDesktopAccount = nullptr, *m_pRead = nullptr,
                     *m_pDownload = nullptr, *m_pLocalDownload = nullptr, *m_pShelfAdd = nullptr,
                     *m_pFullscreen = nullptr, *m_pPrevious = nullptr, *m_pNext = nullptr;
         QPushButton* m_pReaderContents = nullptr;
@@ -166,13 +167,18 @@ namespace Wenku8::Reader
         QString m_strActiveSearch;
         void build();
         void adaptLayout();
-        void showAccountSheet();
+        void showAccountPage();
+        void updateAccountControls();
+        void signInFromAccount();
+        bool canReadBook() const;
         bool mobileMode() const;
         void buildMobileLibrary(QVBoxLayout*, QHBoxLayout*);
         void updateMobileLibraryLayout();
         void applyMobileLibraryStyle();
         void updateMobileContinueReading();
         void updateMobileContinueCover(int nNovel, const QImage&);
+        QCheckBox* createContinueReadingToggle();
+        void setContinueReadingVisible(bool);
         void buildDesktopLibrary(QHBoxLayout*);
         bool desktopLibraryActive() const;
         bool handleDesktopLibraryKey(QObject*, QKeyEvent*);
@@ -183,7 +189,6 @@ namespace Wenku8::Reader
         void pushMobilePage(QWidget*, const QString&);
         void popMobilePage();
         void clearMobilePages();
-        void showMobileAccount(bool bTab = false);
         void showMobileAppearance();
         void showMobileReaderTools();
         void showReaderContents();
@@ -215,6 +220,8 @@ namespace Wenku8::Reader
         void showInformationDocument(const QString& strTitle, const QString& strContents);
         void goBack();
         void authenticate(bool);
+        void setLibraryHeading();
+        void enterLibrarySection();
         void navigate(int);
         void refresh(bool bForce = false);
         void refreshCurrentPage();
@@ -239,7 +246,7 @@ namespace Wenku8::Reader
         void showBookmarks();
         void addBookmark();
         void highlightChapter();
-        void updateShelfAction();
+        void updateBookActions();
         void toggleReaderFullscreen();
         void leaveReaderFullscreen();
         void showBook(const Novel&, const std::vector<Volume>&, bool bLocal);

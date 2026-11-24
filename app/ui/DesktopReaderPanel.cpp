@@ -31,8 +31,8 @@ namespace Wenku8::Reader
 
     void ClientWindow::toggleDesktopReaderPanel()
     {
-        if (mobileMode() || !m_bUnlocked || m_bLoadingBusy || m_bRestoring ||
-            m_pStartupPages->currentIndex() != 1 || m_pPages->currentIndex() != 3 ||
+        if (mobileMode() || !canReadBook() || m_bLoadingBusy || m_bRestoring ||
+            m_pPages->currentIndex() != 3 ||
             m_nChapter < 0 || m_nChapter >= m_vFlat.size() || QApplication::activePopupWidget())
         {
             return;
@@ -70,7 +70,7 @@ namespace Wenku8::Reader
 
     bool ClientWindow::revealDesktopReaderPanel(const QString& strTitle)
     {
-        if (strTitle.isEmpty() || mobileMode() || !m_bUnlocked || m_bLoadingBusy ||
+        if (strTitle.isEmpty() || mobileMode() || !canReadBook() || m_bLoadingBusy ||
             m_bRestoring || m_pPages->currentIndex() != 3 || !m_pReaderDock ||
             !m_pReaderDock->widget() || m_nChapter < 0 || m_nChapter >= m_vFlat.size() ||
             m_pReaderDock->property("bookId").toInt() != m_oBook.m_nId ||
@@ -108,7 +108,7 @@ namespace Wenku8::Reader
         {
             return;
         }
-        if (mobileMode() || !m_bUnlocked || m_bLoadingBusy || m_bRestoring ||
+        if (mobileMode() || !canReadBook() || m_bLoadingBusy || m_bRestoring ||
             m_pPages->currentIndex() != 3 || m_oBook.m_nId <= 0 ||
             m_nChapter < 0 || m_nChapter >= m_vFlat.size())
         {
@@ -174,7 +174,7 @@ namespace Wenku8::Reader
                 connect(pAction, &QPushButton::clicked, pHost,
                         [this, pTabGroup, nIndex]
                         {
-                            if (m_bUnlocked && !m_bLoadingBusy && !m_bRestoring && !mobileMode() &&
+                            if (canReadBook() && !m_bLoadingBusy && !m_bRestoring && !mobileMode() &&
                                 m_pPages->currentIndex() == 3 && m_pReaderDock->isVisible() &&
                                 m_pReaderDock->property("bookId").toInt() == m_oBook.m_nId &&
                                 m_pReaderDock->property("panelTitle") != vTabs[nIndex].m_strTitle)
@@ -230,7 +230,7 @@ namespace Wenku8::Reader
     }
     void ClientWindow::showDesktopBookmarks()
     {
-        if (mobileMode() || !m_bUnlocked || m_bLoadingBusy || m_nChapter < 0 ||
+        if (mobileMode() || !canReadBook() || m_bLoadingBusy || m_nChapter < 0 ||
             m_nChapter >= m_vFlat.size() || m_oBook.m_nId <= 0 || m_pPages->currentIndex() != 3)
         {
             return;
@@ -266,7 +266,7 @@ namespace Wenku8::Reader
         pUndoTimer->setSingleShot(true);
         auto fnCurrentPage = [this, pPage, nBook]
         {
-            return m_bUnlocked && !m_bLoadingBusy && !m_bRestoring && !mobileMode() &&
+            return canReadBook() && !m_bLoadingBusy && !m_bRestoring && !mobileMode() &&
                    m_pPages->currentIndex() == 3 && m_oBook.m_nId == nBook && m_pReaderDock &&
                    pPage->isVisible() && m_pReaderDock->isVisible() && m_pReaderDock->widget() &&
                    m_pReaderDock->widget()->isAncestorOf(pPage);

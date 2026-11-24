@@ -62,13 +62,27 @@ namespace Wenku8::Reader
         QGuiApplication::inputMethod()->hide();
         auto pOld = m_pPages->currentWidget();
         int nTarget = m_vMobileHistory.takeLast();
+        if (nTarget <= 1 && !m_bAuthenticated && m_nSection < 2)
+        {
+            nTarget = 0;
+        }
         if (nTarget == 3)
             m_bRestoring = true;
         m_pPages->returnTo(nTarget);
         m_pPages->removeWidget(pOld);
         pOld->deleteLater();
         adaptLayout();
-        if (nTarget == 3)
+        if (nTarget == 0 && m_bAuthenticated)
+        {
+            QTimer::singleShot(0, this, [this]
+            {
+                if (m_pPages->currentIndex() == 0 && m_bAuthenticated && !m_bLoadingBusy)
+                {
+                    enterLibrarySection();
+                }
+            });
+        }
+        else if (nTarget == 3)
         {
             const auto nGeneration = ++m_nRestoreGeneration;
             QTimer::singleShot(0, this,
@@ -93,33 +107,38 @@ namespace Wenku8::Reader
             popMobilePage();
         m_pPages->setMotionEnabled(mobileMode());
     }
-    void ClientWindow::showMobileAccount(bool bTab)
+    void ClientWindow::showAccountPage()
     {
-        if (bTab)
+        if (m_bLoadingBusy || m_pPages->currentWidget()->objectName() == "mobileAccountPage")
         {
-            clearMobilePages();
-            if (m_pPages->currentIndex() != 1)
-                navigate(m_nSection);
+            return;
         }
+        clearMobilePages();
         QVBoxLayout* pLayout;
         auto pPage = scrollPage(pLayout);
         pPage->setObjectName("mobileAccountPage");
-        pPage->setProperty("rootTab", bTab);
+        pPage->setProperty("rootTab", true);
+        auto* pHeader = new QWidget;
+        pHeader->setObjectName("desktopAccountHeader");
+        auto* pHeaderRow = new QHBoxLayout(pHeader);
+        pHeaderRow->setContentsMargins(0, 0, 0, 0);
+        pHeaderRow->addWidget(paragraph("我的", "bookTitle"), 1);
+        auto* pBack = action("返回", "desktopAccountBack", Icon::Left);
+        connect(pBack, &QPushButton::clicked, this, &ClientWindow::goBack);
+        pHeaderRow->addWidget(pBack);
+        pHeader->setVisible(!mobileMode());
+        pLayout->addWidget(pHeader);
 
         auto* pAccountGroup = settingsGroup(pLayout, "文库账号");
-        auto* pAccountName = paragraph(m_pAccount->text(), "controlLabel");
+        auto* pAccountName = paragraph({}, "controlLabel");
         pAccountName->setObjectName("mobileProfileName");
         pAccountGroup->addWidget(pAccountName);
-        auto* pAccount = action(m_pLogin->text(), "mobileSignIn", Icon::SignIn);
+        auto* pAccount = action("登录文库", "mobileSignIn", Icon::SignIn);
         addGroupAction(pAccountGroup, pAccount);
-        connect(pAccount, &QPushButton::clicked, this,
-                [this]
-                {
-                    clearMobilePages();
-                    m_pLogin->click();
-                });
+        connect(pAccount, &QPushButton::clicked, this, &ClientWindow::signInFromAccount);
 
         auto* pReadingGroup = settingsGroup(pLayout, "阅读与存储");
+        pReadingGroup->addWidget(createContinueReadingToggle());
         auto pAppearance = action("外观", "openAppearance", Icon::Sun);
         addGroupAction(pReadingGroup, pAppearance);
         connect(pAppearance, &QPushButton::clicked, this,
@@ -170,6 +189,7 @@ namespace Wenku8::Reader
                 });
         pLayout->addStretch();
         pushMobilePage(pPage, "我的");
+        updateAccountControls();
     }
     void ClientWindow::showMobileAppearance()
     {
@@ -376,13 +396,13 @@ namespace Wenku8::Reader
         auto* pAdd = action("添加当前位置", "mobileBookmarkAddCurrent", Icon::Bookmark);
         pAdd->setProperty("mobileRow", false);
         pAdd->setProperty("controlAction", true);
-        pAdd->setEnabled(m_bUnlocked && !m_bLoadingBusy && m_nChapter >= 0 &&
+        pAdd->setEnabled(canReadBook() && !m_bLoadingBusy && m_nChapter >= 0 &&
                          m_nChapter < m_vFlat.size());
         pLayout->addWidget(pAdd);
         connect(pAdd, &QPushButton::clicked, pPage,
                 [this]
                 {
-                    if (!m_bUnlocked || m_bLoadingBusy || m_nChapter < 0 ||
+                    if (!canReadBook() || m_bLoadingBusy || m_nChapter < 0 ||
                         m_nChapter >= m_vFlat.size())
                     {
                         return;

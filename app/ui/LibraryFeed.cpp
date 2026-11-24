@@ -37,8 +37,8 @@ namespace Wenku8::Reader
 
     bool ClientWindow::isDiscoveryFeed() const
     {
-        return m_bUnlocked && m_nSection == 1 && m_strActiveSearch.isEmpty() &&
-               m_pStartupPages->currentIndex() == 1 && m_pPages->currentIndex() == 1;
+        return m_bAuthenticated && m_nSection == 1 && m_strActiveSearch.isEmpty() &&
+               m_pPages->currentIndex() == 1;
     }
 
     void ClientWindow::resetDiscoveryFeed()
@@ -90,7 +90,7 @@ namespace Wenku8::Reader
     void ClientWindow::receiveLibraryNovels(int nDiscoveryPage, int nDiscoveryLastPage, bool bStale)
     {
 #ifdef WENKU8_CLIENT_ONLINE
-        if (!m_bUnlocked || m_pPages->currentIndex() != 1)
+        if (!m_bAuthenticated || m_pPages->currentIndex() != 1)
         {
             return;
         }
@@ -147,10 +147,6 @@ namespace Wenku8::Reader
 
     void ClientWindow::populate(const std::vector<Novel>& vNovels)
     {
-        if (!m_bUnlocked)
-        {
-            return;
-        }
         m_pCards->clear();
         appendLibraryBooks(vNovels);
         updateLibraryCount();
@@ -236,7 +232,7 @@ namespace Wenku8::Reader
         const int nCount = m_pCards->count();
         if (nCount == 0)
         {
-            const QStringList vEmptyStates{"书架还没有小说，试试搜索或发现页。", "暂时没有小说。",
+            const QStringList vEmptyStates{"书架还没有小说，试试搜索或最近更新。", "暂时没有小说。",
                                            "还没有缓存小说。", "还没有阅读记录。"};
             m_pCount->setText(m_strActiveSearch.isEmpty() ? vEmptyStates.value(m_nSection)
                                                           : QString("没有找到匹配的小说。"));

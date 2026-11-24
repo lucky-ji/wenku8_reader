@@ -74,7 +74,7 @@ namespace Wenku8::Reader
                         m_pReader->clearSpeechRange();
                         return;
                     }
-                    if (!m_bUnlocked || m_pReadAloud->bookId() != m_oBook.m_nId || m_nChapter < 0 ||
+                    if (!canReadBook() || m_pReadAloud->bookId() != m_oBook.m_nId || m_nChapter < 0 ||
                         m_nChapter >= m_vFlat.size() ||
                         m_pReadAloud->chapterId() != m_vFlat[m_nChapter].m_nId)
                     {
@@ -123,7 +123,7 @@ namespace Wenku8::Reader
         connect(pEngine, &SpeechEngine::playbackAction, this,
                 [this](const QString& strAction)
                 {
-                    if (!speechPageActive() || !m_bUnlocked || m_bLoadingBusy ||
+                    if (!speechPageActive() || !canReadBook() || m_bLoadingBusy ||
                         QGuiApplication::applicationState() != Qt::ApplicationActive)
                     {
                         return;
@@ -238,7 +238,7 @@ namespace Wenku8::Reader
 
     void ClientWindow::showReadAloud()
     {
-        if (!m_bUnlocked || m_bLoadingBusy || m_bRestoring || !m_pReadAloud || m_nChapter < 0 ||
+        if (!canReadBook() || m_bLoadingBusy || m_bRestoring || !m_pReadAloud || m_nChapter < 0 ||
             m_nChapter >= m_vFlat.size())
         {
             return;
@@ -264,7 +264,7 @@ namespace Wenku8::Reader
         connect(pPanel, &ReadAloudPanel::seekReadingPosition, this,
                 [this, pPanel]
                 {
-                    if (!m_bUnlocked || m_bLoadingBusy || !pPanel->isVisible() ||
+                    if (!canReadBook() || m_bLoadingBusy || !pPanel->isVisible() ||
                         !speechPageActive())
                     {
                         return;
@@ -293,7 +293,7 @@ namespace Wenku8::Reader
 
     void ClientWindow::requestSpeechChapter(int nDirection)
     {
-        if (!m_bUnlocked || m_bLoadingBusy || !speechPageActive() ||
+        if (!canReadBook() || m_bLoadingBusy || !speechPageActive() ||
             QGuiApplication::applicationState() != Qt::ApplicationActive ||
             m_pReadAloud->bookId() != m_oBook.m_nId)
         {
@@ -323,7 +323,7 @@ namespace Wenku8::Reader
 
     void ClientWindow::saveSpeechPosition()
     {
-        if (!m_pReadAloud || !m_pReadAloud->follow() || !m_bUnlocked || m_bRestoring ||
+        if (!m_pReadAloud || !m_pReadAloud->follow() || !canReadBook() || m_bRestoring ||
             (m_pReadAloud->state() != ReadAloudController::State::Playing &&
              m_pReadAloud->state() != ReadAloudController::State::WaitingChapter) ||
             m_nChapter < 0 || m_nChapter >= m_vFlat.size() ||

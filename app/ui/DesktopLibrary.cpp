@@ -17,6 +17,11 @@ namespace Wenku8::Reader
     void ClientWindow::buildDesktopLibrary(QHBoxLayout* pBar)
     {
         m_bDesktopShelfList = m_oSettings.value("desktopLibraryList", false).toBool();
+        if (!m_oSettings.contains("desktopRecentUpdatesList"))
+        {
+            m_oSettings.setValue("desktopRecentUpdatesList", m_bDesktopShelfList);
+        }
+        m_bDesktopRecentUpdatesList = m_oSettings.value("desktopRecentUpdatesList").toBool();
         m_pDesktopClearSearch = new QPushButton("退出搜索");
         m_pDesktopClearSearch->setObjectName("desktopClearSearch");
         m_pDesktopClearSearch->setProperty("textAction", true);
@@ -56,10 +61,15 @@ namespace Wenku8::Reader
             pLayout->addWidget(pChoice);
             connect(pChoice, &QPushButton::clicked, this, [this, bList]
             {
-                if (m_bDesktopShelfList != bList)
+                const bool bRecentUpdates = m_nSection == 1 && m_strActiveSearch.isEmpty();
+                auto& bListPreference = bRecentUpdates ? m_bDesktopRecentUpdatesList
+                                                      : m_bDesktopShelfList;
+                if (bListPreference != bList)
                 {
-                    m_bDesktopShelfList = bList;
-                    m_oSettings.setValue("desktopLibraryList", bList);
+                    bListPreference = bList;
+                    m_oSettings.setValue(bRecentUpdates ? "desktopRecentUpdatesList"
+                                                        : "desktopLibraryList",
+                                         bList);
                     updateDesktopLibraryLayout();
                 }
             });
@@ -70,7 +80,7 @@ namespace Wenku8::Reader
         auto* pFocusSearch = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_K), this);
         connect(pFocusSearch, &QShortcut::activated, this, [this]
         {
-            if (desktopLibraryActive())
+            if (m_bAuthenticated && desktopLibraryActive())
             {
                 m_pSearch->setFocus(Qt::ShortcutFocusReason);
                 m_pSearch->selectAll();
@@ -98,8 +108,8 @@ namespace Wenku8::Reader
 
     bool ClientWindow::desktopLibraryActive() const
     {
-        return !mobileMode() && m_bUnlocked && !m_bLoadingBusy && !m_bReaderFullscreen &&
-            m_pPages->currentIndex() == 1 && m_pStartupPages->currentIndex() == 1;
+        return !mobileMode() && !m_bLoadingBusy && !m_bReaderFullscreen &&
+               m_pPages->currentIndex() == 1;
     }
 
     bool ClientWindow::handleDesktopLibraryKey(QObject* pWatched, QKeyEvent* pEvent)
@@ -164,16 +174,19 @@ namespace Wenku8::Reader
     void ClientWindow::updateDesktopLibraryLayout()
     {
         const bool bDesktop = !mobileMode();
-        const bool bLibrary = bDesktop && m_bUnlocked && m_pPages->currentIndex() == 1 &&
-            !m_bReaderFullscreen;
-        m_pDesktopShelfView->setVisible(bLibrary);
+        const bool bLibrary = bDesktop && m_pPages->currentIndex() == 1 && !m_bReaderFullscreen;
+        const bool bRecentUpdates = m_nSection == 1 && m_strActiveSearch.isEmpty();
+        const bool bList = bRecentUpdates ? m_bDesktopRecentUpdatesList : m_bDesktopShelfList;
+        m_pDesktopGrid->setChecked(!bList);
+        m_pDesktopList->setChecked(bList);
+        m_pDesktopShelfView->setVisible(bLibrary && (m_nSection >= 2 || m_bAuthenticated));
         m_pDesktopClearSearch->setVisible(bLibrary && !m_strActiveSearch.isEmpty());
         for (auto* pShortcut : m_vDesktopLibraryShortcuts)
         {
             pShortcut->setEnabled(desktopLibraryActive());
         }
 
-        const bool bCompactCards = bDesktop && m_bDesktopShelfList;
+        const bool bCompactCards = bDesktop && bList;
         if (m_pCards->property("desktopCompactCards").toBool() != bCompactCards)
         {
             auto* pAnchor = m_pCards->itemAt(7, 7);

@@ -11,6 +11,7 @@
 #include <QSet>
 #include <limits>
 #include <mutex>
+#include <optional>
 #include <QTimer>
 #include <QFutureWatcher>
 #include <QtConcurrent/QtConcurrentRun>
@@ -241,9 +242,8 @@ namespace Wenku8::Reader
         QFutureWatcher<Result> m_oWatcher;
         QFutureWatcher<ImageResult> m_oImageWatcher;
         QCache<QString, CachedRead> m_vReads{32 * 1024}; // KiB, verified-account memory only.
-        QString m_strCurrentKey, m_strPendingKey, m_strDataKey, m_strImagePendingKey;
+        QString m_strCurrentKey, m_strDataKey, m_strImagePendingKey;
         Result m_oImagePending;
-        bool m_bCurrentFresh = false, m_bPendingFresh = false;
         Job m_fnFailedJob;
         Kind m_eFailedKind = Kind::Novels;
         QString m_strFailedKey;
@@ -252,9 +252,10 @@ namespace Wenku8::Reader
             std::make_shared<std::atomic_bool>(false);
         QString m_strOrigin, m_strDirectory, m_strUser;
         bool m_bRestoringSession = false, m_bAuthenticated = false, m_bActive = false,
-             m_bShuttingDown = false, m_bOpenAfterTask = false, m_bResumed = false;
-        Kind m_eKind = Kind::Login, m_ePendingKind = Kind::Novels;
-        Job m_fnCurrent, m_fnPending;
+             m_bShuttingDown = false;
+        std::optional<bool> m_oPendingSignIn;
+        Kind m_eKind = Kind::Login;
+        Job m_fnCurrent;
         quint64 m_nRequestGeneration = 0;
         std::shared_ptr<ShelfSessionSlot> m_pShelfSession = std::make_shared<ShelfSessionSlot>();
         Result m_oData;
@@ -265,14 +266,6 @@ namespace Wenku8::Reader
               m_strOrigin(std::move(strSite)), m_strDirectory(std::move(strStore))
         {
             m_pDownloads = std::make_unique<DownloadManager>(m_strDirectory, m_strOrigin);
-            QObject::connect(m_pQ, &OnlineSession::authenticationChanged, m_pDownloads.get(),
-                [this](bool bAuthenticated)
-                {
-                    if (!bAuthenticated)
-                    {
-                        m_pDownloads->suspend();
-                    }
-                });
             QObject::connect(m_pHost.get(), &LoginHost::checkRequested, m_pQ,
                              [this]
                              {
@@ -282,14 +275,19 @@ namespace Wenku8::Reader
                 m_pHost.get(), &LoginHost::unavailable, m_pQ,
                 [this]
                 {
-                    setRestoring(false);
-                    m_bAuthenticated = false;
+                    if (m_bShuttingDown)
+                    {
+                        return;
+                    }
+                    const bool bBackground = m_bRestoringSession;
                     m_pCancelled->store(true);
-                    m_oProbeTimer.stop();
-                    clearReads();
-                    emit m_pQ->authenticationChanged(false);
-                    emit m_pQ->statusChanged(
-                        "系统网页组件不可用，请更新 Android System WebView 并重启客户端。");
+                    stopProbe();
+                    invalidateAuthentication();
+                    if (!bBackground)
+                    {
+                        emit m_pQ->statusChanged(
+                            "系统网页组件不可用，请更新 Android System WebView 并重启客户端。");
+                    }
                 });
             m_oRestoreDeadline.setSingleShot(true);
             m_oRestoreDeadline.setInterval(45000);
@@ -299,10 +297,7 @@ namespace Wenku8::Reader
                                  if (!m_bRestoringSession)
                                      return;
                                  m_pCancelled->store(true);
-                                 setRestoring(false);
-                                 m_oProbeTimer.stop();
-                                 emit m_pQ->statusChanged(
-                                     "登录状态检查超时，请检查网络后点击登录文库重试。");
+                                 stopProbe();
                              });
             m_oProbeTimer.setInterval(2500);
             QObject::connect(&m_oProbeTimer, &QTimer::timeout, m_pQ,
@@ -323,12 +318,15 @@ namespace Wenku8::Reader
             QObject::connect(m_pHost.get(), &LoginHost::cancelled, m_pQ,
                              [this]
                              {
-                                 setRestoring(false);
-                                 m_oProbeTimer.stop();
+                                 if (m_bShuttingDown)
+                                 {
+                                     return;
+                                 }
+                                 stopProbe();
                                  if (!m_bAuthenticated)
                                  {
                                      m_pCancelled->store(true);
-                                     emit m_pQ->statusChanged("尚未登录，点击「登录文库」继续。");
+                                     emit m_pQ->statusChanged("尚未登录，请在「我的」中登录。");
                                  }
                              });
             QObject::connect(&m_oWatcher, &QFutureWatcher<Result>::finished, m_pQ,
@@ -369,6 +367,7 @@ namespace Wenku8::Reader
         {
             m_bShuttingDown = true;
             m_oProbeTimer.stop();
+            m_oRestoreDeadline.stop();
             m_pCancelled->store(true);
             m_pImageCancelled->store(true);
             m_pDownloads->suspend();
@@ -513,26 +512,46 @@ namespace Wenku8::Reader
                 m_oRestoreDeadline.stop();
             emit m_pQ->restorationChanged(bValue);
         }
+        void stopProbe()
+        {
+            m_oProbeTimer.stop();
+            setRestoring(false);
+        }
+        void invalidateAuthentication()
+        {
+            const bool bWasAuthenticated = m_bAuthenticated;
+            m_bAuthenticated = false;
+            m_strUser.clear();
+            m_fnCurrent = {};
+            if (bWasAuthenticated)
+            {
+                m_pDownloads->suspend();
+            }
+            clearReads();
+            if (bWasAuthenticated)
+            {
+                emit m_pQ->authenticationChanged(false);
+            }
+        }
         void showLogin(bool bReset = false)
         {
-            m_pDownloads->suspend();
+            stopProbe();
             if (m_bActive)
             {
-                m_bOpenAfterTask = true;
+                if (m_bAuthenticated)
+                {
+                    m_pDownloads->suspend();
+                }
+                m_oPendingSignIn = bReset;
                 m_pCancelled->store(true);
                 return;
             }
-            clearReads();
-            m_bAuthenticated = false;
-            m_strUser.clear();
-            emit m_pQ->authenticationChanged(false);
-
-            setRestoring(false);
+            invalidateAuthentication();
             m_pHost->setHint(m_pHost->persistent() ? "此设备会记住登录会话；密码不会保存在客户端。"
                                                    : "当前为临时会话；密码不会保存在客户端。若其他"
                                                      "窗口占用登录状态，请先关闭旧窗口。");
-            m_pHost->show(bReset);
             m_oProbeTimer.start();
+            m_pHost->show(bReset);
         }
         void probe()
         {
@@ -552,18 +571,10 @@ namespace Wenku8::Reader
                     return oR;
                 });
         }
-        void run(Kind eType, Job fnJob, bool bReplay = false, QString strKey = {},
-                 bool bFresh = false)
+        void run(Kind eType, Job fnJob, QString strKey = {}, bool bFresh = false)
         {
-            if (m_bActive || m_bShuttingDown)
-                return;
-            if (eType != Kind::Login && !m_bAuthenticated)
+            if (m_bActive || m_bShuttingDown || (eType != Kind::Login && !m_bAuthenticated))
             {
-                m_ePendingKind = eType;
-                m_fnPending = std::move(fnJob);
-                m_strPendingKey = strKey;
-                m_bPendingFresh = bFresh;
-                showLogin();
                 return;
             }
             m_bActive = true;
@@ -571,8 +582,6 @@ namespace Wenku8::Reader
             m_eKind = eType;
             m_fnCurrent = fnJob;
             m_strCurrentKey = strKey;
-            m_bCurrentFresh = bFresh;
-            m_bResumed = bReplay;
             m_pCancelled->store(false);
             if (eType != Kind::Login)
                 clearRetry();
@@ -671,10 +680,11 @@ namespace Wenku8::Reader
             }
             m_bActive = false;
             const bool bBusiness = m_eKind != Kind::Login;
-            if (m_bOpenAfterTask)
+            if (m_oPendingSignIn)
             {
-                m_bOpenAfterTask = false;
-                showLogin(true);
+                const bool bReset = *m_oPendingSignIn;
+                m_oPendingSignIn.reset();
+                showLogin(bReset);
                 if (bBusiness)
                     emit m_pQ->busyChanged(false);
                 return;
@@ -688,13 +698,7 @@ namespace Wenku8::Reader
                 {
                     if (m_bRestoringSession)
                     {
-                        setRestoring(false);
-                        m_oProbeTimer.stop();
-                        if (oResult.m_bNeedsLogin)
-                            showLogin();
-                        else
-                            emit m_pQ->statusChanged(
-                                "网络访问失败，请稍后重试。");
+                        stopProbe();
                     }
                     else
                         m_pHost->setHint(oResult.m_strLoginHint.isEmpty()
@@ -715,19 +719,22 @@ namespace Wenku8::Reader
                 m_pDownloads->setSession(oDownloadOptions,
                     std::make_shared<BrowserOwnedSession>(m_pHost->downloadTransport()), m_strUser);
                 m_oProbeTimer.stop();
-                // Publish the verified account and unlock the Qt shell before the
-                // native login overlay returns input to it on Android's UI thread.
+                // Publish the verified account before Android returns input from
+                // an interactive login overlay to the Qt window.
                 emit m_pQ->authenticationChanged(true);
                 setRestoring(false);
                 if (m_pHost->visible())
                     m_pHost->accept();
                 emit m_pQ->statusChanged("已登录，欢迎回来。");
-                if (m_fnPending)
-                {
-                    auto fnJob = std::move(m_fnPending);
-                    m_fnPending = {};
-                    run(m_ePendingKind, std::move(fnJob), true, m_strPendingKey, m_bPendingFresh);
-                }
+                return;
+            }
+            if (oResult.m_bNeedsLogin)
+            {
+                // The guest shell owns the next navigation. Never replay a request under
+                // credentials chosen during a subsequent interactive sign-in.
+                invalidateAuthentication();
+                emit m_pQ->statusChanged(oResult.m_strText);
+                emit m_pQ->busyChanged(false);
                 return;
             }
             if (!oResult.m_bSuccess && readOnly(m_eKind) && !oResult.m_bCancelled)
@@ -752,24 +759,6 @@ namespace Wenku8::Reader
             if (!oResult.m_bSuccess)
             {
                 emit m_pQ->statusChanged(oResult.m_strText);
-                if (oResult.m_bNeedsLogin)
-                {
-                    clearReads();
-                    m_bAuthenticated = false;
-                    emit m_pQ->authenticationChanged(false);
-                    if (!m_bResumed)
-                    {
-                        // Reauthentication refreshes the shelf. Only resume an explicit book read.
-                        if (m_eKind == Kind::Book || m_eKind == Kind::Chapter)
-                        {
-                            m_fnPending = m_fnCurrent;
-                            m_ePendingKind = m_eKind;
-                            m_strPendingKey = m_strCurrentKey;
-                            m_bPendingFresh = m_bCurrentFresh;
-                        }
-                        showLogin();
-                    }
-                }
                 if (bBusiness)
                     emit m_pQ->busyChanged(false);
                 return;
@@ -829,9 +818,13 @@ namespace Wenku8::Reader
     {
         return m_pImpl->m_bAuthenticated;
     }
+    bool OnlineSession::restoringSession() const
+    {
+        return m_pImpl->m_bRestoringSession;
+    }
     bool OnlineSession::busy() const
     {
-        return m_pImpl->m_bActive;
+        return m_pImpl->m_bActive && m_pImpl->m_eKind != Kind::Login;
     }
     bool OnlineSession::loginVisible() const
     {
@@ -871,14 +864,26 @@ namespace Wenku8::Reader
     }
     void OnlineSession::restoreSession()
     {
-        if (m_pImpl->m_bActive || m_pImpl->m_bAuthenticated)
+        if (m_pImpl->m_bActive || m_pImpl->m_bAuthenticated || restoringSession() ||
+            m_pImpl->m_pHost->visible() || !persistent())
+        {
             return;
+        }
         m_pImpl->setRestoring(true);
         m_pImpl->m_pCancelled->store(false);
-        emit statusChanged("正在检查本机登录状态…");
-        m_pImpl->m_pHost->openLogin();
+        try
+        {
+            m_pImpl->m_pHost->openLogin();
+        }
+        catch (const std::exception&)
+        {
+            m_pImpl->stopProbe();
+            return;
+        }
         if (m_pImpl->m_bRestoringSession)
+        {
             m_pImpl->m_oProbeTimer.start();
+        }
     }
     void OnlineSession::setTheme(Theme eTheme)
     {
@@ -888,6 +893,10 @@ namespace Wenku8::Reader
     {
         m_pImpl->m_pCancelled->store(true);
         m_pImpl->m_pImageCancelled->store(true);
+        if (restoringSession())
+        {
+            m_pImpl->stopProbe();
+        }
         m_pImpl->clearRetry();
     }
     bool OnlineSession::hasRetryableRequest() const
@@ -901,8 +910,7 @@ namespace Wenku8::Reader
         auto fnJob = m_pImpl->m_fnFailedJob;
         const auto eKind = m_pImpl->m_eFailedKind;
         const auto strKey = m_pImpl->m_strFailedKey;
-        m_pImpl->run(eKind, std::move(fnJob), false, strKey,
-                     false); // Explicit retry always goes to the network.
+        m_pImpl->run(eKind, std::move(fnJob), strKey); // Explicit retry goes to the network.
     }
     void OnlineSession::shelf(bool bForce)
     {
@@ -918,7 +926,7 @@ namespace Wenku8::Reader
                 oR.m_strText = QString("书架已更新 · %1 本小说").arg(oR.m_vNovels.size());
                 return oR;
             },
-            false, "shelf", !bForce);
+            "shelf", !bForce);
     }
     void OnlineSession::latest(int nPage, bool bForce)
     {
@@ -935,7 +943,7 @@ namespace Wenku8::Reader
                 oR.m_bSuccess = true;
                 return oR;
             },
-            false, QString("latest:%1").arg(nPage), !bForce);
+            QString("latest:%1").arg(nPage), !bForce);
     }
     void OnlineSession::search(const QString& strQuery, bool bForce)
     {
@@ -953,7 +961,7 @@ namespace Wenku8::Reader
                 oR.m_bSuccess = true;
                 return oR;
             },
-            false, "search:" + strQuery, !bForce);
+            "search:" + strQuery, !bForce);
     }
     void OnlineSession::openBook(int nId, bool bForce)
     {
@@ -968,7 +976,7 @@ namespace Wenku8::Reader
                 oR.m_bSuccess = true;
                 return oR;
             },
-            false, QString("book:%1").arg(nId), !bForce);
+            QString("book:%1").arg(nId), !bForce);
     }
     void OnlineSession::openChapter(int nNovel, int nChapter, bool bForce)
     {
@@ -986,7 +994,7 @@ namespace Wenku8::Reader
                 oR.m_bSuccess = true;
                 return oR;
             },
-            false, QString("chapter:%1:%2").arg(nNovel).arg(nChapter), !bForce);
+            QString("chapter:%1:%2").arg(nNovel).arg(nChapter), !bForce);
     }
     DownloadManager* OnlineSession::downloads() const
     {

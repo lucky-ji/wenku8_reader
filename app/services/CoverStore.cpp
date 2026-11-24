@@ -115,9 +115,10 @@ namespace Wenku8::Reader
                (bDownloaded ||
                 m_vFailed.value(nId, 0) <= QDateTime::currentMSecsSinceEpoch() - 60000);
     }
-    void CoverStore::request(int nId, const QByteArray& baDownloaded)
+    void CoverStore::request(int nId, const QByteArray& baDownloaded, bool bAllowNetwork)
     {
-        if (!canRequest(nId, !baDownloaded.isEmpty()))
+        if (!canRequest(nId, !baDownloaded.isEmpty()) ||
+            (!bAllowNetwork && baDownloaded.isEmpty() && m_vMissing.contains(nId)))
             return;
         if (m_vFailed.contains(nId))
         {
@@ -133,7 +134,7 @@ namespace Wenku8::Reader
         auto strDirectory = m_strDirectory;
         auto strOrigin = m_strOrigin;
         m_oPool.start(QRunnable::create(
-            [this, nId, baDownloaded, pFlag, nGeneration, strDirectory, strOrigin]
+            [this, nId, baDownloaded, bAllowNetwork, pFlag, nGeneration, strDirectory, strOrigin]
             {
                 QImage oImage;
                 bool bMissing = false;
@@ -153,7 +154,7 @@ namespace Wenku8::Reader
                     if (oLocal.width() >= 360)
                         oImage = oLocal;
                 }
-                if (oImage.isNull() && !pFlag->load())
+                if (bAllowNetwork && oImage.isNull() && !pFlag->load())
                 {
                     try
                     {
@@ -230,7 +231,7 @@ namespace Wenku8::Reader
                                             : oImage;
                 QMetaObject::invokeMethod(
                     this,
-                    [this, nId, oImage, oThumbnail, bMissing, nGeneration]
+                    [this, nId, oImage, oThumbnail, bMissing, bAllowNetwork, nGeneration]
                     {
                         if (nGeneration != m_nGeneration)
                             return;
@@ -244,6 +245,11 @@ namespace Wenku8::Reader
                                 int(qMax<qsizetype>(1, oThumbnail.sizeInBytes() / 1024)));
                             m_vFailed.remove(nId);
                             m_vMissing.remove(nId);
+                            m_vRounds.remove(nId);
+                        }
+                        else if (!bAllowNetwork)
+                        {
+                            m_vMissing.insert(nId);
                             m_vRounds.remove(nId);
                         }
                         else
