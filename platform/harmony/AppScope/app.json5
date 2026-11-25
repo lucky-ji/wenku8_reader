@@ -1,0 +1,10 @@
+{
+  "app": {
+    "bundleName": "io.github.lucky_ji.wenku8_reader",
+    "vendor": "lucky_ji",
+    "versionCode": 12,
+    "versionName": "1.0.7",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name"
+  }
+}

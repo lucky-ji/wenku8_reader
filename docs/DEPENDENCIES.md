@@ -26,7 +26,7 @@ Qt、VS、NDK 等开发环境不包含在主仓库中。编译客户端先安装
 | --- | --- | --- |
 | Qt | 5.15.2；官方 Windows、Android、macOS Intel 与 Linux x86_64 kit | [完整源码 tar.xz](https://download.qt.io/archive/qt/5.15/5.15.2/single/qt-everywhere-src-5.15.2.tar.xz)，包含 WebEngine/Chromium 和各模块原始声明 |
 | Qt Speech | 5.15.2；桌面 `TextToSpeech` 库与 `texttospeech` 平台插件 | 包含在上项完整 Qt 源码的 `qtspeech/`，GPL-2.0 许可选项；Android 不链接该模块 |
-| Mbed TLS | 3.6.5；Android 网络依赖 | [完整发布源码 tar.bz2](https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.5/mbedtls-3.6.5.tar.bz2)，需包含 framework 等发布子目录 |
+| Mbed TLS | 3.6.5，Android 与鸿蒙网络依赖 | [完整发布源码 tar.bz2](https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.5/mbedtls-3.6.5.tar.bz2)，需包含 framework 等发布子目录 |
 | GNU libiconv | 1.17；Android 编码转换 | [原始 tar.gz](https://ftp.gnu.org/gnu/libiconv/libiconv-1.17.tar.gz) |
 | OpenSSL | 1.1.1t；部分 Windows Qt 组件依赖 | [官方历史源码](https://www.openssl.org/source/old/1.1.1/openssl-1.1.1t.tar.gz) · [对应 GitHub 发布](https://github.com/openssl/openssl/releases/tag/OpenSSL_1_1_1t) |
 | zlib | 1.2.13；部分 Qt 组件依赖 | [原始 tar.gz](https://zlib.net/fossils/zlib-1.2.13.tar.gz) |

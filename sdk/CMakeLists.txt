@@ -85,7 +85,11 @@ target_link_libraries(Wenku8Sdk PRIVATE
     ${strSdkXmlTarget}
 )
 
-if(NOT WIN32)
+if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+    find_library(strHarmonyIcu icu REQUIRED)
+    target_compile_definitions(Wenku8Sdk PRIVATE WENKU8_HARMONY_ICU)
+    target_link_libraries(Wenku8Sdk PRIVATE "${strHarmonyIcu}")
+elseif(NOT WIN32)
     find_package(Iconv REQUIRED)
     target_link_libraries(Wenku8Sdk PRIVATE Iconv::Iconv)
 endif()

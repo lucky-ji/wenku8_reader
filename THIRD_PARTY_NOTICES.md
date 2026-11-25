@@ -13,7 +13,7 @@
 | [Qt Speech](https://code.qt.io/cgit/qt/qtspeech.git/tree/?h=v5.15.2) | 桌面系统文字转语音适配及平台插件；Android 使用自有 JNI 适配，不链接该模块 | 模块源码提供 GPL-2.0-or-later 选项，本项目选择 GPL-2.0；[未经修改的 LICENSE.GPLv2](licenses/Qt-Speech-5.15.2-GPL-2.0.txt) |
 | [Qt WebEngine / Chromium](https://doc.qt.io/archives/qt-5.15/qtwebengine-licensing.html) | 桌面登录与会话；包括 WebChannel 等传递依赖 | Qt 模块许可及 Chromium 多种第三方许可证；[保留声明](licenses/Qt-5.15.2-Chromium.txt)，完整组件归属随实际 Qt 源码和发行包提供 |
 | [GNU libiconv / libcharset](https://www.gnu.org/software/libiconv/) | 1.17；Android 编码转换 | LGPL-2.1-or-later；[完整文本](licenses/libiconv-1.17.txt) |
-| [Mbed TLS](https://github.com/Mbed-TLS/mbedtls/tree/mbedtls-3.6.5) | 3.6.5；Android 原生网络依赖 | 采用 GPL-2.0-or-later 许可选项；[完整文本](licenses/mbedtls-3.6.5.txt)，内置第三方声明以原源码为准 |
+| [Mbed TLS](https://github.com/Mbed-TLS/mbedtls/tree/mbedtls-3.6.5) | 3.6.5，Android 与鸿蒙原生网络依赖 | 采用 GPL-2.0-or-later 许可选项；[完整文本](licenses/mbedtls-3.6.5.txt)，内置第三方声明以原源码为准 |
 | [LLVM libc++ filesystem](https://github.com/llvm/llvm-project/tree/llvmorg-9.0.1/libcxx) | 9.0.1；补足 NDK r21 的 filesystem 实现 | Apache-2.0 WITH LLVM-exception，含 GPL 兼容例外；[完整文本](third_party/libcxx-filesystem/LICENSE.TXT) |
 | [OpenSSL](https://www.openssl.org/) | 1.1.1t；部分桌面 Qt 运行组件依赖 | OpenSSL / SSLeay 双许可证；[完整文本](licenses/OpenSSL-1.1.1t.txt) |
 | [zlib](https://zlib.net/) | 1.2.13；部分 Qt 运行组件依赖 | zlib license；[完整文本](licenses/zlib-1.2.13.txt) |
@@ -24,6 +24,8 @@ Windows 默认 SDK cURL 使用系统 Schannel，不为此链接 OpenSSL。Androi
 听书通过 Windows SAPI、macOS 系统语音、Linux Speech Dispatcher 或 Android TextToSpeech 调用用户设备上的语音引擎与音色。本项目不分发这些系统语音数据，也不附带云端语音 SDK、API 密钥或自建语音服务。系统音色可能需要联网；应用默认不允许联网音色合成，用户明确允许后由所选系统引擎按其服务规则处理文字。语音引擎与音色的许可和隐私规则由对应提供方维护。
 
 原生桌面构建补充：Linux x86_64 与 macOS Intel 使用官方 Qt 5.15.2，macOS SDK cURL 使用系统 SecureTransport；Linux SDK cURL 使用发行版 Mbed TLS，采用 GPL-2.0-or-later 许可选项。Ubuntu 24.04 ARM64 使用系统 Qt 5.15.13、Qt WebEngine 5.15.16 及系统 Mbed TLS，不随应用复制这些系统库。Linux 包内的 `BUILD-METADATA.json`、`RUNTIME-DEPENDENCIES.txt` 与对应源码材料记录实际系统包及源码版本，不能将其视为使用了表中全部同版本的私有库。QtMacExtras、QtX11Extras 等实际分发模块的原始源码与声明随桌面对应源码保留。
+
+鸿蒙 HAP 的 SDK 桥接库静态链接 cURL、libxml2、TinyXML-2 和 Mbed TLS，并分发 DevEco 工具链的 `libc++_shared.so`。ArkUI、ArkWeb 和 ICU 由系统提供。依赖原始文本随 HAP 分发。[鸿蒙构建说明](platform/harmony/README.md)
 
 项目的线性 SVG 操作图标为自有资源；不包含外部图标字体。应用图标为本项目生成的视觉资源。小说、封面和插图仅在用户运行时从内容来源获取，不作为源码或安装包素材分发。
 

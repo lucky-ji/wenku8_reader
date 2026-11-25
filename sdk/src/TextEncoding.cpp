@@ -4,6 +4,8 @@
 #ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
+#elif defined(WENKU8_HARMONY_ICU)
+#include <unicode/ucnv.h>
 #else
 #include <iconv.h>
 #include <cerrno>
@@ -53,6 +55,52 @@ namespace Wenku8::Detail
             nReplaced)
             throw Error(ErrorCode::Parse, "Cannot encode text");
         return strResult;
+#elif defined(WENKU8_HARMONY_ICU)
+        // The base musl iconv implementation can decode GBK and Big5, but
+        // cannot reliably encode search keywords into these charsets.
+        auto fnOpen = [](const std::string& strEncoding)
+        {
+            UErrorCode eError = U_ZERO_ERROR;
+            std::unique_ptr<UConverter, decltype(&ucnv_close)> pConverter(
+                ucnv_open(strEncoding.c_str(), &eError), ucnv_close);
+            if (U_FAILURE(eError) || !pConverter)
+            {
+                throw Error(ErrorCode::Unsupported, "Encoding conversion unavailable");
+            }
+            return pConverter;
+        };
+        auto pFrom = fnOpen(strFrom);
+        auto pTo = fnOpen(strTo);
+        UErrorCode eError = U_ZERO_ERROR;
+        // Leave ICU's incoming conversion error intact instead of substituting text.
+        ucnv_setToUCallBack(
+            pFrom.get(), [](const void*, UConverterToUnicodeArgs*, const char*, int32_t,
+                            UConverterCallbackReason, UErrorCode*)
+            {
+            },
+            nullptr, nullptr, nullptr, &eError);
+        ucnv_setFromUCallBack(
+            pTo.get(), [](const void*, UConverterFromUnicodeArgs*, const UChar*, int32_t,
+                          UChar32, UConverterCallbackReason, UErrorCode*)
+            {
+            },
+            nullptr, nullptr, nullptr, &eError);
+        if (strBytes.size() > (std::numeric_limits<std::size_t>::max() - 32) / 4)
+        {
+            throw Error(ErrorCode::ResponseTooLarge, "Text too large");
+        }
+        std::string strOutput(strBytes.size() * 4 + 32, '\0');
+        const char* pInput = strBytes.data();
+        char* pOutput = strOutput.data();
+        ucnv_convertEx(pTo.get(), pFrom.get(), &pOutput, strOutput.data() + strOutput.size(), &pInput,
+                       strBytes.data() + strBytes.size(), nullptr, nullptr, nullptr, nullptr,
+                       true, true, &eError);
+        if (U_FAILURE(eError) || pInput != strBytes.data() + strBytes.size())
+        {
+            throw Error(ErrorCode::Parse, "Invalid or unrepresentable encoded text");
+        }
+        strOutput.resize(static_cast<std::size_t>(pOutput - strOutput.data()));
+        return strOutput;
 #else
         auto pConverter = iconv_open(strTo.c_str(), strFrom.c_str());
         if (pConverter == reinterpret_cast<iconv_t>(-1))
