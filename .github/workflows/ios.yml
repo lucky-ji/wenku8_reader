@@ -44,14 +44,29 @@ jobs:
           strBundle=$(plutil -extract CFBundleIdentifier raw "$strApp/Info.plist")
           strDevice=$(xcrun simctl list devices available --json | python3 -c \
             'import json, sys; print(next(device["udid"] for device in json.load(sys.stdin)["devices"]["com.apple.CoreSimulator.SimRuntime.iOS-18-5"] if device["name"] == "iPhone 16"))')
+          strDiagnostics="$RUNNER_TEMP/ios-smoke"
+          mkdir -p "$strDiagnostics"
           xcrun simctl bootstatus "$strDevice" -b
+          saveDiagnostics()
+          {
+            xcrun simctl spawn "$strDevice" log show --last 3m --style compact --info \
+              --predicate 'process == "wenku8_client" OR eventMessage CONTAINS[c] "io.github.lucky-ji.wenku8-reader"' \
+              > "$strDiagnostics/simulator.log" 2>&1 || true
+          }
+          trap saveDiagnostics EXIT
           xcrun simctl install "$strDevice" "$strApp"
-          strLaunch=$(xcrun simctl launch "$strDevice" "$strBundle")
+          strLaunch=$(SIMCTL_CHILD_QT_LOGGING_RULES='qt.qpa.*=true' xcrun simctl launch \
+            --terminate-running-process --stdout="$strDiagnostics/app-stdout.log" \
+            --stderr="$strDiagnostics/app-stderr.log" "$strDevice" "$strBundle")
           echo "$strLaunch"
           nPid=${strLaunch##*: }
           sleep 15
-          kill -0 "$nPid"
-          xcrun simctl io "$strDevice" screenshot "$RUNNER_TEMP/ios-startup.png"
+          xcrun simctl io "$strDevice" screenshot "$strDiagnostics/ios-startup.png"
+          ps -p "$nPid" -o stat= -o comm=
+          if ! xcrun swift platform/ios/verify_simulator.swift "$strDiagnostics/ios-startup.png"; then
+            sample "$nPid" 3 1 -file "$strDiagnostics/app-sample.txt" || true
+            exit 1
+          fi
       - name: Build unsigned iPhone and iPad app
         if: matrix.target == 'device'
         run: bash platform/ios/build.sh device
@@ -75,6 +90,6 @@ jobs:
         if: always() && matrix.target == 'simulator'
         with:
           name: ios-simulator-startup-${{ github.sha }}
-          path: ${{ runner.temp }}/ios-startup.png
+          path: ${{ runner.temp }}/ios-smoke/
           if-no-files-found: ignore
           retention-days: 7
