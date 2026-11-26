@@ -48,6 +48,20 @@ jobs:
           xcrun simctl io "$strDevice" screenshot "$RUNNER_TEMP/ios-startup.png"
       - name: Build unsigned iPhone and iPad app
         run: bash platform/ios/build.sh device
+      - name: Archive unsigned iPhone and iPad app
+        run: |
+          strApp=$(find build/ios-device -type d -name wenku8_client.app -print -quit)
+          strVersion=$(plutil -extract CFBundleShortVersionString raw "$strApp/Info.plist")
+          strArchive="$RUNNER_TEMP/wenku8-reader-$strVersion-ios-arm64-unsigned.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$strApp" "$strArchive"
+          unzip -tq "$strArchive"
+          shasum -a 256 "$strArchive"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ios-arm64-unsigned-${{ github.sha }}
+          path: ${{ runner.temp }}/wenku8-reader-*-ios-arm64-unsigned.zip
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
