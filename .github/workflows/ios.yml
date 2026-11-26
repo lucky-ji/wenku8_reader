@@ -6,12 +6,16 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-concurrency:
-  group: ios-${{ github.ref }}
-  cancel-in-progress: true
 jobs:
   ios:
-    name: iOS Simulator x86_64 and device ARM64
+    name: iOS ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [simulator, device]
+    concurrency:
+      group: ios-${{ github.ref }}-${{ matrix.target }}
+      cancel-in-progress: true
     runs-on: macos-15-intel
     timeout-minutes: 60
     env:
@@ -31,8 +35,10 @@ jobs:
             --outputdir "$RUNNER_TEMP/Qt" --archives qtbase qtsvg qtspeech
           echo "QT5_IOS_ROOT=$RUNNER_TEMP/Qt/5.15.2/ios" >> "$GITHUB_ENV"
       - name: Build iOS simulator app
+        if: matrix.target == 'simulator'
         run: bash platform/ios/build.sh simulator
       - name: Launch iOS app on iPhone simulator
+        if: matrix.target == 'simulator'
         run: |
           strApp=$(find build/ios-simulator -type d -name wenku8_client.app -print -quit)
           strBundle=$(plutil -extract CFBundleIdentifier raw "$strApp/Info.plist")
@@ -47,8 +53,10 @@ jobs:
           kill -0 "$nPid"
           xcrun simctl io "$strDevice" screenshot "$RUNNER_TEMP/ios-startup.png"
       - name: Build unsigned iPhone and iPad app
+        if: matrix.target == 'device'
         run: bash platform/ios/build.sh device
       - name: Archive unsigned iPhone and iPad app
+        if: matrix.target == 'device'
         run: |
           strApp=$(find build/ios-device -type d -name wenku8_client.app -print -quit)
           strVersion=$(plutil -extract CFBundleShortVersionString raw "$strApp/Info.plist")
@@ -57,13 +65,14 @@ jobs:
           unzip -tq "$strArchive"
           shasum -a 256 "$strArchive"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: matrix.target == 'device'
         with:
           name: ios-arm64-unsigned-${{ github.sha }}
           path: ${{ runner.temp }}/wenku8-reader-*-ios-arm64-unsigned.zip
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        if: always() && matrix.target == 'simulator'
         with:
           name: ios-simulator-startup-${{ github.sha }}
           path: ${{ runner.temp }}/ios-startup.png

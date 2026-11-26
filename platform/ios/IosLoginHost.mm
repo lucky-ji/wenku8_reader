@@ -518,8 +518,10 @@ namespace Wenku8::Reader
                 [m_pHeader addSubview:m_pBack];
                 [m_pHeader addSubview:m_pTitle];
                 [m_pHeader addSubview:m_pLoading];
+                NSLayoutConstraint* pHeaderHeight = [m_pHeader.heightAnchor constraintEqualToConstant:52];
+                pHeaderHeight.priority = UILayoutPriorityRequired - 1;
                 [NSLayoutConstraint activateConstraints:@[
-                    [m_pHeader.heightAnchor constraintEqualToConstant:52],
+                    pHeaderHeight,
                     [m_pBack.leadingAnchor constraintEqualToAnchor:m_pHeader.leadingAnchor constant:8],
                     [m_pBack.centerYAnchor constraintEqualToAnchor:m_pHeader.centerYAnchor],
                     [m_pBack.widthAnchor constraintGreaterThanOrEqualToConstant:56],

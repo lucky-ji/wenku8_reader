@@ -23,12 +23,12 @@ bash platform/ios/build.sh simulator
 bash platform/ios/build.sh device
 ```
 
-模拟器和真机分别输出到 `build/ios-simulator` 和 `build/ios-device`。可在 Xcode 中打开构建目录内的 `Wenku8Reader.xcodeproj`，选择 `wenku8_client` 和对应设备运行。真机运行前，在 Xcode 的目标构建设置中将 Code Signing Allowed 设为 Yes，并在 Signing & Capabilities 中选择自己的开发团队。CI 会编译两种目标，并在 iPhone 16 模拟器上启动应用和保存截图。
+模拟器和真机分别输出到 `build/ios-simulator` 和 `build/ios-device`。可在 Xcode 中打开构建目录内的 `Wenku8Reader.xcodeproj`，选择 `wenku8_client` 和对应设备运行。真机运行前，在 Xcode 的目标构建设置中将 Code Signing Allowed 设为 Yes，并在 Signing & Capabilities 中选择自己的开发团队。CI 会在 iPhone 16 模拟器上验证启动并保存截图，另将 ARM64 真机构建的未签名应用归档为供本地签名的测试产物。
 
 ## 验证登录
 
 1. 启动客户端，进入「我的」并点击「登录文库」。
-2. 在弹出的网页登录窗登录。验证通过后窗口应自动关闭，并能查看书架和最近更新。
-3. 完全退出并重开客户端。确认后台验证可以恢复登录状态，并检查「退出登录」后可以重新登录。
+2. 在网页登录页完成登录。账号验证成功后应自动返回，并能打开书架和最近更新。
+3. 完全退出并重新打开客户端，确认后台验证能恢复会话。再从「我的」选择「切换账号」，核对旧会话已清除且可以重新登录。
 
 网页登录验证使用自己的测试账号。GitHub 模拟器启动测试使用新的应用容器。
