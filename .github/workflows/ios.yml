@@ -46,16 +46,30 @@ jobs:
             'import json, sys; print(next(device["udid"] for device in json.load(sys.stdin)["devices"]["com.apple.CoreSimulator.SimRuntime.iOS-18-5"] if device["name"] == "iPhone 16"))')
           strDiagnostics="$RUNNER_TEMP/ios-smoke"
           mkdir -p "$strDiagnostics"
+          strVerifier="$RUNNER_TEMP/verify-ios-screen"
+          xcrun swiftc platform/ios/verify_simulator.swift -o "$strVerifier"
           xcrun simctl bootstatus "$strDevice" -b
+          strLaunchStamp="$RUNNER_TEMP/ios-launch-stamp"
+          touch "$strLaunchStamp"
           saveDiagnostics()
           {
-            xcrun simctl spawn "$strDevice" log show --last 3m --style compact --info \
+            xcrun simctl spawn "$strDevice" log show --last 5m --style compact --info \
               --predicate 'process == "wenku8_client" OR eventMessage CONTAINS[c] "io.github.lucky-ji.wenku8-reader"' \
               > "$strDiagnostics/simulator.log" 2>&1 || true
+            for strLogs in "$HOME/Library/Logs/DiagnosticReports" \
+                "$HOME/Library/Developer/CoreSimulator/Devices/$strDevice/data/Library/Logs/CrashReporter"
+            do
+              if [[ -d "$strLogs" ]]; then
+                find "$strLogs" -type f -newer "$strLaunchStamp" \
+                  \( -name 'wenku8_client*.ips' -o -name 'wenku8_client*.crash' \) \
+                  -exec cp {} "$strDiagnostics/" \;
+              fi
+            done
           }
           trap saveDiagnostics EXIT
           xcrun simctl install "$strDevice" "$strApp"
-          strLaunch=$(SIMCTL_CHILD_QT_LOGGING_RULES='qt.qpa.*=true' xcrun simctl launch \
+          strLaunch=$(SIMCTL_CHILD_QT_LOGGING_RULES='qt.qpa.*=true;qt.eventdispatcher.debug=true' \
+            xcrun simctl launch \
             --terminate-running-process --stdout="$strDiagnostics/app-stdout.log" \
             --stderr="$strDiagnostics/app-stderr.log" "$strDevice" "$strBundle")
           echo "$strLaunch"
@@ -63,10 +77,12 @@ jobs:
           sleep 15
           xcrun simctl io "$strDevice" screenshot "$strDiagnostics/ios-startup.png"
           ps -p "$nPid" -o stat= -o comm=
-          if ! xcrun swift platform/ios/verify_simulator.swift "$strDiagnostics/ios-startup.png"; then
+          if ! "$strVerifier" "$strDiagnostics/ios-startup.png"; then
             sample "$nPid" 3 1 -file "$strDiagnostics/app-sample.txt" || true
             exit 1
           fi
+          sleep 45
+          ps -p "$nPid" -o stat= -o comm=
       - name: Build unsigned iPhone and iPad app
         if: matrix.target == 'device'
         run: bash platform/ios/build.sh device

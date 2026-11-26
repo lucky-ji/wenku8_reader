@@ -20,7 +20,7 @@ let vTexts = oRequest.results?.flatMap(
 let vNavigationLabels = ["书架", "最近更新", "下载缓存", "我的"]
 let vRecognizedLabels = vNavigationLabels.filter(
 { strLabel in
-    vTexts.contains(
+    vTexts.contains(where:
     {
         $0.contains(strLabel)
     })

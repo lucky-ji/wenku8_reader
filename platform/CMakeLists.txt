@@ -33,8 +33,9 @@ elseif(IOS)
     )
     set_source_files_properties(ios/IosLoginHost.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_target_properties(reader_platform PROPERTIES OBJCXX_STANDARD 17 OBJCXX_STANDARD_REQUIRED ON)
-    target_link_libraries(reader_platform PRIVATE
-        Qt5::TextToSpeech "${strFoundationFramework}" "${strUIKitFramework}" "${strWebKitFramework}"
+    target_link_libraries(reader_platform
+        PUBLIC Qt5::TextToSpeech
+        PRIVATE "${strFoundationFramework}" "${strUIKitFramework}" "${strWebKitFramework}"
     )
 else()
     find_package(Qt5 5.15 REQUIRED COMPONENTS WebEngineWidgets TextToSpeech)
