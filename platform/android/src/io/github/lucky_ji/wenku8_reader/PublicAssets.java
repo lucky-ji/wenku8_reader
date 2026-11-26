@@ -7,8 +7,8 @@ import java.io.*;
 import java.util.*;
 
 /**
- * Public images use platform TLS, never WebView cookies or exported trust stores. Called on SDK
- * workers.
+ * Public requests use platform TLS, never WebView cookies or exported trust stores. Called on
+ * worker threads.
  */
 public final class PublicAssets
 {
@@ -26,13 +26,16 @@ public final class PublicAssets
         boolean proceed(long nReceived, long nTotal);
     }
     public static Reply get(long nRequest, String strAddress, int nConnectTimeout, int nTimeout,
-                            int nLimit, boolean bFollow, String[] vNames, String[] vValues)
+                            int nLimit, boolean bFollow, boolean bReleaseLookup,
+                            String[] vNames, String[] vValues)
     {
         return request(strAddress, nConnectTimeout, nTimeout, nLimit, bFollow, vNames, vValues,
-                       (nReceived, nTotal) -> continueTransfer(nRequest, nReceived, nTotal));
+                       (nReceived, nTotal) -> continueTransfer(nRequest, nReceived, nTotal),
+                       bReleaseLookup);
     }
     static Reply request(String strAddress, int nConnectTimeout, int nTimeout, int nLimit,
-                         boolean bFollow, String[] vNames, String[] vValues, Progress fnProgress)
+                         boolean bFollow, String[] vNames, String[] vValues, Progress fnProgress,
+                         boolean bReleaseLookup)
     {
         Reply oResult = new Reply();
         long nDeadline = System.nanoTime() + nTimeout * 1000000L;
@@ -51,7 +54,10 @@ public final class PublicAssets
             }
             for (int nRedirect = 0;; nRedirect++)
             {
-                if (!PublicAssetPolicy.allowed(strAddress))
+                boolean bAllowed = bReleaseLookup
+                    ? !bFollow && "https://github.com/lucky-ji/wenku8_reader/releases/latest".equals(strAddress)
+                    : PublicAssetPolicy.allowed(strAddress);
+                if (!bAllowed)
                 {
                     oResult.error = "origin";
                     return oResult;

@@ -22,8 +22,17 @@ namespace Wenku8::Reader
         std::mutex oTransfersMutex;
         std::map<jlong, Transfer*> vTransfers;
         std::atomic<jlong> oNextTransfer{1};
-        class AndroidAssets final : public HttpTransport
+        class AndroidPublicTransport final : public HttpTransport
         {
+          public:
+            explicit AndroidPublicTransport(bool bReleaseLookup = false)
+                : m_bReleaseLookup(bReleaseLookup)
+            {
+            }
+
+          private:
+            const bool m_bReleaseLookup;
+
             void clearCookies() override
             {
             } // No cookie jar.
@@ -32,16 +41,19 @@ namespace Wenku8::Reader
             {
                 if (qApp && QThread::currentThread() == qApp->thread())
                     throw Error(ErrorCode::InvalidArgument,
-                                "Call public image transport on a worker");
+                                "Call public transport on a worker");
                 QUrl oUrl(QString::fromStdString(oRequest.m_strUrl), QUrl::StrictMode);
                 auto strHost = oUrl.host().toLower();
+                const bool bAllowed = m_bReleaseLookup
+                    ? oRequest.m_strUrl == "https://github.com/lucky-ji/wenku8_reader/releases/latest" &&
+                        !oLimits.m_bFollowRedirects
+                    : strHost == "img.wenku8.com" || strHost == "pic.wenku8.com" ||
+                        strHost == "pic.777743.xyz";
                 if (oUrl.scheme() != "https" || !oUrl.isValid() || !oUrl.userInfo().isEmpty() ||
-                    oUrl.hasFragment() || (oUrl.port() != -1 && oUrl.port() != 443) ||
-                    (strHost != "img.wenku8.com" && strHost != "pic.wenku8.com" &&
-                     strHost != "pic.777743.xyz"))
-                    throw Error(ErrorCode::InvalidArgument, "Unsupported public image origin");
+                    oUrl.hasFragment() || (oUrl.port() != -1 && oUrl.port() != 443) || !bAllowed)
+                    throw Error(ErrorCode::InvalidArgument, "Unsupported public request URL");
                 if (oRequest.m_strMethod != "GET" || !oRequest.m_strBody.empty())
-                    throw Error(ErrorCode::Unsupported, "Public images require GET");
+                    throw Error(ErrorCode::Unsupported, "Public requests require GET");
                 if (oLimits.m_oTimeout.count() <= 0 ||
                     oLimits.m_oTimeout > std::chrono::hours(24) ||
                     oLimits.m_oConnectTimeout.count() <= 0 || !oLimits.m_nMaxResponseBytes ||
@@ -91,12 +103,12 @@ namespace Wenku8::Reader
                     QAndroidJniObject::fromString(QString::fromStdString(oRequest.m_strUrl));
                 auto oReply = QAndroidJniObject::callStaticObjectMethod(
                     "io/github/lucky_ji/wenku8_reader/PublicAssets", "get",
-                    "(JLjava/lang/String;IIIZ[Ljava/lang/String;[Ljava/lang/String;)Lio/github/"
+                    "(JLjava/lang/String;IIIZZ[Ljava/lang/String;[Ljava/lang/String;)Lio/github/"
                     "lucky_ji/wenku8_reader/PublicAssets$Reply;",
                     nId, oAddress.object<jstring>(),
                     jint(std::min(oLimits.m_oConnectTimeout.count(), oLimits.m_oTimeout.count())),
                     jint(oLimits.m_oTimeout.count()), jint(oLimits.m_nMaxResponseBytes),
-                    jboolean(oLimits.m_bFollowRedirects), pNames, pValues);
+                    jboolean(oLimits.m_bFollowRedirects), jboolean(m_bReleaseLookup), pNames, pValues);
                 oEnv->DeleteLocalRef(pNames);
                 oEnv->DeleteLocalRef(pValues);
                 if (oEnv->ExceptionCheck())
@@ -150,7 +162,11 @@ namespace Wenku8::Reader
     } // namespace
     std::shared_ptr<HttpTransport> makeAndroidAssetTransport()
     {
-        return std::make_shared<AndroidAssets>();
+        return std::make_shared<AndroidPublicTransport>();
+    }
+    std::shared_ptr<HttpTransport> makeAndroidUpdateTransport()
+    {
+        return std::make_shared<AndroidPublicTransport>(true);
     }
     bool continueAndroidAsset(jlong nId, jlong nReceived, jlong nTotal)
     {

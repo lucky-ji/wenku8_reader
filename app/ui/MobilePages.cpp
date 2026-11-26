@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "ClientWindow.h"
 #include "AppInfo.h"
+#include "AppUpdatePanel.h"
 #include "ReadAloudController.h"
 #include "PageControls.h"
 #include <QDialog>
@@ -173,6 +174,7 @@ namespace Wenku8::Reader
                         showAppInformation(nI);
                     });
         }
+        pInformationGroup->addWidget(new AppUpdatePanel);
         auto pFeedback = action("意见反馈", "mobileFeedback", Icon::Discover);
         addGroupAction(pInformationGroup, pFeedback);
         connect(pFeedback, &QPushButton::clicked, pPage,

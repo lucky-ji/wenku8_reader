@@ -8,6 +8,7 @@ import wenku8, {
   NativeNovel, NativeChapter, NativeVolume, NativeRequest, NativeResult
 } from 'libwenku8_bridge.so';
 import { BrowserSession, isLibraryUrl, strLoginUrl } from '../services/BrowserSession';
+import { checkLatestRelease, installedAppVersion, strRepositoryUrl, UpdateState } from '../services/UpdateCheck';
 
 const vTitles: string[] = ['我的书架', '最近更新', '下载缓存', '我的'];
 const vTabs: string[] = ['书架', '最近更新', '下载缓存', '我的'];
@@ -71,6 +72,10 @@ struct Index
   @State private vHistory: ReadingSpot[] = [];
   @State private vMarks: ReadingSpot[] = [];
   @State private bLocal: boolean = false;
+  @State private strAppVersion: string = '';
+  @State private bCheckingUpdate: boolean = false;
+  @State private strUpdateStatus: string = '';
+  @State private strReleaseUrl: string = '';
 
   private strStorage: string = '';
   private oPreferences?: preferences.Preferences;
@@ -111,6 +116,7 @@ struct Index
 
   private async initialize(): Promise<void>
   {
+    this.strAppVersion = installedAppVersion();
     try
     {
       const oContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
@@ -126,6 +132,53 @@ struct Index
     catch
     {
       this.strStatus = '暂时无法读取本地设置。';
+    }
+  }
+
+  private async checkForUpdates(): Promise<void>
+  {
+    if (this.bCheckingUpdate)
+    {
+      return;
+    }
+    this.bCheckingUpdate = true;
+    this.strReleaseUrl = '';
+    this.strUpdateStatus = '正在检查更新…';
+
+    const oResult = await checkLatestRelease(this.strAppVersion);
+    this.bCheckingUpdate = false;
+    switch (oResult.nState)
+    {
+      case UpdateState.Available:
+        this.strUpdateStatus = '发现新版本 ' + oResult.strVersion + '。';
+        this.strReleaseUrl = oResult.strUrl;
+        break;
+      case UpdateState.UpToDate:
+        this.strUpdateStatus = '没有可用的新版本。';
+        break;
+      case UpdateState.InvalidRelease:
+        this.strUpdateStatus = '无法识别版本信息，请稍后再试。';
+        break;
+      case UpdateState.NetworkError:
+        this.strUpdateStatus = '无法连接 GitHub，请检查网络后重试。';
+        break;
+    }
+  }
+
+  private async openUpdateRelease(): Promise<void>
+  {
+    if (this.strReleaseUrl.length === 0)
+    {
+      return;
+    }
+    try
+    {
+      const oContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      await oContext.openLink(this.strReleaseUrl);
+    }
+    catch
+    {
+      this.strUpdateStatus = '无法打开 GitHub 发布页，请稍后再试。';
     }
   }
 
@@ -1080,8 +1133,21 @@ struct Index
             });
           }.width('100%').padding(8).backgroundColor(this.panel()).borderRadius(8);
         }, (_oSpot: ReadingSpot, nIndex: number) => nIndex.toString());
-        Text('轻小说文库 1.0.7 · SDK ' + wenku8.sdkVersion()).fontSize(13).fontColor(this.muted());
-        Text('https://github.com/lucky-ji/wenku8_reader').fontSize(13).fontColor(this.accent())
+        Text('轻小说文库 ' + (this.strAppVersion || '版本未知') + ' · SDK ' + wenku8.sdkVersion())
+          .fontSize(13).fontColor(this.muted());
+        Row({ space: 8 })
+        {
+          Button('检查更新').enabled(!this.bCheckingUpdate).onClick(() => this.checkForUpdates());
+          if (this.strReleaseUrl.length > 0)
+          {
+            Button('打开发布页').onClick(() => this.openUpdateRelease());
+          }
+        };
+        if (this.strUpdateStatus.length > 0)
+        {
+          Text(this.strUpdateStatus).fontSize(13).fontColor(this.muted());
+        }
+        Text(strRepositoryUrl).fontSize(13).fontColor(this.accent())
           .copyOption(CopyOptions.LocalDevice);
       }.alignItems(HorizontalAlign.Start).padding(6).width('100%');
     }.width('100%').height('100%');

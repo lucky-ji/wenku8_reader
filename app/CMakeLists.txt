@@ -50,6 +50,7 @@ set_target_properties(wenku8_reader PROPERTIES POSITION_INDEPENDENT_CODE ON AUTO
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../platform" "${CMAKE_CURRENT_BINARY_DIR}/platform")
 
 add_library(wenku8_client_services STATIC
+    services/AppUpdateCheck.cpp services/AppUpdateCheck.h
     services/OnlineSession.cpp services/OnlineSession.h
     services/DownloadManager.cpp services/DownloadManager.h
     services/ReadAloudController.cpp services/ReadAloudController.h
@@ -61,6 +62,7 @@ set_target_properties(wenku8_client_services PROPERTIES POSITION_INDEPENDENT_COD
 
 add_library(wenku8_client_ui STATIC
     ui/ClientWindow.cpp ui/ClientWindow.h
+    ui/AppUpdatePanel.cpp ui/AppUpdatePanel.h
     ui/BookDetails.cpp ui/DesktopLibrary.cpp ui/LibraryFeed.cpp ui/GuestAccess.cpp
     ui/MobilePages.cpp ui/MobileLibrary.cpp ui/ReaderSearch.cpp ui/DesktopReaderPanel.cpp ui/ReaderNavigation.cpp ui/PageControls.h ui/DesktopInformation.cpp ui/ReaderContents.cpp ui/DownloadActions.cpp
     ui/DownloadTaskPanel.cpp ui/DownloadTaskPanel.h
