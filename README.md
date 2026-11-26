@@ -4,7 +4,7 @@
 
 基于 C++17 与 Qt 5 的 Wenku8 阅读客户端，提供独立的纯 C++ SDK。
 
-[![Version](https://img.shields.io/badge/version-1.0.6-315b46)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.7-315b46)](docs/CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--2.0--only-blue)](LICENSE)
 [![Qt](https://img.shields.io/badge/Qt-5.15-41cd52)](https://doc.qt.io/archives/qt-5.15/)
 
@@ -25,6 +25,7 @@ SDK 独立版本为 1.1.0，支持初始化时配置自动重试。详见 [SDK �
 - 连续切章保留菜单状态，移动端可选阅读常亮，书签支持直达、管理与删除撤销。
 - 后台下载缓存与离线阅读。未登录时也能从「下载缓存」打开已下载的小说。支持小说导出、下载进度、暂停与断点恢复。
 - 封面缓存、网络失败重试与保留已有内容，应用内提供开源地址与意见反馈入口。
+- 在「我的」检查 GitHub 正式版本，发现新版时可打开对应发布页。
 - 明亮、暗色、护眼三种外观，桌面与触屏分别适配。
 
 ## 听书
@@ -55,7 +56,7 @@ SDK 独立版本为 1.1.0，支持初始化时配置自动重试。详见 [SDK �
 | Linux x86_64 | Ubuntu 22.04 原生构建与启动检查通过 | Qt 5 WebEngine |
 | Linux ARM64 | Ubuntu 24.04 原生构建与启动检查通过 | 系统 Qt 5 WebEngine |
 | macOS Intel x86_64 | 原生构建、部署与 WebEngine 启动检查通过 | Qt 5 WebEngine |
-| 鸿蒙 PC / 手机 / 平板（ARM64） | 1.0.7 适配。支持构建未签名 Release HAP | ArkWeb |
+| 鸿蒙 PC / 手机 / 平板（ARM64） | HarmonyOS 6.0.0+，提供未签名 Release HAP | ArkWeb |
 | iOS | 登录适配尚未完成，不提供占位客户端 | WKWebView 适配待实现 |
 
 需要使用在线书库时，从「我的」打开登录窗口。网站验证成功后自动关闭登录网页，后续操作在 Qt 界面完成。网站可用性及验证要求取决于源站。
@@ -89,7 +90,7 @@ git clone https://github.com/lucky-ji/wenku8_reader.git
 cd wenku8_reader
 ```
 
-默认获取 `main` 分支。可执行 `git switch --detach v1.0.6` 获取正式版本代码。最新环境与构建说明见主仓库的 [构建指南](https://github.com/lucky-ji/wenku8_reader/blob/main/docs/BUILDING.md)。
+默认获取 `main` 分支。可执行 `git switch --detach v1.0.7` 获取正式版本代码。最新环境与构建说明见主仓库的 [构建指南](https://github.com/lucky-ji/wenku8_reader/blob/main/docs/BUILDING.md)。
 
 需要 CMake 3.24+、支持 C++17 的编译器。客户端仅使用 Qt 5.15；Qt、Visual Studio、Android SDK/NDK 和 JDK 均由开发者自行安装，不包含在源码仓库中。
 
