@@ -261,7 +261,8 @@ namespace Wenku8::Reader
             }
         }
 
-        void startPending(const std::shared_ptr<BrowserLane>& pLane)
+        // The escaping WebKit completion block must own its copy of the lane.
+        void startPending(const std::shared_ptr<BrowserLane> pLane)
         {
             const auto pPending = pLane->m_pPending;
             if (!pPending || pPending->done() || pLane->m_bFetching || !pLane->m_bReady)
