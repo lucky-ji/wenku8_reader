@@ -107,6 +107,8 @@ namespace Wenku8::Reader
         vItems.append({"Mbed TLS", "GPL-2.0-or-later 许可选项", "mbedtls-3.6.5.txt"});
         vItems.append(
             {"LLVM libc++ filesystem", "Apache-2.0 WITH LLVM-exception", "llvm-libcxx.txt"});
+#elif defined(Q_OS_IOS)
+        vItems.append({"Qt Speech（系统听书）", "GPL-2.0-or-later 许可选项", "Qt-Speech-5.15.2-GPL-2.0.txt"});
 #else
         vItems.append({"Qt Speech（桌面听书）", "GPL-2.0-or-later 许可选项", "Qt-Speech-5.15.2-GPL-2.0.txt"});
         vItems.append({"Qt WebEngine / Chromium", "原始版权与许可证", "Qt-5.15.2-Chromium.txt"});

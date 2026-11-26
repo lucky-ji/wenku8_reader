@@ -3,7 +3,7 @@
  const c=CONFIG;
  if(location.origin!==new URL(c.url).origin)return false;
  const s={done:false,controller:new AbortController()};window.__wenku8SdkJob=s;
- (async()=>{try{
+ s.result=(async()=>{try{
   const r=await fetch(c.url,{method:'GET',headers:c.headers,credentials:'same-origin',mode:'same-origin',cache:'no-store',redirect:c.follow?'follow':'manual',signal:s.controller.signal});
   if(r.type==='opaqueredirect'){s.error='redirect';return;}
   if(!r.status || new URL(r.url).origin!==location.origin){s.error='origin';return;}

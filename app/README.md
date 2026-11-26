@@ -12,4 +12,4 @@
 
 构建依赖从低到高为 `reader_widgets`、`wenku8_reader`、`reader_platform`、`wenku8_client_services`、`wenku8_client_ui` 和可执行目标 `wenku8_client`。平台登录实现位于 `platform/`，通过 `LoginHost` 抽象向会话服务提供传输与登录能力。
 
-Windows、Linux、macOS 使用 Qt 5 WebEngine；Android 使用系统 WebView。iOS 的适配基础文件已保留，正式 WKWebView 会话实现尚未完成，不能作为完整可用平台发布。工具链与完整构建步骤参见根目录 README。
+Windows、Linux、macOS 使用 Qt 5 WebEngine，Android 使用系统 WebView，iOS 使用系统 WKWebView。各平台构建步骤见项目根目录说明。

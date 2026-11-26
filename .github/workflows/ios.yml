@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: GPL-2.0-only
+name: iOS Qt 5 build and simulator
+on:
+  push:
+    branches: [feature-ios-*]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ios:
+    name: iOS Simulator x86_64 and device ARM64
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Record build environment
+        run: |
+          git rev-parse HEAD HEAD^{tree}
+          xcodebuild -version
+          xcrun simctl list runtimes
+      - name: Install Qt 5.15.2 iOS tools and libraries
+        run: |
+          python3 -m venv "$RUNNER_TEMP/aqt-venv"
+          "$RUNNER_TEMP/aqt-venv/bin/pip" install aqtinstall==3.3.0
+          "$RUNNER_TEMP/aqt-venv/bin/python" -m aqt install-qt mac ios 5.15.2 ios \
+            --outputdir "$RUNNER_TEMP/Qt" --archives qtbase qtsvg qtspeech
+          echo "QT5_IOS_ROOT=$RUNNER_TEMP/Qt/5.15.2/ios" >> "$GITHUB_ENV"
+      - name: Build iOS simulator app
+        run: bash platform/ios/build.sh simulator
+      - name: Launch iOS app on iPhone simulator
+        run: |
+          strApp=$(find build/ios-simulator -type d -name wenku8_client.app -print -quit)
+          strBundle=$(plutil -extract CFBundleIdentifier raw "$strApp/Info.plist")
+          strDevice=$(xcrun simctl list devices available --json | python3 -c \
+            'import json, sys; print(next(device["udid"] for device in json.load(sys.stdin)["devices"]["com.apple.CoreSimulator.SimRuntime.iOS-18-5"] if device["name"] == "iPhone 16"))')
+          xcrun simctl bootstatus "$strDevice" -b
+          xcrun simctl install "$strDevice" "$strApp"
+          strLaunch=$(xcrun simctl launch "$strDevice" "$strBundle")
+          echo "$strLaunch"
+          nPid=${strLaunch##*: }
+          sleep 15
+          kill -0 "$nPid"
+          xcrun simctl io "$strDevice" screenshot "$RUNNER_TEMP/ios-startup.png"
+      - name: Build unsigned iPhone and iPad app
+        run: bash platform/ios/build.sh device
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ios-simulator-startup-${{ github.sha }}
+          path: ${{ runner.temp }}/ios-startup.png
+          if-no-files-found: ignore
+          retention-days: 7

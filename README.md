@@ -57,7 +57,7 @@ SDK 独立版本为 1.1.0，支持初始化时配置自动重试。详见 [SDK �
 | Linux ARM64 | Ubuntu 24.04 原生构建与启动检查通过 | 系统 Qt 5 WebEngine |
 | macOS Intel x86_64 | 原生构建、部署与 WebEngine 启动检查通过 | Qt 5 WebEngine |
 | 鸿蒙 PC / 手机 / 平板（ARM64） | HarmonyOS 6.0.0+，提供未签名 Release HAP | ArkWeb |
-| iOS | 登录适配尚未完成，不提供占位客户端 | WKWebView 适配待实现 |
+| iOS / iPadOS | 1.0.8 登录适配，面向 iOS 15.0+ | 系统 WKWebView |
 
 需要使用在线书库时，从「我的」打开登录窗口。网站验证成功后自动关闭登录网页，后续操作在 Qt 界面完成。网站可用性及验证要求取决于源站。
 
@@ -80,6 +80,8 @@ licenses/            完整第三方许可证
 SDK 不依赖 Qt、JNI 或阅读器界面。主程序链接 `Wenku8::Sdk` 库，由平台适配层实现登录与会话传输。需要仅使用 SDK 时可以关闭客户端构建，详见 [架构与 SDK 接入](docs/ARCHITECTURE.md)。
 
 鸿蒙客户端使用 ArkUI 和 ArkWeb，通过 N-API 调用同一个 C++ SDK。适配和打包步骤见 [鸿蒙构建说明](platform/harmony/README.md)。
+
+iOS 和 iPadOS 复用 Qt 5 移动界面与 C++ SDK。模拟器、真机构建与登录验证步骤见 [iOS 构建与登录验证](platform/ios/README.md)。
 
 ## 从源码构建
 

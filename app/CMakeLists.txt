@@ -2,7 +2,7 @@
 if(ANDROID)
     set(QT_ANDROID_APPLICATION_BINARY wenku8_client)
     set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../platform/android")
-    set(ANDROID_VERSION_CODE 12)
+    set(ANDROID_VERSION_CODE 13)
     set(ANDROID_VERSION_NAME "${PROJECT_VERSION}")
 endif()
 
@@ -93,6 +93,18 @@ set_target_properties(wenku8_client PROPERTIES
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
 )
+if(IOS)
+    set(strIosDirectory "${CMAKE_CURRENT_SOURCE_DIR}/../platform/ios")
+    set(strLaunchScreen "${strIosDirectory}/LaunchScreen.storyboard")
+    target_sources(wenku8_client PRIVATE "${strLaunchScreen}")
+    target_link_options(wenku8_client PRIVATE "LINKER:-e,_qt_main_wrapper")
+    set_source_files_properties("${strLaunchScreen}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    set_target_properties(wenku8_client PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST "${strIosDirectory}/Info.plist.in"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "io.github.lucky-ji.wenku8-reader"
+        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+    )
+endif()
 foreach(strTarget IN ITEMS reader_widgets wenku8_reader reader_platform wenku8_client_services wenku8_client_ui wenku8_client)
     target_compile_features(${strTarget} PUBLIC cxx_std_17)
     if(MSVC)

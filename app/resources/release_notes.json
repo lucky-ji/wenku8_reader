@@ -1,6 +1,13 @@
 {
   "releases": [
     {
+      "version": "1.0.8",
+      "date": "开发中",
+      "changes": [
+        "iOS 和 iPadOS 支持从「我的」登录文库，验证成功后自动返回，并在下次启动时恢复会话。"
+      ]
+    },
+    {
       "version": "1.0.7",
       "date": "2026-11-26",
       "changes": [

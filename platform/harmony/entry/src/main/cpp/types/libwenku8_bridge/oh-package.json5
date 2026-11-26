@@ -1,6 +1,6 @@
 {
   "name": "libwenku8_bridge.so",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Wenku8 C++ SDK bridge",
   "types": "./index.d.ts"
 }

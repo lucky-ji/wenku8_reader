@@ -285,8 +285,12 @@ namespace Wenku8::Reader
                     invalidateAuthentication();
                     if (!bBackground)
                     {
+#ifdef Q_OS_ANDROID
                         emit m_pQ->statusChanged(
                             "系统网页组件不可用，请更新 Android System WebView 并重启客户端。");
+#else
+                        emit m_pQ->statusChanged("系统网页组件暂时不可用，请重新打开登录页。");
+#endif
                     }
                 });
             m_oRestoreDeadline.setSingleShot(true);
@@ -719,8 +723,7 @@ namespace Wenku8::Reader
                 m_pDownloads->setSession(oDownloadOptions,
                     std::make_shared<BrowserOwnedSession>(m_pHost->downloadTransport()), m_strUser);
                 m_oProbeTimer.stop();
-                // Publish the verified account before Android returns input from
-                // an interactive login overlay to the Qt window.
+                // Publish the verified account before returning input to the Qt window.
                 emit m_pQ->authenticationChanged(true);
                 setRestoring(false);
                 if (m_pHost->visible())

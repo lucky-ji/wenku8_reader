@@ -21,7 +21,21 @@ if(ANDROID)
     target_link_libraries(wenku8_reader PRIVATE Qt5::AndroidExtras)
     target_compile_definitions(wenku8_reader PRIVATE WENKU8_ANDROID_ASSET_TLS)
 elseif(IOS)
-    message(FATAL_ERROR "iOS WKWebView session host is not implemented yet; the iOS files currently document UI groundwork only.")
+    find_package(Qt5 5.15 REQUIRED COMPONENTS TextToSpeech)
+    find_library(strFoundationFramework Foundation REQUIRED)
+    find_library(strUIKitFramework UIKit REQUIRED)
+    find_library(strWebKitFramework WebKit REQUIRED)
+    target_sources(reader_platform PRIVATE
+        ios/IosLoginHost.mm
+        android/nativebridge/MobileBrowserProtocol.cpp android/nativebridge/MobileBrowserProtocol.h
+        desktop/ExportDestination.cpp
+        desktop/QtSpeechEngine.cpp
+    )
+    set_source_files_properties(ios/IosLoginHost.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    set_target_properties(reader_platform PROPERTIES OBJCXX_STANDARD 17 OBJCXX_STANDARD_REQUIRED ON)
+    target_link_libraries(reader_platform PRIVATE
+        Qt5::TextToSpeech "${strFoundationFramework}" "${strUIKitFramework}" "${strWebKitFramework}"
+    )
 else()
     find_package(Qt5 5.15 REQUIRED COMPONENTS WebEngineWidgets TextToSpeech)
     add_library(Wenku8WebView STATIC desktop/qtwebview/Wenku8WebView.cpp desktop/qtwebview/Wenku8WebView.h)

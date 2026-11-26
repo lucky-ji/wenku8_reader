@@ -108,7 +108,7 @@ cmake --install build/sdk --config Release --prefix out/sdk
 
 使用系统 cURL 时设置 `-DWENKU8_BUNDLED_CURL=OFF`；静态 SDK 设置 `-DWENKU8_BUILD_SHARED=OFF`。Linux/macOS 的 `desktop-qt5` 预设使用 `QT5_ROOT` 和可选 `WENKU8_TARGET_DEPS`，需要系统提供满足最低版本的目标 cURL 和 Iconv。发行构建的 Qt、TLS 后端、系统依赖及原生构建流程见 [原生桌面构建](NATIVE_DESKTOP.md)；编译和启动检查不代替真实账号与设备的业务验收。
 
-iOS 仅保留启动界面与基础配置，WKWebView 会话适配尚未实现。当前不提供 iOS 客户端构建预设，不能将现有目录视为可发布版本。
+iOS 使用 Qt 5.15.2、Xcode 和系统 WKWebView。模拟器与真机构建流程见 [iOS 构建与登录验证](../platform/ios/README.md)。
 
 ## 发布核对
 
@@ -136,4 +136,4 @@ Windows x86 打包时为 `build_msi.py` 添加 `--arch x86`，由 WiX 生成对�
 
 Android 四 ABI 的网络与编码依赖可使用 [原生依赖构建脚本](ANDROID_BUILD.md) 准备。选定预设后先执行 `cmake --preset <预设名>`，再执行 `cmake --build --preset <预设名>`；生成 APK 时为构建命令添加 `--target apk`，或使用 `CMakePresets.json` 中对应的 APK 构建预设。每次都应让 `ANDROID_ABI` 与依赖前缀一致。
 
-Linux x86_64、Linux ARM64 与 macOS Intel 的原生 runner、构建配置、部署、运行依赖、签名及对应源码安排见 [NATIVE_DESKTOP.md](NATIVE_DESKTOP.md)。Windows ARM64 和原生 macOS ARM64 尚无本项目可用的 Qt 5 WebEngine kit；iOS 登录适配尚未完成，因此不生成占位客户端。
+Linux x86_64、Linux ARM64 与 macOS Intel 的原生 runner、构建配置、部署、运行依赖、签名及对应源码安排见 [NATIVE_DESKTOP.md](NATIVE_DESKTOP.md)。Windows ARM64 和原生 macOS ARM64 尚无本项目可用的 Qt 5 WebEngine kit。

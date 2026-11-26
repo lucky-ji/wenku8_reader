@@ -16,6 +16,8 @@
 
 Android 系统 WebView 由操作系统提供。Windows 版使用系统 Schannel 进行 TLS；Microsoft 运行库遵守随附的再分发条款。
 
+iOS 版使用系统 WKWebView 登录、系统 SecureTransport 发起原生 HTTPS 请求，并使用 Qt Speech 调用系统语音。Qt 5 与 SDK 静态链接进 iOS 应用。
+
 听书使用系统提供的语音服务与音色，不随本应用分发语音数据或在线语音 SDK。系统引擎及音色的许可、下载和联网隐私规则由其提供方维护。
 
 完整法律文本与版权声明

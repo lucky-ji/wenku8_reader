@@ -27,6 +27,8 @@ Windows 默认 SDK cURL 使用系统 Schannel，不为此链接 OpenSSL。Androi
 
 鸿蒙 HAP 的 SDK 桥接库静态链接 cURL、libxml2、TinyXML-2 和 Mbed TLS，并分发 DevEco 工具链的 `libc++_shared.so`。ArkUI、ArkWeb 和 ICU 由系统提供。依赖原始文本随 HAP 分发。[鸿蒙构建说明](platform/harmony/README.md)
 
+iOS 使用系统 WKWebView、SecureTransport 和编码转换库。应用静态链接 Qt 5.15.2、Qt Speech 与 C++ SDK，使用上述同版本组件的原始许可与对应源码。[iOS 构建与登录验证](platform/ios/README.md)
+
 项目的线性 SVG 操作图标为自有资源；不包含外部图标字体。应用图标为本项目生成的视觉资源。小说、封面和插图仅在用户运行时从内容来源获取，不作为源码或安装包素材分发。
 
 ## 协议与交互参考
