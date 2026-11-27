@@ -2,7 +2,7 @@
 name: iOS Qt 5 build and simulator
 on:
   push:
-    branches: [feature-ios-*]
+    branches: [feature-ios-*, release-*]
   workflow_dispatch:
 permissions:
   contents: read

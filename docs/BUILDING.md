@@ -7,7 +7,7 @@ git clone https://github.com/lucky-ji/wenku8_reader.git
 cd wenku8_reader
 ```
 
-默认获取 `main` 分支。可执行 `git switch --detach v1.0.7` 获取正式版本代码。最新环境与构建说明见主仓库的 [构建指南](https://github.com/lucky-ji/wenku8_reader/blob/main/docs/BUILDING.md)。
+默认获取 `main` 分支。可执行 `git switch --detach v1.0.8` 获取正式版本代码。最新环境与构建说明见主仓库的 [构建指南](https://github.com/lucky-ji/wenku8_reader/blob/main/docs/BUILDING.md)。
 
 工程与 SDK 源码、平台适配、构建脚本及许可证均在主仓库中。Qt、NDK 等环境另行安装；未随仓库保存的第三方依赖源码按 [依赖来源](DEPENDENCIES.md) 获取，不从 Release 附件取得工程源码。
 
@@ -44,7 +44,7 @@ cmake --install build/windows --prefix out/windows
 MSI 脚本使用 Python 3 与 WiX Toolset 3。先准备完整的部署目录：
 
 ```powershell
-python platform/windows/build_msi.py --stage out/windows/bin --wix C:/Tools/WiX/bin --output out/installer --version 1.0.7
+python platform/windows/build_msi.py --stage out/windows/bin --wix C:/Tools/WiX/bin --output out/installer --version 1.0.8
 ```
 
 `--stage` 指向经过检查的应用根目录；将许可证、图标及其他分发文件与程序一起放在该目录。发布附件仅包含编译好的程序；源码入口为主仓库及 [匹配依赖来源](DEPENDENCIES.md)。保留完整许可证、实际依赖版本及必要构建信息，不把开发机的 Qt 或 VS 安装目录加入 Git。
@@ -112,7 +112,7 @@ iOS 使用 Qt 5.15.2、Xcode 和系统 WKWebView。模拟器与真机构建流�
 
 ## 发布核对
 
-1. 在干净构建目录生成程序，核对版本为 1.0.7、名称为轻小说文库。
+1. 在干净构建目录生成程序，核对版本为 1.0.8、名称为轻小说文库。
 2. 检查游客启动、手动登录、后台会话恢复、书架、最近更新、搜索、正文、目录、下载与离线续读。
 3. 检查明暗护眼主题、历史位置、书签，以及 Android 触控和音量键。
    听书需另查中文语音是否可用、暂停／继续／逐段跳转、切章、跟读定位、睡眠定时、网络音色默认关闭及后台自动暂停。构建机无音频设备或中文音色时应显示真实不可用原因，不宣称已完成发声验收。
